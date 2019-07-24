@@ -1,0 +1,58 @@
+Index: strongswan-5.3.3/src/libcharon/plugins/vici/python/vici/session.py
+===================================================================
+--- strongswan-5.3.3.orig/src/libcharon/plugins/vici/python/vici/session.py
++++ strongswan-5.3.3/src/libcharon/plugins/vici/python/vici/session.py
+@@ -206,6 +206,30 @@ class Session(object):
+         :rtype: generator
+         """
+         return self.handler.listen(event_types)
++ 
++    def listen_status(self):
++        """Listen for the ike-updown event.
++
++        :return: gstreamed event responses as (dict)
++        :rtype: dict
++        """
++        return self.handler.listen_status()
++ 
++    def register(self, event_type):
++        """Register for the given event.
++
++        :param event_type: event to register
++        :type event_type: str
++        """
++        self.handler._register_unregister(event_type, True);
++ 
++    def unregister(self, event_type):
++        """unRegister for the given event.
++
++        :param event_type: event to unregister
++        :type event_type: str
++        """
++        self.handler._register_unregister(event_type, False);
+ 
+ 
+ class SessionHandler(object):
+@@ -365,3 +389,22 @@ class SessionHandler(object):
+         finally:
+             for event_type in event_types:
+                 self._register_unregister(event_type, False)
++
++    def listen_status(self):
++        """Register and listen for the given events.
++
++        :param event_types: event types to register
++        :type event_types: list
++        :return: generator for streamed event responses as (event_type, dict)
++        :rtype: generator
++        """
++
++        while True:
++            response = Packet.parse(self.transport.receive())
++            if response.response_type == Packet.EVENT:
++                try:
++                   return Message.deserialize(response.payload)
++                except GeneratorExit:
++                    break
++
++

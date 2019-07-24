@@ -1,0 +1,14 @@
+Index: tftpy-0.6.2/tftpy/TftpStates.py
+===================================================================
+--- tftpy-0.6.2.orig/tftpy/TftpStates.py	2013-11-12 10:44:18.000000000 +0800
++++ tftpy-0.6.2/tftpy/TftpStates.py	2016-12-02 13:15:47.976912725 +0800
+@@ -533,6 +533,9 @@
+         if not self.context.tidport:
+             self.context.tidport = rport
+             log.info("Set remote port for session to %s" % rport)
++        if self.context.host != raddress:
++            self.context.host = raddress
++            log.info("Set remote host for session to %s" % raddress)
+ 
+         # Now check the packet type and dispatch it properly.
+         if isinstance(pkt, TftpPacketOACK):

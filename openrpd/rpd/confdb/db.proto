@@ -1,0 +1,37 @@
+/*
+ * Copyright (c) 2016 Cisco and/or its affiliates, and 
+ *                    Cable Television Laboratories, Inc. ("CableLabs")
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+import "cfg.proto";
+import "dhcp.proto";
+
+message db {
+	message operational {
+		message t_CCAPCapabilities {
+			required string ip_addr = 1;
+			optional bool is_principal = 2;
+			optional bool is_active = 3;
+		}
+		repeated t_CCAPCapabilities CCAPCapabilities = 4;
+		optional string HwVersion = 1;
+		optional t_DhcpData DhcpData = 2;
+		repeated string RedirectCCAPAddresses = 3;
+	}
+	optional operational oper = 1;
+	optional config cfg = 2;
+}

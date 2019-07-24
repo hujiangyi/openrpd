@@ -1,0 +1,15 @@
+#!/bin/sh /etc/rc.common
+
+START=10
+STOP=10
+
+start() {
+        /etc/init.d/cron restart
+        /etc/init.d/cron enable
+	/usr/sbin/rsyslogd
+}
+
+reload() {
+        kill -9 $(pidof rsyslogd)
+	/usr/sbin/rsyslogd
+}

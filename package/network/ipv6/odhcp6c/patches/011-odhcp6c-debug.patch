@@ -1,0 +1,12 @@
+Index: odhcp6c-2015-07-13/src/script.c
+===================================================================
+--- odhcp6c-2015-07-13.orig/src/script.c	2017-11-28 10:01:54.725278255 +0800
++++ odhcp6c-2015-07-13/src/script.c	2017-12-10 10:12:09.818012157 +0800
+@@ -378,6 +378,7 @@
+ 	uint8_t *ra_dns = odhcp6c_get_state(STATE_RA_DNS, &ra_dns_len);
+ 	uint8_t *ra_search = odhcp6c_get_state(STATE_RA_SEARCH, &ra_search_len);
+ 	uint8_t *vendor = odhcp6c_get_state(STATE_VENDOR_OPTS, &vendor_opts_len);
++	syslog(LOG_ERR, "script call status%s, address%s, prefix%s", status, address, prefix);
+ 
+ 	// Don't set environment before forking, because env is leaky.
+ 	if (fork() == 0) {

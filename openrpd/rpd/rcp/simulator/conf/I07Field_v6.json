@@ -1,0 +1,86 @@
+{
+   "staticl2tp" : {
+        "DS" : {
+            "FwdStaticPwConfig" : {
+                "Index" : 10,
+                "GroupAddress" : "ff02:0:0:0:0:0:0:2",
+                "SourceAddress" : "2001:9:9:9::2",
+                "CcapCoreOwner" : "00:0c:29:45:ff:a2"
+            },
+            "CommonStaticPwConfig" : {
+                "Direction" : 0,
+                "Index" : 10,
+                "PwType" :14,
+                "DepiPwSubtype" : 4,
+                "L2SublayerType" : 4,
+                "DepiL2SublayerSubtype" : 4,
+                "CircuitStatus" : 32768,
+                "RpdEnetPortIndex" : 0,
+                "EnableStatusNotification" : 0,
+                "PwAssociation" : {
+                    "Index" : 10,
+                    "ChannelSelector" : {
+                        "RfPortIndex" : 0,
+                        "ChannelType" : 1,
+                        "ChannelIndex" : 0
+                    }
+                }
+            }
+        },
+        "US" : {
+            "RetStaticPwConfig" : {
+                "Index" : 11,
+                "DestAddress" : "2001:9:9:9::2",
+                "CcapCoreOwner" : "00:0c:29:45:ff:a2",
+                "MtuSize" : 100,
+                "UsPhbId" : 1
+            },
+            "CommonStaticPwConfig" : {
+                "Direction" : 1,
+                "Index" : 11,
+                "PwType" : 13,
+                "DepiPwSubtype" : 6,
+                "L2SublayerType" : 4,
+                "DepiL2SublayerSubtype" : 6,
+                "CircuitStatus" : 32768,
+                "RpdEnetPortIndex" : 0,
+                "EnableStatusNotification" : 0,
+                "PwAssociation" : {
+                    "Index" : 11,
+                    "ChannelSelector" : {
+                        "RfPortIndex" : 0,
+                        "ChannelType" : 5,
+                        "ChannelIndex" : 0
+                    }
+                }
+            }
+        }
+   },
+   "corelist" : ["2001:9:9:9::15", "2001:9:9:9::16"],
+   "rdti" : {
+        "RpdRdtiMode" : 2,
+        "RpdPtpDefDsDomainNumber" : 0,
+        "RpdPtpDefDsPriority1" : 128,
+        "RpdPtpDefDsPriority2" : 255,
+        "RpdPtpDefDsLocalPriority" : 128,
+        "RpdPtpProfileVersion" : "10",
+        "RpdPtpPortConfig" : {
+            "RpdEnetPortIndex" : 1,
+            "RpdPtpPortIndex" : 22,
+            "RpdPtpPortAdminState" : 2,
+            "RpdPtpPortClockSource" : "158.158.158.158",
+            "RpdPtpPortClockSelectAlternateSourceFirst" : 0,
+            "RpdPtpPortTransportType" : 2,
+            "RpdPtpPortTransportCos" : 6,
+            "RpdPtpPortTransportDscp" : 47,
+            "RpdPtpPortDsLocalPriority" : 128,
+            "RpdPtpPortDsLogSyncInterval" : 5,
+            "RpdPtpPortDsLogAnnounceInterval" : 0,
+            "RpdPtpPortDsLogDelayReqInterval" : 5,
+            "RpdPtpPortDsAnnounceReceiptTimeout" : 11,
+            "RpdPtpPortUnicastContractDuration" : 300,
+            "RpdPtpPortClockGW" : "9.9.9.3"
+        }
+   }
+}
+

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CLISH_MODULE xmlns="http://clish.sourceforge.net/XMLSchema" 
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+ xsi:schemaLocation="http://clish.sourceforge.net/XMLSchema
+                     http://clish.sourceforge.net/XMLSchema/clish.xsd">
+	<!--=======================================================-->
+   <COMMAND name="macsec-status"
+            help="Lorem ipsum">
+       <DETAIL>
+		   macsec status information
+       </DETAIL>
+	   <ACTION>exec /usr/lib/python2.7/site-packages/rpd/klish_backend.py macsec status</ACTION>
+    </COMMAND>
+    <COMMAND name="macsec-detail"
+            help="Lorem ipsum">
+       <DETAIL>
+       macsec details information
+       </DETAIL>
+       <ACTION>exec /usr/lib/python2.7/site-packages/rpd/klish_backend.py macsec details</ACTION>
+    </COMMAND>
+</CLISH_MODULE>

@@ -1,0 +1,109 @@
+/*
+ * Copyright (c) 2016 Cisco and/or its affiliates, and
+ *                    Cable Television Laboratories, Inc. ("CableLabs")
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+/*
+ * OpenRPD messages
+ */
+message t_ItApiRpdMessage {
+    enum t_ItApiRpdMessageType {
+        IT_API_RPD_NONE = 0;
+        IT_API_RPD_GET = 1;
+        IT_API_RPD_GET_RCP_CFG = 2;
+        IT_API_RPD_GET_L2TP_CFG = 3;
+        // TBD new message types
+    }
+
+    enum t_ItApiMsgResult {
+        IT_API_RESULT_OK = 0;
+        IT_API_RESULT_FAIL = 1;
+    }
+
+    required t_ItApiRpdMessageType ItApiRpdMessageType = 1;
+    optional bytes ItMsgPayload = 2;
+    optional t_ItApiMsgResult result = 3;
+}
+
+/*
+ * Service Suite messages
+ */
+message t_ItApiServiceDhcpV4 {
+    required bool enable = 1;
+    // TBD attributes
+}
+
+message t_ItApiServiceDhcpV6 {
+    required bool enable = 1;
+    // TBD attributes
+}
+
+message t_ItApiServiceTp {
+    required bool enable = 1;
+}
+
+message t_ItApiCcapCoreClientScenario {
+    enum t_ScenarioType {
+        SCENARIO_DEFAULT = 0; // 1. RD RPD caps; 2. WR Ccap caps
+        SCENARIO_REDIRECT = 1; // 1. WR Redirect IP
+    }
+    required t_ScenarioType ScenarioType = 1;
+    optional string client_ip = 2; // unique ID of client (OpenRPD)
+    optional string redirect_ip_addr = 3;
+
+    // TBD parameters for other scenario types
+}
+
+message t_ItApiServiceCcapCoreV4 {
+    required bool enable = 1;
+    repeated t_ItApiCcapCoreClientScenario ClientScenarios = 2;
+    optional string IPv4Address = 3;
+}
+
+message t_ItApiServiceCcapCoreV6 {
+    required bool enable = 1;
+    repeated t_ItApiCcapCoreClientScenario ClientScenarios = 2;
+    optional string IPv6Address = 3;
+}
+
+message t_ItApiServiceConfigureMessage {
+    optional t_ItApiServiceDhcpV4 DHCPv4 = 1;
+    optional t_ItApiServiceDhcpV6 DHCPv6 = 2;
+    optional t_ItApiServiceTp Tp = 3;
+    optional t_ItApiServiceCcapCoreV4 CcapCoreV4 = 4;
+    optional t_ItApiServiceCcapCoreV6 CcapCoreV6 = 5;
+}
+
+message t_ItApiServiceSuiteMessage {
+    enum t_ItApiServiceSuiteMessageType {
+        IT_API_SERVICE_SUITE_NONE = 0;
+        IT_API_SERVICE_SUITE_CONFIGURE = 1;
+        IT_API_SERVICE_SUITE_L2TP = 2;
+        // TBD next msg types
+        // IT_API_SERVICE_SUITE_RPD_CONFIG = 3;
+    }
+
+    enum t_ItApiServiceSuiteMessageResult {
+        IT_API_SERVICE_SUITE_RESULT_NONE = 0;
+        IT_API_SERVICE_SUITE_RESULT_OK = 1;
+        IT_API_SERVICE_SUITE_RESULT_FAILED = 2;
+    }
+
+    required t_ItApiServiceSuiteMessageType MessageType = 1;
+    optional t_ItApiServiceConfigureMessage ServiceConfigureMessage = 2;
+    optional t_ItApiServiceSuiteMessageResult MessageResult = 3;
+}

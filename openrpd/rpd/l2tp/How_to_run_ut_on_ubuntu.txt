@@ -1,0 +1,45 @@
+1. This document will guide you to setup the UT environment, Please following the steps. 
+
+2. System requirement: 
+	Ubuntu >= 14.04, 64bit.
+	
+3. Install the Python with l2tp:
+	You can get the precompiled python with the following link:
+	https://cisco.box.com/s/aj42xzmpafd0imfhmsk6wq9ozaogx90v
+	
+	After getting the python image, you can extract it and put it into some place, such as you home directory. 
+	tar zxvf python.tar.gz 
+
+4. Install the virtualenv and virtualenvwrapper. virtualenv is used to setup a virtual python envioronment using a 
+   specified python version or packages, instead of using the system python env. 
+
+	sudo pip install virtualenvwrapper
+
+	If you don't install the pip in your system, you should install the pip first. 
+
+	sudo apt-get install python-pip 
+
+   Configure the virtualenv: 
+
+	mkvirtualenv  -p /home/cmts/test/pythonBuild/bin/python testL2tp
+
+	workon testl2tp 
+
+	The first command will create a virtual env using the python that we have added the l2tp feature. The second 
+	cmd will use the env. 
+
+5. Add some dependent packages:
+	
+	in the env shell, execute the following commands:
+	
+	pip install python-daemon fysom pyzmq protobuf 
+
+6. Last but the most important, probe the l2tp module into kernel: 
+
+	sudo modprobe l2tp_ip 
+
+7. Test the system setup:
+	goto <l2tp>/l2tpv3/src/ directory, execute the following commands:
+
+	python L2tpv3Main.py 
+

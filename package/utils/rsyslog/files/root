@@ -1,0 +1,1 @@
+0 */1 * * * sh /usr/sbin/log_rotate_clean.sh

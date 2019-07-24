@@ -1,0 +1,162 @@
+/*
+* Copyright (c) 2016 Cisco and/or its affiliates, and
+*                    Cable Television Laboratories, Inc. ("CableLabs")
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at:
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
+syntax = "proto2";
+
+
+/* This is used to describe a CIN interface (future) */
+/*
+message t_CinIfInfo {
+    optional bytes  mac = 1;
+    optional string ip = 2;
+}
+*/
+/* This is used to manage the CIN interface configuration */
+/* Should be called only once if there is only one CIN interface - when DHCP lease is obtained */ 
+/*
+message t_CinIfAssignment {
+
+    enum t_Operation {
+        ADD_CIN_IF = 1;
+        DEL_CIN_IF = 2;
+        UPDATE_CIN_IF = 3;
+        READ_CIN_IF = 4;
+    }
+
+    optional t_Operation    msg_type = 1;
+    optional uint32         cin_if_id = 2;
+    optional t_CinIfInfo    cin_if_info = 3;
+}
+*/
+/* This is used to describe a remote LCCE */
+message t_l2tpLcceInfo {
+    optional bytes  remote_mac = 1;
+    optional string remote_ip = 2;
+/*  Eventually a cin_if_id could
+    replace the local_mac and local_ip
+    optional uint32 cin_if_id = 3; */
+    optional bytes  local_mac = 3;
+    optional string local_ip = 4;
+    /* This is the MTU from path MTU discovery */
+    optional uint32 mtu = 5;
+}
+
+
+/* This is used to manage the remote LCCE assignments */
+message t_l2tpLcceAssignmentReq {
+    enum t_lcce_Operation {
+        ADD_L2TPv3_LCCE = 1;
+        DEL_L2TPv3_LCCE = 2;
+        UPDATE_L2TPv3_LCCE = 3;
+        READ_L2TPv3_LCCE = 4;
+    }
+    optional uint32             lcce_id = 1;
+    optional t_lcce_Operation   msg_type = 2;
+    optional t_l2tpLcceInfo     lcce_info = 3;
+}
+
+message t_l2tpLcceAssignmentRsp {
+    optional uint32             lcce_id = 1;
+    optional bool               result = 2 [default = false];
+    optional string             reason = 3;
+    optional t_l2tpLcceInfo     lcce_info = 4;
+}
+
+/* This has been modified to use the LCCE's ID instead of explicit parameters */
+message t_l2tpSessionSelector {
+    optional uint32 local_session_id = 1;
+    optional uint32 remote_session_id = 2;
+    optional string local_ip = 3;
+    optional string remote_ip = 4;
+    optional uint32 lcce_id = 5;
+}
+
+message t_l2tpRemoteEndId {
+    optional uint32 RfPortIndex = 1;
+    optional uint32 RfChannelType = 2;
+    optional uint32 RfChannelIndex = 3;
+    optional uint32 mpts_tag = 4;
+    }
+
+message t_l2tpPhbInfo {
+    optional uint32 phb_id = 1;
+    optional uint32 flow_id = 2;
+    optional uint32 udp_port = 3;
+    }
+
+message t_l2tpMcastInfo {
+    optional string src_ip = 1;
+    optional string grp_ip = 2;
+    }
+
+/*the HAL_CFG message type could be found at HalConfigMsg.py: L2TP message type*/
+/* This has been modified to use the LCCE's ID instead of explicit parameters */
+message t_l2tpReqData {
+    optional bytes             local_mac = 1;
+    optional bytes             remote_mac = 2;
+    /* Vendor ID = 0 Attribute Type = 68*/
+    optional uint32            pw_type = 3;
+    /* Vendor ID = 4491 Attribute Type = 17*/
+    optional uint32            sublayer_type = 4;
+    optional uint32            remote_mtu = 5;
+    repeated t_l2tpRemoteEndId remote_end_id = 6;
+    repeated t_l2tpPhbInfo     phb_info = 7;
+    optional bool              circuit_status = 8 [default = false];
+    optional uint32            vlan = 9;
+    repeated t_l2tpMcastInfo   mcast_info = 10; 
+    optional uint32            lcce_id = 11;
+}
+
+message t_l2tpSessionReq {
+
+    enum t_Operation {
+        ADD_L2TPv3_SESSION = 1;
+        DEL_L2TPv3_SESSION = 2;
+        UPDATE_L2TPv3_SESSION = 3;
+        READ_L2TPv3_SESSION = 4;
+    }
+
+    optional t_l2tpSessionSelector session_selector = 1;
+    optional t_Operation msg_type = 2;
+    optional t_l2tpReqData req_data = 3;
+}
+
+
+message t_l2tpSessionRsp {
+    optional t_l2tpSessionSelector session_selector = 1;
+    optional bool   result = 2 [default = false];
+    optional string reason = 3;
+    optional t_l2tpReqData req_data = 4;
+}
+
+
+message t_l2tpSessionCircuitStatus {
+    optional t_l2tpSessionSelector session_selector = 1;
+    optional bool   status = 2 [default = false];
+}
+
+message t_l2tpCapability {
+    /*Vendor ID= 4491 Attribute Type = 7 */
+    optional uint32 local_mtu = 1;
+    /*Vendor ID = 4491 Attribute Type = 15*/
+    repeated uint32 sublayer_pw_cap_list = 2;
+    /*Vendor ID= 0 Attribute Type = 62 */
+    repeated uint32 pw_cap_list = 3;
+    /*Vendor ID= 4491 Attribute Type = 13*/
+    optional bool mcast_cap = 4 [default = true];
+    /*if local session id range defined here*/
+    /*if phb flow id range defined here*/
+}

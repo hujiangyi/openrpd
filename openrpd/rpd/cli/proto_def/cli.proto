@@ -1,0 +1,27 @@
+/*
+ * Copyright (c) 2016-2017 Cisco Systems, Inc.
+ * All rights reserved.
+ */
+syntax = "proto2";
+
+import "test.proto";
+
+
+message t_CliMessage {
+	enum t_CliDataOperation {
+		CLI_OPER_NONE = 0;
+		CLI_CFG_WRITE = 1;
+		CLI_CFG_READ = 2;
+		CLI_CFG_DELETE = 3;
+	}
+	required t_CliDataOperation CliDataOperation = 1;
+
+	enum t_CliDataResult {
+		CLI_RESULT_NONE = 0;
+		CLI_RESULT_OK = 1;
+		CLI_RESULT_FAIL = 2;
+	}
+	optional t_CliDataResult CliDataResult = 2;
+	optional uint32 CliMsgType = 3;
+	optional t_Test CliData = 4;
+}

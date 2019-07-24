@@ -1,0 +1,51 @@
+/*
+ * Copyright (c) 2016 Cisco and/or its affiliates, and 
+ *                    Cable Television Laboratories, Inc. ("CableLabs")
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import "HalCommon.proto";
+package HalOperation;
+
+message HalGlobalStatsReq{
+    required string MsgType = 1 [default= "HalGlobalStatsReq"];
+    required string ClientID = 2;
+}
+
+message HalGlobalStats {// This stats will hold the how many clients connected
+    required string MsgType = 1 [default= "HalGlobalStats"];
+    optional HalCommon.Rsp Rsp = 100;
+    optional int32 NrClient = 10;
+    optional int32 NrErrorMsgs = 11;
+}
+
+message HalAgentStatsReq{
+    required string MsgType = 1 [default= "HalAgentStatsReq"];
+    optional string ClientID = 2;
+}
+message HalAgentStatsRsp {
+    required string MsgType = 1 [default= "HalAgentStats"];
+    optional HalCommon.Rsp Rsp = 100;
+    optional int32 NrMsgs = 10;
+    optional int32 NrCfgMsgs = 11;
+    optional int32 NrCfgRspMsgs = 12;
+    optional int32 NrNotifyMsgs = 13;
+    optional int32 NrHelloMsgs = 14;
+    optional int32 NrHelloRspMsgs = 15;
+    optional int32 NrDroppedMsgs = 16;
+    optional int32 NrTimeoutMsgs = 17;
+    optional int32 NrErrorMsgs = 18;
+}
+
+

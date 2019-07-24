@@ -1,0 +1,58 @@
+Index: libzmq-a9bad3bc13887c07759318751738d5a2d14ee9d0/acinclude.m4
+===================================================================
+--- libzmq-a9bad3bc13887c07759318751738d5a2d14ee9d0.orig/acinclude.m4
++++ libzmq-a9bad3bc13887c07759318751738d5a2d14ee9d0/acinclude.m4
+@@ -599,7 +599,7 @@ int main (int argc, char *argv [])
+         ],
+         [libzmq_cv_sock_cloexec="yes"],
+         [libzmq_cv_sock_cloexec="no"],
+-        [libzmq_cv_sock_cloexec="not during cross-compile"]
++        [libzmq_cv_sock_cloexec="yes"]
+         )]
+     )
+     AS_IF([test "x$libzmq_cv_sock_cloexec" = "xyes"], [$1], [$2])
+@@ -646,7 +646,7 @@ int main (int argc, char *argv [])
+         ],
+         [libzmq_cv_so_keepalive="yes"],
+         [libzmq_cv_so_keepalive="no"],
+-        [libzmq_cv_so_keepalive="not during cross-compile"]
++        [libzmq_cv_so_keepalive="yes"]
+         )]
+     )
+     AS_IF([test "x$libzmq_cv_so_keepalive" = "xyes"], [$1], [$2])
+@@ -676,7 +676,7 @@ int main (int argc, char *argv [])
+         ],
+         [libzmq_cv_tcp_keepcnt="yes"],
+         [libzmq_cv_tcp_keepcnt="no"],
+-        [libzmq_cv_tcp_keepcnt="not during cross-compile"]
++        [libzmq_cv_tcp_keepcnt="yes"]
+         )]
+     )
+     AS_IF([test "x$libzmq_cv_tcp_keepcnt" = "xyes"], [$1], [$2])
+@@ -706,7 +706,7 @@ int main (int argc, char *argv [])
+         ],
+         [libzmq_cv_tcp_keepidle="yes"],
+         [libzmq_cv_tcp_keepidle="no"],
+-        [libzmq_cv_tcp_keepidle="not during cross-compile"]
++        [libzmq_cv_tcp_keepidle="yes"]
+         )]
+     )
+     AS_IF([test "x$libzmq_cv_tcp_keepidle" = "xyes"], [$1], [$2])
+@@ -736,7 +736,7 @@ int main (int argc, char *argv [])
+         ],
+         [libzmq_cv_tcp_keepintvl="yes"],
+         [libzmq_cv_tcp_keepintvl="no"],
+-        [libzmq_cv_tcp_keepintvl="not during cross-compile"]
++        [libzmq_cv_tcp_keepintvl="yes"]
+         )]
+     )
+     AS_IF([test "x$libzmq_cv_tcp_keepintvl" = "xyes"], [$1], [$2])
+@@ -766,7 +766,7 @@ int main (int argc, char *argv [])
+         ],
+         [libzmq_cv_tcp_keepalive="yes"],
+         [libzmq_cv_tcp_keepalive="no"],
+-        [libzmq_cv_tcp_keepalive="not during cross-compile"]
++        [libzmq_cv_tcp_keepalive="yes"]
+         )]
+     )
+     AS_IF([test "x$libzmq_cv_tcp_keepalive" = "xyes"], [$1], [$2])

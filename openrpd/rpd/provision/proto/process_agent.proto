@@ -1,0 +1,140 @@
+/*
+ * Copyright (c) 2016 Cisco and/or its affiliates, and 
+ *                    Cable Television Laboratories, Inc. ("CableLabs")
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+import "CcapCoreIdentification.proto";
+
+message msg_manager_ka {
+	enum t_action {
+		KA = 1;
+	}
+	required string id = 1; // Which is a random number, which is used to identify the sender
+	required t_action action = 2;
+	optional string parameter = 3; // The parameter which is needed when registering.
+}
+
+message msg_ka_rsp {
+	enum t_reg_status {
+		OK = 0;
+		FAIL = 1;
+	}
+	required string id = 1;
+	required uint32 agent_id = 2;
+	required t_reg_status status = 3;
+	required string reason = 4;
+}
+
+message msg_manager_register {
+	enum t_reg_action {
+		REG = 1; 
+		UNREG = 2;
+	}
+	required string id = 1; // Which is a random number, which is used to identify the sender
+	required t_reg_action action = 2; 
+	optional string module_name = 3; // This is the name of the requester
+	optional string parameter = 4; // The parameter which is needed when registering.
+
+	// The path info, which is used by the process agent to send the results back.
+	optional string path_info = 10; 
+}
+
+message msg_core_register {
+	enum t_reg_action {
+		REG = 1; 
+		UNREG = 2; 
+	}
+	required string ccap_core_id = 1; // Which is a random number, which is used to identify the sender
+	required string mgr_id = 2; 
+	required t_reg_action action = 3; 
+}
+
+message msg_register_rsp {
+	enum t_reg_status {
+		OK = 0; 
+		FAIL = 1; 
+	}
+
+	required string id = 1; 
+	required uint32 agent_id = 2;
+	required t_reg_status status = 3; 
+	required string reason = 4; 
+}
+
+message msg_event {
+	enum t_event_action {
+		START = 1; 
+		STOP = 2; 
+		CHECKSTATUS = 3;
+		READ = 4;
+		WRITE = 5;
+		UNKNOWN = 6;
+	}
+
+	required string id = 1; // The ID is used to identify the requester
+	required string ccap_core_id = 2; 
+	required uint32 event_id = 3; 
+	required t_event_action action = 4; 
+	optional string parameter = 5; 
+}
+
+message msg_core_event_notification {
+	enum t_event_status {
+		OK = 0; 
+		FAIL = 1;
+	}
+	required string id = 1; // the fsm id, which is used to identify on fsm
+	required string ccap_core_id = 2; 
+	required t_event_status status = 3; 
+	optional string reason = 4; 
+	required uint32 event_id = 5; 
+	optional string result = 6; // This field  hold the results from the 
+	optional string parameter = 10;
+	optional uint32 action = 11; // suppose to be in t_event_action
+}
+
+message msg_agent_info_update {
+    required string ccap_core_id = 1;
+    optional t_CcapCoreIdentification ccap_core_identification = 2;
+}
+
+message msg_mgr_event_notification {
+	required string mgr_id = 1; 
+	required uint32 event_id = 2; 
+	required string data = 3; 
+}
+
+message msg_event_request {
+	optional msg_event action = 2;
+	optional msg_manager_ka ka_msg = 3;
+}
+
+message msg_event_notification {
+	optional msg_core_event_notification core_event = 1;
+	optional msg_mgr_event_notification mgr_event = 2;
+    optional msg_agent_info_update agent_info_update = 3;
+	optional msg_ka_rsp ka_rsp = 4;
+}
+
+message api_request {
+	optional msg_manager_register mgr_reg = 1; 
+	optional msg_core_register core_reg = 2;
+}
+
+message api_rsp {
+	optional msg_register_rsp reg_rsp = 1;
+}
+

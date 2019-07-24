@@ -1,0 +1,50 @@
+diff --git a/deps/lua/src/Makefile b/deps/lua/src/Makefile
+index f3bba2f..a5dfd94 100644
+--- a/deps/lua/src/Makefile
++++ b/deps/lua/src/Makefile
+@@ -7,10 +7,10 @@
+ # Your platform. See PLATS for possible values.
+ PLAT= none
+ 
+-CC?= gcc
+-CFLAGS= -O2 -Wall $(MYCFLAGS)
+-AR= ar rcu
+-RANLIB= ranlib
++#CC?= gcc
++CFLAGS=$(CFLAGS) -O2 -Wall $(MYCFLAGS)
++#AR= ar rcu
++#RANLIB= ranlib
+ RM= rm -f
+ LIBS= -lm $(MYLIBS)
+ 
+diff --git a/src/Makefile b/src/Makefile
+index bfb5d47..aa4f999 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -13,7 +13,8 @@
+ # Just use 'make dep', but this is only needed by developers.
+ 
+ release_hdr := $(shell sh -c './mkreleasehdr.sh')
+-uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
++#uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
++uname_S := not
+ OPTIMIZATION?=-O2
+ DEPENDENCY_TARGETS=hiredis linenoise lua
+ 
+diff --git a/src/config.h b/src/config.h
+index 9ec65fc..3cc20fe 100644
+--- a/src/config.h
++++ b/src/config.h
+@@ -62,9 +62,9 @@
+ #endif
+ 
+ /* Test for backtrace() */
+-#if defined(__APPLE__) || (defined(__linux__) && defined(__GLIBC__))
+-#define HAVE_BACKTRACE 1
+-#endif
++//#if defined(__APPLE__) || (defined(__linux__) && defined(__GLIBC__))
++//#define HAVE_BACKTRACE 1
++//#endif
+ 
+ /* Test for polling API */
+ #ifdef __linux__

@@ -1,0 +1,80 @@
+diff -ur a/readline.c b/readline.c
+--- a/readline.c	2016-01-25 18:18:16.900489577 -0500
++++ b/readline.c	2016-01-25 18:21:03.944493559 -0500
+@@ -288,6 +288,7 @@
+ 
+ #endif
+ 
++static PyObject *customer = NULL;
+ 
+ /* Exported function to specify a word completer in Python */
+ 
+@@ -296,6 +297,50 @@
+ static PyObject *begidx = NULL;
+ static PyObject *endidx = NULL;
+ 
++static PyObject *
++set_customer(PyObject *self, PyObject *args)
++{
++    return set_hook("customer", &customer, args);
++}
++
++PyDoc_STRVAR(doc_set_customer,
++"set_customer([function]) -> None\n\
++Set or remove the customer function.");
++
++
++static int
++on_custom_hook(int count, int key)
++{
++    int result = 0;
++    if (customer != NULL) {
++        PyObject *r;
++#ifdef WITH_THREAD
++        PyGILState_STATE gilstate = PyGILState_Ensure();
++#endif
++        r = PyObject_CallFunction(customer, "i", key);
++        if (r == NULL)
++            goto error;
++        if (r == Py_None)
++            result = 0;
++        else {
++            result = PyInt_AsLong(r);
++            if (result == -1 && PyErr_Occurred())
++                goto error;
++        }
++        Py_DECREF(r);
++        goto done;
++      error:
++        PyErr_Clear();
++        Py_XDECREF(r);
++      done:
++#ifdef WITH_THREAD
++        PyGILState_Release(gilstate);
++#endif
++        return result;
++    }
++    return result;
++}
++
+ 
+ /* Get the completion type for the scope of the tab-completion */
+ static PyObject *
+@@ -696,6 +741,7 @@
+ #ifdef HAVE_RL_COMPLETION_APPEND_CHARACTER
+     {"clear_history", py_clear_history, METH_NOARGS, doc_clear_history},
+ #endif
++    {"set_customer", set_customer, METH_VARARGS, doc_set_customer},
+     {0, 0}
+ };
+ 
+@@ -897,6 +943,9 @@
+         strdup(" \t\n`~!@#$%^&*()-=+[{]}\\|;:'\",<>/?");
+         /* All nonalphanums except '.' */
+ 
++    /* Register for custom function*/
++    rl_add_funmap_entry ("custom", (rl_command_func_t *)on_custom_hook);
++
+     begidx = PyInt_FromLong(0L);
+     endidx = PyInt_FromLong(0L);
+     /* Initialize (allows .inputrc to override)

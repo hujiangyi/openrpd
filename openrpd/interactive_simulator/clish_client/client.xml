@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CLISH_MODULE xmlns="http://clish.sourceforge.net/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://clish.sourceforge.net/XMLSchema http://clish.sourceforge.net/XMLSchema/clish.xsd">
+    <PTYPE name="name" pattern="[^\-]+" help="cos"/>
+    <PTYPE name="selection" method="select"
+           pattern="rfchannelscenario(rfchannelscenario) rfportscenario(rfportscenario) sweepdsscenario(sweepdsscenario) qamupanddownscenario(qamupanddownscenario)"
+           help="Select name of scenario, which has to be executed"/>
+
+    <COMMAND name="s-select" help="select scenario">
+        <PARAM name="file" prefix="file" default="" ptype="name" help="Path to file with attributes"/>
+        <PARAM name="attrs" prefix="attrs" default="" ptype="name" help="attributes typed beetwen quotes"/>
+        <PARAM name="selection" ptype="selection" help="Select name of scenario"/>
+        <ACTION>/interactive_simulator/clish_client/client.py --scenarios select ${selection} --attrs ${attrs} --file ${file}</ACTION>
+    </COMMAND>
+    <COMMAND name="s-status" help="Show scenario status">
+        <ACTION>/interactive_simulator/clish_client/client.py --scenarios status</ACTION>
+    </COMMAND>
+    <COMMAND name="s-break" help="Break executing scenario">
+        <ACTION>/interactive_simulator/clish_client/client.py --scenarios break</ACTION>
+    </COMMAND>
+    <COMMAND name="s-default-set" help="Set dafult scenario">
+        <PARAM name="file" prefix="file" default="" ptype="name" help="Path to file with attributes"/>
+        <PARAM name="attrs" prefix="attrs" default="" ptype="name" help="attributes typed beetwen quotes"/>
+        <PARAM name="selection" ptype="selection" help="Select name of scenario, which has to be default"/>
+        <ACTION>/interactive_simulator/clish_client/client.py --scenarios set_default ${selection} --attrs ${attrs} --file ${file}</ACTION>
+    </COMMAND>
+    <COMMAND name="s-default-rm" help="Remove default scenario">
+        <ACTION>/interactive_simulator/clish_client/client.py --scenarios remove_default</ACTION>
+    </COMMAND>
+    <COMMAND name="s-help" help="Remove default scenario">
+        <PARAM name="selection" default="" ptype="selection" help="Select name of scenario, which has to be default"/>
+        <ACTION>/interactive_simulator/clish_client/client.py --scenarios help ${selection}</ACTION>
+    </COMMAND>
+</CLISH_MODULE>

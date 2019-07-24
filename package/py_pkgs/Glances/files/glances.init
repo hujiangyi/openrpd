@@ -1,0 +1,8 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=10
+
+start() {
+	python /usr/bin/glances -s -t 30 -C /etc/glances.conf&
+}

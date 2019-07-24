@@ -1,0 +1,61 @@
+/*
+ * Copyright (c) 2016 Cisco and/or its affiliates, and 
+ *                    Cable Television Laboratories, Inc. ("CableLabs")
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+import "cfg.proto";
+
+message t_Path {
+	required string Name = 1;
+	repeated t_Path Value = 2;
+}
+
+message t_RpdDataMessage {
+	enum t_RpdDataOperation {
+		RPD_OPER_NONE = 0;
+		RPD_CFG_WRITE = 1;
+		RPD_CFG_READ = 2;
+		RPD_CFG_DELETE = 3;
+		RPD_CFG_ALLOCATE_WRITE = 7;
+	}
+	required t_RpdDataOperation RpdDataOperation = 1;
+	optional t_Path Path = 2;
+	optional config RpdData = 3;
+}
+
+message t_RcpMessage {
+	enum t_RcpMessageType {
+		RCP_MESSAGE_TYPE_NONE = 0;
+		ADD_CCAP_CORES = 1;
+		REMOVE_ALL_CCAP_CORES = 2;
+		REDIRECT_NOTIFICATION = 3;
+		RPD_CONFIGURATION = 4;
+		RPD_CONFIGURATION_DONE = 5;
+		RPD_REBOOT = 6;
+		CONNECT_CLOSE_NOTIFICATION = 7;
+	}
+	enum t_RcpDataResult {
+		RCP_RESULT_NONE = 0;
+		RCP_RESULT_OK = 1;
+		RCP_RESULT_GENERAL_ERROR = 2;
+	}
+	required t_RcpMessageType RcpMessageType = 1;
+	optional t_RpdDataMessage RpdDataMessage = 2;
+	repeated string RedirectCCAPAddresses = 3;
+	optional t_RcpDataResult RcpDataResult = 4;
+	optional string parameter = 5; // can used to hold extra information
+}

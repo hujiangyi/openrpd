@@ -1,0 +1,1037 @@
+--- a/networking/udhcp/dhcpc.h
++++ b/networking/udhcp/dhcpc.h
+@@ -1,10 +1,16 @@
+ /* vi: set sw=4 ts=4: */
+ /*
++ * Portions Copyright (c) 2016 Cisco and/or its affiliates, and
++ *                             Cable Television Laboratories, Inc. ("CableLabs")
++ *
+  * Licensed under GPLv2, see file LICENSE in this source tree.
+  */
+ #ifndef UDHCP_DHCPC_H
+ #define UDHCP_DHCPC_H 1
+ 
++#include <zsock.h>
++#include <sys/types.h>
++
+ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
+ 
+ struct client_config_t {
+@@ -23,6 +29,7 @@ struct client_config_t {
+ 
+ 	uint16_t first_secs;
+ 	uint16_t last_secs;
++	zsock_t *ipc_sock;
+ } FIX_ALIASING;
+ 
+ /* server_config sits in 1st half of bb_common_bufsiz1 */
+--- a/networking/udhcp/common.c
++++ b/networking/udhcp/common.c
+@@ -1,6 +1,8 @@
+ /* vi: set sw=4 ts=4: */
+ /*
+  * Rewrite by Russ Dill <Russ.Dill@asu.edu> July 2001
++ * Portions Copyright (c) 2016 Cisco and/or its affiliates, and
++ *                             Cable Television Laboratories, Inc. ("CableLabs")
+  *
+  * Licensed under GPLv2, see file LICENSE in this source tree.
+  */
+@@ -21,12 +23,12 @@ const uint8_t MAC_BCAST_ADDR[6] ALIGN2 =
+ const struct dhcp_optflag dhcp_optflags[] = {
+ 	/* flags                                    code */
+ 	{ OPTION_IP                   | OPTION_REQ, 0x01 }, /* DHCP_SUBNET        */
+-	{ OPTION_S32                              , 0x02 }, /* DHCP_TIME_OFFSET   */
++	{ OPTION_S32                  | OPTION_REQ, 0x02 }, /* DHCP_TIME_OFFSET   */
+ 	{ OPTION_IP | OPTION_LIST     | OPTION_REQ, 0x03 }, /* DHCP_ROUTER        */
+-//	{ OPTION_IP | OPTION_LIST                 , 0x04 }, /* DHCP_TIME_SERVER   */
++	{ OPTION_IP | OPTION_LIST     | OPTION_REQ, 0x04 }, /* DHCP_TIME_SERVER   */
+ //	{ OPTION_IP | OPTION_LIST                 , 0x05 }, /* DHCP_NAME_SERVER   */
+ 	{ OPTION_IP | OPTION_LIST     | OPTION_REQ, 0x06 }, /* DHCP_DNS_SERVER    */
+-//	{ OPTION_IP | OPTION_LIST                 , 0x07 }, /* DHCP_LOG_SERVER    */
++	{ OPTION_IP | OPTION_LIST     | OPTION_REQ, 0x07 }, /* DHCP_LOG_SERVER    */
+ //	{ OPTION_IP | OPTION_LIST                 , 0x08 }, /* DHCP_COOKIE_SERVER */
+ 	{ OPTION_IP | OPTION_LIST                 , 0x09 }, /* DHCP_LPR_SERVER    */
+ 	{ OPTION_STRING_HOST          | OPTION_REQ, 0x0c }, /* DHCP_HOST_NAME     */
+@@ -43,7 +45,8 @@ const struct dhcp_optflag dhcp_optflags[
+ 	{ OPTION_IP_PAIR | OPTION_LIST            , 0x21 }, /* DHCP_ROUTES        */
+ 	{ OPTION_STRING_HOST                      , 0x28 }, /* DHCP_NIS_DOMAIN    */
+ 	{ OPTION_IP | OPTION_LIST                 , 0x29 }, /* DHCP_NIS_SERVER    */
+-	{ OPTION_IP | OPTION_LIST     | OPTION_REQ, 0x2a }, /* DHCP_NTP_SERVER    */
++	{ OPTION_IP | OPTION_LIST                 , 0x2a }, /* DHCP_NTP_SERVER    */
++	{ OPTION_STRING               | OPTION_REQ, 0x2b }, /* DHCP_VENDOR_SPECIFIC */
+ 	{ OPTION_IP | OPTION_LIST                 , 0x2c }, /* DHCP_WINS_SERVER   */
+ 	{ OPTION_U32                              , 0x33 }, /* DHCP_LEASE_TIME    */
+ 	{ OPTION_IP                               , 0x36 }, /* DHCP_SERVER_ID     */
+@@ -58,6 +61,7 @@ const struct dhcp_optflag dhcp_optflags[
+ 	{ OPTION_SIP_SERVERS                      , 0x78 }, /* DHCP_SIP_SERVERS   */
+ #endif
+ 	{ OPTION_STATIC_ROUTES | OPTION_LIST      , 0x79 }, /* DHCP_STATIC_ROUTES */
++	{ OPTION_STRING               | OPTION_REQ, 0x7c }, /* DHCP_VENDOR_CLASS  */
+ #if ENABLE_FEATURE_UDHCP_8021Q
+ 	{ OPTION_U16                              , 0x84 }, /* DHCP_VLAN_ID       */
+ 	{ OPTION_U8                               , 0x85 }, /* DHCP_VLAN_PRIORITY */
+@@ -85,6 +89,24 @@ const struct dhcp_optflag dhcp_optflags[
+ 	{ 0, 0 } /* zeroed terminating entry */
+ };
+ 
++const struct dhcp_optflag dhcp_suboptflags[DHCP_CL_MAX + 1] = {
++	/* flags                                 code */
++	{0,                                      0x0},
++	{OPTION_U16 | OPTION_LIST  | OPTION_REQ, 0x01 },/* DHCP_CL_REQ_SUBOPTIONS */
++	{OPTION_STRING             | OPTION_REQ, 0x02 },/* DHCP_CL_DEVICE_TYPE    */
++	{OPTION_STRING                         , 0x03 },/* DHCP_CL_ECM_ESAFE      */
++	{OPTION_STRING             | OPTION_REQ, 0x04 },/* DHCP_CL_SERIAL         */
++	{OPTION_STRING             | OPTION_REQ, 0x05 },/* DHCP_CL_HW_VER         */
++	{OPTION_STRING             | OPTION_REQ, 0x06 },/* DHCP_CL_SW_VER         */
++	{OPTION_STRING             | OPTION_REQ, 0x07 },/* DHCP_CL_BOOT_ROM_VER   */
++	{OPTION_STRING             | OPTION_REQ, 0x08 },/* DHCP_CL_ORG_UNIQ_ID    */
++	{OPTION_STRING             | OPTION_REQ, 0x09 },/* DHCP_CL_MODEL_NUM      */
++	{OPTION_STRING             | OPTION_REQ, 0x0a },/* DHCP_CL_VENDOR_NAME    */
++	[DHCP_CL_CCAP_CORES_V4] = {OPTION_IP  | OPTION_LIST  | OPTION_REQ, 0x03d },/* DHCP_CL_CCAP_CORES_V4  */
++	{ 0, 0 } /* zeroed terminating entry */
++};
++
++
+ /* Used for converting options from incoming packets to env variables
+  * for udhcpc stript, and for setting options for udhcpd via
+  * "opt OPTION_NAME OPTION_VALUE" directives in udhcpd.conf file.
+@@ -92,12 +114,12 @@ const struct dhcp_optflag dhcp_optflags[
+ /* Must match dhcp_optflags[] order */
+ const char dhcp_option_strings[] ALIGN1 =
+ 	"subnet" "\0"      /* DHCP_SUBNET         */
+-	"timezone" "\0"    /* DHCP_TIME_OFFSET    */
++	"time-offset" "\0" /* DHCP_TIME_OFFSET    */
+ 	"router" "\0"      /* DHCP_ROUTER         */
+-//	"timesrv" "\0"     /* DHCP_TIME_SERVER    */
++	"time-server" "\0" /* DHCP_TIME_SERVER    */
+ //	"namesrv" "\0"     /* DHCP_NAME_SERVER    */
+ 	"dns" "\0"         /* DHCP_DNS_SERVER     */
+-//	"logsrv" "\0"      /* DHCP_LOG_SERVER     */
++	"log-server" "\0"  /* DHCP_LOG_SERVER     */
+ //	"cookiesrv" "\0"   /* DHCP_COOKIE_SERVER  */
+ 	"lprsrv" "\0"      /* DHCP_LPR_SERVER     */
+ 	"hostname" "\0"    /* DHCP_HOST_NAME      */
+@@ -112,6 +134,7 @@ const char dhcp_option_strings[] ALIGN1
+ 	"nisdomain" "\0"   /* DHCP_NIS_DOMAIN     */
+ 	"nissrv" "\0"      /* DHCP_NIS_SERVER     */
+ 	"ntpsrv" "\0"      /* DHCP_NTP_SERVER     */
++	"vendor" "\0"      /* DHCP_VENDOR_SPECIFIC */
+ 	"wins" "\0"        /* DHCP_WINS_SERVER    */
+ 	"lease" "\0"       /* DHCP_LEASE_TIME     */
+ 	"serverid" "\0"    /* DHCP_SERVER_ID      */
+@@ -126,6 +149,7 @@ const char dhcp_option_strings[] ALIGN1
+ 	"sipsrv" "\0"      /* DHCP_SIP_SERVERS    */
+ #endif
+ 	"staticroutes" "\0"/* DHCP_STATIC_ROUTES  */
++	"vendor_id" "\0"   /* DHCP_VENDOR_CLASS   */
+ #if ENABLE_FEATURE_UDHCP_8021Q
+ 	"vlanid" "\0"      /* DHCP_VLAN_ID        */
+ 	"vlanpriority" "\0"/* DHCP_VLAN_PRIORITY  */
+@@ -165,6 +189,30 @@ const uint8_t dhcp_option_lengths[] ALIG
+ 	[OPTION_6RD] =    22,  /* ignored by udhcp_str2optset */
+ };
+ 
++/* Must match dhcp_suboptflags[] order
++ * TODO: optimization like ALIGN1, packed,..*/
++const char *dhcp_subopt_strings[DHCP_CL_MAX + 1]= {
++	"invalid",
++	"reqsubopts",	/* DHCP_CL_REQ_SUBOPTIONS	*/
++	"devicetype",	/* DHCP_CL_DEVICE_TYPE		*/
++	"esafe",		/* DHCP_CL_ECM_ESAFE		*/
++	"serial",		/* DHCP_CL_SERIAL			*/
++	"hwver",		/* DHCP_CL_HW_VER			*/
++	"swver",		/* DHCP_CL_SW_VER			*/
++	"romver",		/* DHCP_CL_BOOT_ROM_VER		*/
++	"oui",			/* DHCP_CL_ORG_UNIQ_ID		*/
++	"modelnum",		/* DHCP_CL_MODEL_NUM		*/
++	"vendor",
++	[DHCP_CL_CCAP_CORES_V4] = "ccapcores"		/* DHCP_CL_CCAP_CORES_V4	*/
++};
++
++const char* FAST_FUNC dhcp_subopt2str(uint8_t opt_code) {
++	if (opt_code < DHCP_CL_MAX) {
++		return dhcp_subopt_strings[opt_code];
++	}
++
++	return "invalid";
++}
+ 
+ #if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 2
+ static void log_option(const char *pfx, const uint8_t *opt)
+@@ -563,6 +611,92 @@ int FAST_FUNC udhcp_str2optset(const cha
+ 	return retval;
+ }
+ 
++int FAST_FUNC udhcp_str2subopt(const char *const_str, void *arg)
++{
++	struct option_set **opt_list = arg;
++	char *subopt, *val;
++	//char *str;
++	unsigned optcode;
++	int sub_len;
++	uint8_t *data = NULL;
++	struct option_set *opt = NULL;
++
++	opt = udhcp_find_option(*opt_list, DHCP_VENDOR_SPECIFIC);
++	if (NULL == opt) {
++		struct option_set **curr;
++
++		/* Alloc vendor id (124) option to identify vendor */
++		opt = xmalloc(sizeof(*opt));
++		opt->data = xzalloc(OPT_DATA + 5);
++		opt->data[OPT_CODE] = DHCP_VENDOR_CLASS;
++		opt->data[OPT_LEN] = 5;
++		move_to_unaligned32(&opt->data[OPT_DATA],
++							htonl(DHCP_CABLELABS_VENDOR_ID));
++		/* Remaining 1 byte are for data size = 0 */
++		curr = opt_list;
++		while (*curr && (*curr)->data[OPT_CODE] < DHCP_VENDOR_CLASS)
++			curr = &(*curr)->next;
++		opt->next = *curr;
++		*curr = opt;
++
++		/* Alloc vendor option if this is first suboption */
++		opt = xmalloc(sizeof(*opt));
++		/* [code = 1] + [len = 1] + [data max size = 255] */
++		opt->data = xmalloc(OPT_DATA + DHCP_OPT_MAX_SIZE);
++		opt->data[OPT_CODE] = DHCP_VENDOR_SPECIFIC;
++		opt->data[OPT_LEN] = 0;
++
++		curr = opt_list;
++		while (*curr && (*curr)->data[OPT_CODE] < DHCP_VENDOR_SPECIFIC)
++			curr = &(*curr)->next;
++
++		opt->next = *curr;
++		*curr = opt;
++	}
++
++	/* Suboption string format: 0x55:"value" */
++	subopt = strtok((char *)const_str, ":");
++	if (!subopt) {
++		bb_error_msg("Bad -c option format");
++		/* TODO: error handling? */
++		return false;
++	}
++
++	/* Try to parse subopt code */
++	optcode = bb_strtou(subopt, NULL, 0);
++	if (!errno && optcode < DHCP_END) {
++	} else {
++		bb_error_msg("Bad -c option format");
++		return false;
++	}
++
++	/* Get pointer to free space in buffer */
++	data = opt->data + opt->data[OPT_LEN] + OPT_DATA;
++
++	do {
++		val = strtok(NULL, "\"");
++		if (!val)
++			break;
++		sub_len = strnlen(val, DHCP_OPT_MAX_SIZE - OPT_DATA);
++		if ((sub_len + OPT_DATA) > (DHCP_OPT_MAX_SIZE - opt->data[OPT_LEN])) {
++			bb_error_msg("No space for suboption: used: %u sub: %u",
++								opt->data[OPT_LEN], sub_len);
++			return false;
++		}
++		if (sub_len > 0) {
++			/* Store suboption to option buffer */
++			data[OPT_CODE] = optcode;
++			data[OPT_LEN] = sub_len;
++			memcpy(data + OPT_DATA, val, sub_len);
++			/* Update option size */
++			opt->data[OPT_LEN] += (OPT_DATA + sub_len);
++			bb_info_msg("Adding subopt [%u]: len %u", optcode, sub_len);
++		}
++	} while (true);
++
++	return true;
++}
++
+ /* note: ip is a pointer to an IPv6 in network order, possibly misaliged */
+ int FAST_FUNC sprint_nip6(char *dest, /*const char *pre,*/ const uint8_t *ip)
+ {
+--- a/networking/udhcp/common.h
++++ b/networking/udhcp/common.h
+@@ -2,6 +2,8 @@
+ /*
+  * Russ Dill <Russ.Dill@asu.edu> September 2001
+  * Rewritten by Vladimir Oleynik <dzo@simtreas.ru> (C) 2003
++ * Portions Copyright (c) 2016 Cisco and/or its affiliates, and
++ *                             Cable Television Laboratories, Inc. ("CableLabs")
+  *
+  * Licensed under GPLv2 or later, see file LICENSE in this source tree.
+  */
+@@ -16,7 +18,6 @@ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDD
+ 
+ extern const uint8_t MAC_BCAST_ADDR[6] ALIGN2; /* six all-ones */
+ 
+-
+ /*** DHCP packet ***/
+ 
+ /* DHCP protocol. See RFC 2131 */
+@@ -24,6 +25,15 @@ extern const uint8_t MAC_BCAST_ADDR[6] A
+ #define DHCP_OPTIONS_BUFSIZE    308
+ #define BOOTREQUEST             1
+ #define BOOTREPLY               2
++#define DHCP_OPT_MAX_SIZE       255
++
++#define VENDOR_CLASS_ID 		"RPD"
++/* http://www.cablelabs.com/wp-content/uploads/specdocs/
++ * CM-SP-R-PHY-I01_150615.pdf
++ * */
++#define DHCP_CABLELABS_VENDOR_ID 4491
++#define DHCP_DEVICE_TYPE_RPD 	"RPD"
++#define DHCP_INTF_CONF_FILE_PREFIX 	"/tmp/dhcp_if_"
+ 
+ //TODO: rename ciaddr/yiaddr/chaddr
+ struct dhcp_packet {
+@@ -111,12 +121,12 @@ enum {
+  */
+ #define DHCP_PADDING            0x00
+ #define DHCP_SUBNET             0x01
+-//#define DHCP_TIME_OFFSET      0x02 /* (localtime - UTC_time) in seconds. signed */
++#define DHCP_TIME_OFFSET        0x02 /* (localtime - UTC_time) in seconds. signed */
+ //#define DHCP_ROUTER           0x03
+-//#define DHCP_TIME_SERVER      0x04 /* RFC 868 time server (32-bit, 0 = 1.1.1900) */
++#define DHCP_TIME_SERVER        0x04 /* RFC 868 time server (32-bit, 0 = 1.1.1900) */
+ //#define DHCP_NAME_SERVER      0x05 /* IEN 116 _really_ ancient kind of NS */
+ //#define DHCP_DNS_SERVER       0x06
+-//#define DHCP_LOG_SERVER       0x07 /* port 704 UDP log (not syslog)
++#define DHCP_LOG_SERVER         0x07 /* port 704 UDP log (not syslog)
+ //#define DHCP_COOKIE_SERVER    0x08 /* "quote of the day" server */
+ //#define DHCP_LPR_SERVER       0x09
+ #define DHCP_HOST_NAME          0x0c /* either client informs server or server gives name to client */
+@@ -131,6 +141,7 @@ enum {
+ //#define DHCP_NIS_DOMAIN       0x28
+ //#define DHCP_NIS_SERVER       0x29
+ //#define DHCP_NTP_SERVER       0x2a
++#define DHCP_VENDOR_SPECIFIC    0x2b
+ //#define DHCP_WINS_SERVER      0x2c
+ #define DHCP_REQUESTED_IP       0x32 /* sent by client if specific IP is wanted */
+ #define DHCP_LEASE_TIME         0x33
+@@ -149,6 +160,7 @@ enum {
+ //#define DHCP_DOMAIN_SEARCH    0x77 /* RFC 3397. set of ASCIZ string, DNS-style compressed */
+ //#define DHCP_SIP_SERVERS      0x78 /* RFC 3361. flag byte, then: 0: domain names, 1: IP addrs */
+ //#define DHCP_STATIC_ROUTES    0x79 /* RFC 3442. (mask,ip,router) tuples */
++#define DHCP_VENDOR_CLASS 		0x7c /* RFC 3925 Section 3 */
+ //#define DHCP_VLAN_ID          0x84 /* 802.1P VLAN ID */
+ //#define DHCP_VLAN_PRIORITY    0x85 /* 802.1Q VLAN priority */
+ //#define DHCP_PXE_CONF_FILE    0xd1 /* RFC 5071 Configuration File */
+@@ -178,6 +190,23 @@ enum {
+ #define DHCP_MINTYPE DHCPDISCOVER
+ #define DHCP_MAXTYPE DHCPINFORM
+ 
++/* DHCP CableLabs suboptions
++ * http://www.cablelabs.com/wp-content/uploads/specdocs/
++ * CL-SP-CANN-DHCP-Reg-I11-150515.pdf
++ */
++#define DHCP_CL_REQ_SUBOPTIONS 		0x1
++#define DHCP_CL_DEVICE_TYPE 		0x2
++#define DHCP_CL_ECM_ESAFE 			0x3
++#define DHCP_CL_SERIAL 				0x4
++#define DHCP_CL_HW_VER	 			0x5
++#define DHCP_CL_SW_VER	 			0x6
++#define DHCP_CL_BOOT_ROM_VER 		0x7
++#define DHCP_CL_ORG_UNIQ_ID			0x8
++#define DHCP_CL_MODEL_NUM 			0x9
++#define DHCP_CL_VENDOR_NAME 		0xa
++#define DHCP_CL_CCAP_CORES_V4 		0x3d
++#define DHCP_CL_MAX 			0x3e
++
+ struct dhcp_optflag {
+ 	uint8_t flags;
+ 	uint8_t code;
+@@ -189,11 +218,13 @@ struct option_set {
+ };
+ 
+ extern const struct dhcp_optflag dhcp_optflags[];
++extern const struct dhcp_optflag dhcp_suboptflags[];
+ extern const char dhcp_option_strings[] ALIGN1;
+ extern const uint8_t dhcp_option_lengths[] ALIGN1;
+ 
+ unsigned FAST_FUNC udhcp_option_idx(const char *name);
+ 
++const char *dhcp_subopt2str(uint8_t opt_code) FAST_FUNC;
+ uint8_t *udhcp_get_option(struct dhcp_packet *packet, int code) FAST_FUNC;
+ int udhcp_end_option(uint8_t *optionptr) FAST_FUNC;
+ void udhcp_add_binary_option(struct dhcp_packet *packet, uint8_t *addopt) FAST_FUNC;
+@@ -284,6 +315,7 @@ void udhcp_dump_packet(struct dhcp_packe
+ int FAST_FUNC udhcp_str2nip(const char *str, void *arg);
+ /* 2nd param is "struct option_set**" */
+ int FAST_FUNC udhcp_str2optset(const char *str, void *arg);
++int FAST_FUNC udhcp_str2subopt(const char *str, void *arg);
+ 
+ void udhcp_init_header(struct dhcp_packet *packet, char type) FAST_FUNC;
+ 
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -3,6 +3,8 @@
+  * udhcp client
+  *
+  * Russ Dill <Russ.Dill@asu.edu> July 2001
++ * Portions Copyright (c) 2016 Cisco and/or its affiliates, and
++ *                             Cable Television Laboratories, Inc. ("CableLabs")
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -18,16 +20,20 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  */
++
++#include <dhcp.pb-c.h>
++#include <czmq.h>
+ #include <syslog.h>
++#include <signal.h>
+ /* Override ENABLE_FEATURE_PIDFILE - ifupdown needs our pidfile to always exist */
+ #define WANT_PIDFILE 1
+ #include "common.h"
+-#include "dhcpd.h"
+-#include "dhcpc.h"
+ 
+ #include <netinet/if_ether.h>
+ #include <linux/filter.h>
+ #include <linux/if_packet.h>
++#include "dhcpc.h"
++#include "dhcpd.h"
+ 
+ /* "struct client_config_t client_config" is in bb_common_bufsiz1 */
+ 
+@@ -79,10 +85,12 @@ enum {
+ 	OPT_O = 1 << 16,
+ 	OPT_o = 1 << 17,
+ 	OPT_x = 1 << 18,
+-	OPT_f = 1 << 19,
+-	OPT_B = 1 << 20,
++	OPT_I = 1 << 19,
++	OPT_c = 1 << 20,
++	OPT_f = 1 << 21,
++	OPT_B = 1 << 22,
+ /* The rest has variable bit positions, need to be clever */
+-	OPTBIT_B = 20,
++	OPTBIT_B = 23,
+ 	USE_FOR_MMU(             OPTBIT_b,)
+ 	IF_FEATURE_UDHCPC_ARPING(OPTBIT_a,)
+ 	IF_FEATURE_UDHCP_PORT(   OPTBIT_P,)
+@@ -403,8 +411,103 @@ static NOINLINE char *xmalloc_optname_op
+ 	return ret;
+ }
+ 
++/* Process suboptions with bounds checking */
++static int udhcp_process_subopts(uint8_t *optptr, int rem,
++								 TDhcpData *ipc_data)
++{
++	int opt_len;
++
++	if (NULL == optptr) {
++		return FALSE;
++	}
++
++	/* option bytes: [code][len][data1][data2]..[dataLEN] */
++	while (1) {
++		if (rem <= 0) {
++			bb_error_msg("bad packet, malformed option field");
++			return FALSE;
++		}
++		if (optptr[OPT_CODE] == DHCP_PADDING) {
++			rem--;
++			optptr++;
++			continue;
++		}
++		if (optptr[OPT_CODE] == DHCP_END) {
++			break;
++		}
++
++		if (rem < OPT_DATA) {
++			bb_error_msg("bad packet, malformed option field");
++			return FALSE;
++		}
++
++		opt_len = OPT_DATA + optptr[OPT_LEN];
++		rem -= opt_len;
++		if (rem < 0)
++			continue;
++
++		if (optptr[OPT_CODE] < DHCP_CL_MAX) {
++			uint8_t value_type =
++					dhcp_suboptflags[optptr[OPT_CODE]].flags & OPTION_TYPE_MASK;
++			uint8_t one_value_len = dhcp_option_lengths[value_type];
++
++			switch(optptr[OPT_CODE]) {
++			/* For now parsing of CCAP-core addresses is sufficient */
++			case DHCP_CL_CCAP_CORES_V4:
++			{
++				struct in_addr addr;
++				int idx;
++				size_t addr_count = opt_len / one_value_len;
++				char * addr_str = NULL;
++
++				bb_info_msg("suboption found: %s[%u] len: %u",
++								dhcp_subopt2str(optptr[OPT_CODE]),
++								optptr[OPT_CODE],
++								optptr[OPT_LEN]);
++
++				if (NULL != ipc_data) {
++					if (0 != ipc_data->n_ccapcores){
++						bb_info_msg("Duplicate suboption found, ignoring ...");
++						break;
++					}
++					ipc_data->n_ccapcores = addr_count;
++					ipc_data->ccapcores =
++							xmalloc(addr_count * sizeof(char*));
++				}
++
++				for(idx = 0; idx < addr_count; idx++) {
++					move_from_unaligned32(addr.s_addr,
++							optptr + OPT_DATA + one_value_len*idx);
++					addr_str = inet_ntoa(addr);
++					if (NULL != ipc_data) {
++						size_t addr_str_len =
++								strnlen(addr_str, INET_ADDRSTRLEN) + 1;
++						ipc_data->ccapcores[idx] =
++								xmalloc(addr_str_len * sizeof(char));
++						strncpy(ipc_data->ccapcores[idx], addr_str,
++								addr_str_len);
++					}
++					bb_info_msg("   %d. addr: %s", idx+1, addr_str);
++				}
++				break;
++			} /* case */
++			} /* switch */
++		} else {
++			bb_error_msg("Unknown suboption found: %d", optptr[OPT_CODE]);
++		}
++
++		if (0 == rem) {
++			return TRUE;
++		}
++
++		optptr += opt_len;
++	}
++	return FALSE;
++}
++
+ /* put all the parameters into the environment */
+-static char **fill_envp(struct dhcp_packet *packet)
++static char **fill_envp(struct dhcp_packet *packet,
++						TDhcpData *ipc_data)
+ {
+ 	int envc;
+ 	int i;
+@@ -412,6 +515,9 @@ static char **fill_envp(struct dhcp_pack
+ 	const char *opt_name;
+ 	uint8_t *temp;
+ 	uint8_t overload = 0;
++	uint32_t vendor_id = 0;
++	uint16_t vendor_tlv_len = 0;
++	uint8_t *vendor_ptr = NULL;
+ 
+ #define BITMAP unsigned
+ #define BBITS (sizeof(BITMAP) * 8)
+@@ -473,6 +579,7 @@ static char **fill_envp(struct dhcp_pack
+ 	*curr = xmalloc(sizeof("ip=255.255.255.255"));
+ 	sprint_nip(*curr, "ip=", (uint8_t *) &packet->yiaddr);
+ 	putenv(*curr++);
++
+ 	if (packet->siaddr_nip) {
+ 		/* IP address of next server to use in bootstrap */
+ 		*curr = xmalloc(sizeof("siaddr=255.255.255.255"));
+@@ -495,25 +602,155 @@ static char **fill_envp(struct dhcp_pack
+ 	i = 0;
+ 	while (*opt_name) {
+ 		uint8_t code = dhcp_optflags[i].code;
++		uint8_t value_type = dhcp_optflags[i].flags & OPTION_TYPE_MASK;
++		uint8_t one_value_len = dhcp_option_lengths[value_type];
+ 		BITMAP *found_ptr = &FOUND_OPTS(code);
+ 		BITMAP found_mask = BMASK(code);
++		unsigned data_len = 0;
+ 		if (!(*found_ptr & found_mask))
+ 			goto next;
+ 		*found_ptr &= ~found_mask; /* leave only unknown options */
+ 		temp = udhcp_get_option(packet, code);
++		data_len = temp[-OPT_DATA + OPT_LEN];
+ 		*curr = xmalloc_optname_optval(temp, &dhcp_optflags[i], opt_name);
+ 		putenv(*curr++);
+-		if (code == DHCP_SUBNET) {
++
++		switch(code) {
++		case DHCP_SUBNET:
++		{
+ 			/* Subnet option: make things like "$ip/$mask" possible */
+ 			uint32_t subnet;
++			if (data_len < sizeof(uint32_t))
++			{
++				bb_error_msg("ignoring short DHCP_SUBNET option");
++				break;
++			}
+ 			move_from_unaligned32(subnet, temp);
+ 			*curr = xasprintf("mask=%u", mton(subnet));
+ 			putenv(*curr++);
++			break;
++		}
++		case DHCP_TIME_OFFSET:
++		{
++			int32_t offset = 0;
++			if (data_len < sizeof(uint32_t))
++			{
++				bb_error_msg("ignoring short DHCP_TIME_OFFSET option");
++				break;
++			}
++			move_from_unaligned32(offset, temp);
++			offset = ntohl(offset);
++
++			if (NULL != ipc_data) {
++				ipc_data->timeoffset = offset;
++			}
++			bb_info_msg("option found: time-offset[%u]: %"PRId32,
++											temp[-OPT_DATA], offset);
++			break;
++		}
++		case DHCP_TIME_SERVER:
++		{
++			struct in_addr server;
++			char* addr_str = NULL;
++			size_t addr_count = data_len / one_value_len;
++			int idx = 0;
++
++			if (NULL != ipc_data) {
++				ipc_data->n_timeservers = addr_count;
++				ipc_data->timeservers =
++						xmalloc(ipc_data->n_timeservers * sizeof(char*));
++			}
++
++			bb_info_msg("option found: %s[%u] len: %u", opt_name,
++											temp[-OPT_DATA], data_len);
++
++			for (idx = 0; idx < addr_count; ++idx) {
++				move_from_unaligned32(server.s_addr, temp);
++				addr_str = inet_ntoa(server);
++				if (NULL != ipc_data) {
++					size_t addr_str_len =
++							strnlen(addr_str, INET_ADDRSTRLEN) + 1;
++					ipc_data->timeservers[idx] =
++							xmalloc(addr_str_len * sizeof(char));
++					strncpy(ipc_data->timeservers[idx], addr_str, addr_str_len);
++				}
++				bb_info_msg("   addr: %s", addr_str);
++				data_len -= one_value_len;
++				temp += one_value_len;
++			}
++			break;
++		}
++		case DHCP_LOG_SERVER:
++		{
++			struct in_addr server;
++			char* addr_str = NULL;
++			size_t addr_count = data_len / one_value_len;
++			int idx = 0;
++
++			if (NULL != ipc_data) {
++				ipc_data->n_logservers = addr_count;
++				ipc_data->logservers =
++						xmalloc(ipc_data->n_logservers * sizeof(char*));
++			}
++
++			bb_info_msg("option found: %s[%u] len: %u", opt_name,
++											temp[-OPT_DATA], data_len);
++
++			for (idx = 0; idx < addr_count; ++idx) {
++				move_from_unaligned32(server.s_addr, temp);
++				addr_str = inet_ntoa(server);
++				if (NULL != ipc_data) {
++					size_t addr_str_len =
++							strnlen(addr_str, INET_ADDRSTRLEN) + 1;
++					ipc_data->logservers[idx] =
++							xmalloc(addr_str_len * sizeof(char));
++					strncpy(ipc_data->logservers[idx], addr_str, addr_str_len);
++				}
++				bb_info_msg("   addr: %s", addr_str);
++				data_len -= one_value_len;
++				temp += one_value_len;
++			}
++			break;
++		}
++		case DHCP_VENDOR_SPECIFIC:
++		{
++			/* Maybe vendor class TLV is not parsed yet, save pointer
++			 * to vendor data and parse it later*/
++			vendor_ptr = temp;
++			vendor_tlv_len = data_len;
++			break;
++		}
++		case DHCP_VENDOR_CLASS:
++			if (data_len < sizeof(uint32_t))
++			{
++				bb_error_msg("ignoring short DHCP_VENDOR_CLASS option");
++				break;
++			}
++			move_from_unaligned32(vendor_id, temp);
++			vendor_id = ntohl(vendor_id);
++			/* Ignore rest of vendor class option */
++			break;
+ 		}
+  next:
+ 		opt_name += strlen(opt_name) + 1;
+ 		i++;
+ 	}
++	/* Process stored vendor data */
++	if (NULL != vendor_ptr) {
++		if (DHCP_CABLELABS_VENDOR_ID == vendor_id) {
++			udhcp_process_subopts(vendor_ptr, vendor_tlv_len, ipc_data);
++		} else if (0 == vendor_id) {
++			bb_info_msg("Vendor Identifying class [%d] not found - "
++						 "using default vendor [%d] format",
++						 DHCP_VENDOR_CLASS, DHCP_CABLELABS_VENDOR_ID);
++			/* TODO: remove this, if dhcp server is really sending option 124 */
++			udhcp_process_subopts(vendor_ptr, vendor_tlv_len, ipc_data);
++		}
++		else {
++			bb_info_msg("Unknown vendor ID [%d] found, ignoring ...",
++					vendor_id);
++		}
++	}
+ 	/* Export unknown options */
+ 	for (i = 0; i < 256;) {
+ 		BITMAP bitmap = FOUND_OPTS(i);
+@@ -540,14 +777,121 @@ static char **fill_envp(struct dhcp_pack
+ 	return envp;
+ }
+ 
++static void udhcp_send_ipc_message(zsock_t *sock, TDhcpMessage *msg) {
++	void *ipc_buffer = NULL;
++	zframe_t *frame = NULL;
++	size_t ipc_msg_len = 0;
++
++	if (NULL == sock || NULL == msg) {
++		bb_error_msg_and_die("NULL arguments provided");
++		return;
++	}
++	msg->client = T__DHCP_MESSAGE__T__CLIENT__DHCPV4;
++	ipc_msg_len = t__dhcp_message__get_packed_size(msg);
++	if (0 == ipc_msg_len) {
++		bb_info_msg("Zero length of IPC message");
++		return;
++	}
++	ipc_buffer = xmalloc(ipc_msg_len);
++
++	t__dhcp_message__pack(msg, ipc_buffer);
++	frame = zframe_new(ipc_buffer, ipc_msg_len);
++	if (NULL == frame) {
++		bb_error_msg_and_die("Failed to create zframe");
++	} else {
++		// frame is automatically destroyed after send
++		if (-1 == zframe_send(&frame, sock, 0)) {
++			bb_error_msg_and_die("Failed to send data to manager: %s",
++					zmq_strerror(zmq_errno()));
++		} else {
++			bb_info_msg("DHCP data sent to manager, length[%d]", ipc_msg_len);
++		}
++	}
++
++	free(ipc_buffer);
++}
++
++/* Send error message and !!!destroy!!! socket */
++static void udhcp_send_ipc_error_msg(zsock_t *sock, char* error_str) {
++	TDhcpMessage ipc_msg = T__DHCP_MESSAGE__INIT;
++
++	/*fill the interface field*/
++	int len= strlen(client_config.interface) + 1;
++	ipc_msg.interfacename = xmalloc(len);
++	strncpy(ipc_msg.interfacename, client_config.interface, len);
++
++	if (NULL == sock) {
++		return;
++	}
++	ipc_msg.status = T__DHCP_MESSAGE__T__STATUS__FAILED;
++	if (NULL != error_str) {
++		ipc_msg.errormessage = error_str;
++	}
++	udhcp_send_ipc_message(sock, &ipc_msg);
++	zsock_destroy(&sock);
++}
++
++static void udhcp_free_string_array(char **str_array, size_t length) {
++	size_t i;
++	if (NULL == str_array) {
++		return;
++	}
++	for (i = 0; i < length; i++) {
++		if (NULL != str_array[i]) {
++			free(str_array[i]);
++		}
++	}
++	free(str_array);
++}
++
+ /* Call a script with a par file and env vars */
+ static void udhcp_run_script(struct dhcp_packet *packet, const char *name)
+ {
+ 	char **envp, **curr;
+ 	char *argv[3];
++	uint8_t *message;
++	TDhcpMessage *ipc_msg = NULL;
++	TDhcpData *ipc_data = NULL;
+ 
+-	envp = fill_envp(packet);
+-
++	if (NULL != packet && NULL != client_config.ipc_sock) {
++		message = udhcp_get_option(packet, DHCP_MESSAGE_TYPE);
++		if (NULL != message && *message == DHCPACK) {
++			ipc_msg = xmalloc(sizeof(TDhcpMessage));
++			t__dhcp_message__init(ipc_msg);
++			ipc_data = xmalloc(sizeof(TDhcpData));
++			t__dhcp_data__init(ipc_data);
++			ipc_msg->dhcpdata = ipc_data;
++			ipc_msg->status = T__DHCP_MESSAGE__T__STATUS__UPDATED;
++		}
++	} else if (strcmp(name, "leasefail") == 0 && NULL != client_config.ipc_sock) {
++		ipc_msg = xmalloc(sizeof(TDhcpMessage));
++		t__dhcp_message__init(ipc_msg);
++		ipc_data = xmalloc(sizeof(TDhcpData));
++		t__dhcp_data__init(ipc_data);
++		ipc_msg->dhcpdata = ipc_data;
++		ipc_msg->status = T__DHCP_MESSAGE__T__STATUS__FAILED;
++	}
++
++	envp = fill_envp(packet, ipc_data);
++
++	/*fill the interface field*/
++	if (NULL != ipc_msg) {
++		int len= strlen(client_config.interface) + 1;
++		ipc_msg->interfacename = xmalloc(len);
++		strncpy(ipc_msg->interfacename, client_config.interface, len);
++	}
++	if (ipc_data == NULL) {
++	    bb_info_msg("ipc data is null");
++	} else {
++	    bb_info_msg("ipc msg interface is %s", ipc_msg->interfacename);
++	    bb_info_msg("ipc msg time offset is %d", ipc_data->timeoffset);
++	    if (0 == ipc_data->n_ccapcores || 0 == ipc_data->n_timeservers){
++			bb_error_msg("66070313:DHCP FAILED - Critical field invalid in response");
++			if (strcmp(name, "renew") == 0) {
++			    bb_error_msg("66070303:DHCP RENEW FAILED - Critical field invalid in response");
++			}
++		}
++	}
+ 	/* call script */
+ 	log1("Executing %s %s", client_config.script, name);
+ 	argv[0] = (char*) client_config.script;
+@@ -560,6 +904,17 @@ static void udhcp_run_script(struct dhcp
+ 		bb_unsetenv_and_free(*curr);
+ 	}
+ 	free(envp);
++
++	if (NULL != ipc_msg) {
++		udhcp_send_ipc_message(client_config.ipc_sock, ipc_msg);
++		//cleanup
++		udhcp_free_string_array(ipc_data->logservers, ipc_data->n_logservers);
++		udhcp_free_string_array(ipc_data->ccapcores, ipc_data->n_ccapcores);
++		udhcp_free_string_array(ipc_data->timeservers,
++				ipc_data->n_timeservers);
++		free(ipc_data);
++		free(ipc_msg);
++	}
+ }
+ 
+ 
+@@ -685,7 +1040,7 @@ static int bcast_or_ucast(struct dhcp_pa
+ static NOINLINE int send_discover(uint32_t xid, uint32_t requested)
+ {
+ 	struct dhcp_packet packet;
+-	static int msgs = 0;
++	/*static int msgs = 0;*/
+ 
+ 	/* Fill in: op, htype, hlen, cookie, chaddr fields,
+ 	 * random xid field (we override it below),
+@@ -703,7 +1058,7 @@ static NOINLINE int send_discover(uint32
+ 	 */
+ 	add_client_options(&packet);
+ 
+-	if (msgs++ < 3)
++	/*if (msgs++ < 3)*/
+ 	bb_info_msg("Sending discover...");
+ 	return raw_bcast_from_client_config_ifindex(&packet, INADDR_ANY);
+ }
+@@ -1238,12 +1593,13 @@ int udhcpc_main(int argc, char **argv) M
+ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	uint8_t *message;
+-	const char *str_V, *str_h, *str_F, *str_r;
++	const char *str_V, *str_h, *str_F, *str_r, *str_I;
+ 	IF_FEATURE_UDHCPC_ARPING(const char *str_a = "2000";)
+ 	IF_FEATURE_UDHCP_PORT(char *str_P;)
+ 	void *clientid_mac_ptr;
+ 	llist_t *list_O = NULL;
+ 	llist_t *list_x = NULL;
++	llist_t *list_c = NULL;
+ 	int tryagain_timeout = 20;
+ 	int discover_timeout = 3;
+ 	int discover_retries = 3;
+@@ -1258,19 +1614,25 @@ int udhcpc_main(int argc UNUSED_PARAM, c
+ 	int max_fd;
+ 	int retval;
+ 	fd_set rfds;
++	sigset_t sigset;
+ 
+ 	/* Default options */
+ 	IF_FEATURE_UDHCP_PORT(SERVER_PORT = 67;)
+ 	IF_FEATURE_UDHCP_PORT(CLIENT_PORT = 68;)
+ 	client_config.interface = "eth0";
+ 	client_config.script = CONFIG_UDHCPC_DEFAULT_SCRIPT;
+-	str_V = "udhcp "BB_VER;
++	client_config.ipc_sock = NULL;
++	str_V = VENDOR_CLASS_ID;
++
++	/* Unblock signals blocked by parent */
++	sigemptyset (&sigset);
++	sigprocmask(SIG_SETMASK, &sigset, NULL);
+ 
+ 	/* Parse command line */
+ 	/* O,x: list; -T,-t,-A take numeric param */
+-	opt_complementary = "O::x::T+:t+:A+" IF_UDHCP_VERBOSE(":vv") ;
++	opt_complementary = "O::x::c::T+:t+:A+" IF_UDHCP_VERBOSE(":vv") ;
+ 	IF_LONG_OPTS(applet_long_options = udhcpc_longopts;)
+-	opt = getopt32(argv, "CV:H:h:F:i:np:qRr:s:T:t:SA:O:ox:fB"
++	opt = getopt32(argv, "CV:H:h:F:i:np:qRr:s:T:t:SA:O:ox:I:c:fB"
+ 		USE_FOR_MMU("b")
+ 		IF_FEATURE_UDHCPC_ARPING("a::")
+ 		IF_FEATURE_UDHCP_PORT("P:")
+@@ -1281,6 +1643,8 @@ int udhcpc_main(int argc UNUSED_PARAM, c
+ 		, &discover_timeout, &discover_retries, &tryagain_timeout /* T,t,A */
+ 		, &list_O
+ 		, &list_x
++		, &str_I
++		, &list_c
+ 		IF_FEATURE_UDHCPC_ARPING(, &str_a)
+ 		IF_FEATURE_UDHCP_PORT(, &str_P)
+ 		IF_UDHCP_VERBOSE(, &dhcp_verbose)
+@@ -1331,6 +1695,12 @@ int udhcpc_main(int argc UNUSED_PARAM, c
+ 			}
+ 		}
+ 	}
++
++	while (list_c) {
++		char *optstr = llist_pop(&list_c);
++		udhcp_str2subopt(optstr, &client_config.options);
++	}
++
+ 	while (list_x) {
+ 		char *optstr = llist_pop(&list_x);
+ 		char *colon = strchr(optstr, ':');
+@@ -1341,6 +1711,19 @@ int udhcpc_main(int argc UNUSED_PARAM, c
+ 		udhcp_str2optset(optstr, &client_config.options);
+ 	}
+ 
++	if (opt & OPT_I) {
++		if (NULL != str_I) {
++			client_config.ipc_sock = zsock_new_push(str_I);
++			if (NULL == client_config.ipc_sock) {
++				// No socket -> no way how to inform manager about failure
++				bb_error_msg_and_die("Failed to create sock to address: %s",
++						str_I);
++			}
++		} else {
++			bb_error_msg("No address for IPC found");
++		}
++	}
++
+ 	if (udhcp_read_interface(client_config.interface,
+ 			&client_config.ifindex,
+ 			NULL,
+@@ -1375,7 +1758,7 @@ int udhcpc_main(int argc UNUSED_PARAM, c
+ 	}
+ #endif
+ 	if (opt & OPT_S) {
+-		openlog(applet_name, LOG_PID, LOG_DAEMON);
++		openlog(applet_name, LOG_PID, LOG_LOCAL7);
+ 		logmode |= LOGMODE_SYSLOG;
+ 	}
+ 
+@@ -1473,13 +1856,15 @@ int udhcpc_main(int argc UNUSED_PARAM, c
+ 					if (packet_num == 0)
+ 						xid = random_xid();
+ 					/* broadcast */
++					bb_info_msg("%d. attempt - discover", packet_num + 1);
+ 					send_discover(xid, requested_ip);
+-					timeout = discover_timeout;
+ 					packet_num++;
++					timeout = rand() % (1 << packet_num);
+ 					continue;
+ 				}
+  leasefail:
+ 				udhcp_run_script(NULL, "leasefail");
++				bb_error_msg("66070310:DHCP FAILED - Discover sent, no offer received IPV4");
+ #if BB_MMU /* -b is not supported on NOMMU */
+ 				if (opt & OPT_b) { /* background if no lease */
+ 					bb_info_msg("No lease, forking to background");
+@@ -1501,10 +1886,13 @@ int udhcpc_main(int argc UNUSED_PARAM, c
+ 				if (!discover_retries || packet_num < discover_retries) {
+ 					/* send broadcast select packet */
+ 					send_select(xid, server_addr, requested_ip);
++					bb_info_msg("%d. attempt - request", packet_num + 1);
+ 					timeout = discover_timeout;
+ 					packet_num++;
+ 					continue;
+ 				}
++				bb_error_msg("66070311:DHCP FAILED - Request sent, No response");
++				bb_error_msg("66070317:DHCP failed - DHCP Request sent, No DHCP REPLY received");
+ 				/* Timed out, go back to init state.
+ 				 * "discover...select...discover..." loops
+ 				 * were seen in the wild. Treat them similarly
+@@ -1553,6 +1941,8 @@ int udhcpc_main(int argc UNUSED_PARAM, c
+ 				}
+ 				/* Timed out, enter init state */
+ 				bb_info_msg("Lease lost, entering init state");
++				bb_error_msg("66070300:DHCP RENEW sent - No response for IPV4");
++				bb_error_msg("66070301:DHCP REBIND sent - No response for IPV4");
+ 				udhcp_run_script(NULL, "deconfig");
+ 				state = INIT_SELECTING;
+ 				client_config.first_secs = 0; /* make secs field count from 0 */
+@@ -1712,6 +2102,7 @@ int udhcpc_main(int argc UNUSED_PARAM, c
+ 				temp = udhcp_get_option(&packet, DHCP_LEASE_TIME);
+ 				if (!temp) {
+ 					bb_error_msg("no lease time with ACK, using 1 hour lease");
++					bb_error_msg("66070312:DHCP FAILED - Non-critical field invalid in response");
+ 					lease_seconds = 60 * 60;
+ 				} else {
+ 					/* it IS unaligned sometimes, don't "optimize" */
+@@ -1743,6 +2134,11 @@ int udhcpc_main(int argc UNUSED_PARAM, c
+ 					) {
+ 						bb_info_msg("Offered address is in use "
+ 							"(got ARP reply), declining");
++						if (state == RENEWING || state == RENEW_REQUESTED) {
++						    bb_error_msg("66070303:DHCP RENEW FAILED - Critical field invalid in response");
++						} else if (state == REBINDING) {
++						    bb_error_msg("66070305:DHCP REBIND FAILED - Critical field invalid in response");
++						}
+ 						send_decline(/*xid,*/ server_addr, packet.yiaddr);
+ 
+ 						if (state != REQUESTING)
+@@ -1803,6 +2199,11 @@ int udhcpc_main(int argc UNUSED_PARAM, c
+ 						log1("%s with wrong server ID, ignoring packet",
+ 							"Received DHCP NAK"
+ 						);
++						if (state == RENEWING || state == RENEW_REQUESTED) {
++						    bb_error_msg("66070302:DHCP RENEW WARNING - Field invalid in response");
++						} else if (state == REBINDING) {
++						    bb_error_msg("66070304:DHCP REBIND WARNING - Field invalid in response");
++						}
+ 						continue;
+ 					}
+ 					move_from_unaligned32(svid, temp);
+@@ -1835,6 +2236,13 @@ int udhcpc_main(int argc UNUSED_PARAM, c
+ 		perform_release(server_addr, requested_ip);
+ 	retval = 0;
+  ret:
++    /* Notify parent about exiting */
++	if (NULL == client_config.ipc_sock) {
++		bb_info_msg("Socket to parent not ready, skipping sending info");
++	} else {
++		/* Inform about exiting */
++		udhcp_send_ipc_error_msg(client_config.ipc_sock, NULL);
++	}
+ 	/*if (client_config.pidfile) - remove_pidfile has its own check */
+ 		remove_pidfile(client_config.pidfile);
+ 	return retval;

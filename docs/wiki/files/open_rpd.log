@@ -1,0 +1,423 @@
+Wed Mar 23 08:05:46 2016 daemon.warn netifd: You have delegated IPv6-prefixes but haven't assigned them to any interface. Did you forget to set option ip6assign on your lan-interfaces?
+Wed Mar 23 08:05:46 2016 daemon.notice netifd: Interface 'loopback' is enabled
+Wed Mar 23 08:05:46 2016 daemon.notice netifd: Interface 'loopback' is setting up now
+Wed Mar 23 08:05:46 2016 daemon.notice netifd: Interface 'loopback' is now up
+Wed Mar 23 08:05:46 2016 kern.info kernel: [   10.477565] 8021q: adding VLAN 0 to HW filter on device eth0
+Wed Mar 23 08:05:46 2016 kern.info kernel: [   10.485355] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+Wed Mar 23 08:05:46 2016 daemon.notice netifd: Interface 'wan' is enabled
+Wed Mar 23 08:05:46 2016 daemon.notice netifd: Network device 'lo' link is up
+Wed Mar 23 08:05:46 2016 daemon.notice netifd: Interface 'loopback' has link connectivity 
+Wed Mar 23 08:05:46 2016 daemon.info procd: - init complete -
+Wed Mar 23 08:05:46 2016 daemon.info dnsmasq[1242]: started, version 2.73 cachesize 150
+Wed Mar 23 08:05:46 2016 daemon.info dnsmasq[1242]: compile time options: IPv6 GNU-getopt no-DBus no-i18n no-IDN DHCP no-DHCPv6 no-Lua TFTP no-conntrack no-ipset no-auth no-DNSSEC loop-detect inotify
+Wed Mar 23 08:05:46 2016 daemon.info dnsmasq[1242]: DNS service limited to local subnets
+Wed Mar 23 08:05:46 2016 daemon.info dnsmasq[1242]: using local addresses only for domain lan
+Wed Mar 23 08:05:46 2016 daemon.warn dnsmasq[1242]: no servers found in /tmp/resolv.conf.auto, will retry
+Wed Mar 23 08:05:46 2016 daemon.info dnsmasq[1242]: read /etc/hosts - 1 addresses
+Wed Mar 23 08:05:47 2016 authpriv.info dropbear[1267]: Not backgrounding
+Wed Mar 23 08:05:47 2016 daemon.info manager: Changing state: none -> init
+Wed Mar 23 08:05:47 2016 daemon.debug it_api: Listening for testing requests
+Wed Mar 23 08:05:47 2016 kern.info kernel: [   11.879842] 8021q: adding VLAN 0 to HW filter on device eth1
+Wed Mar 23 08:05:47 2016 kern.info kernel: [   11.888318] IPv6: ADDRCONF(NETDEV_UP): eth1: link is not ready
+Wed Mar 23 08:05:47 2016 daemon.info manager: Changing state: init -> if_up_waiting
+Wed Mar 23 08:05:47 2016 daemon.info manager: Waiting for interface to go up
+Wed Mar 23 08:05:48 2016 kern.info kernel: [   12.490835] e1000: eth0 NIC Link is Up 1000 Mbps Full Duplex, Flow Control: RX
+Wed Mar 23 08:05:48 2016 daemon.notice netifd: Network device 'eth0' link is up
+Wed Mar 23 08:05:48 2016 daemon.notice netifd: Interface 'wan' has link connectivity 
+Wed Mar 23 08:05:48 2016 daemon.notice netifd: Interface 'wan' is setting up now
+Wed Mar 23 08:05:48 2016 kern.info kernel: [   12.540260] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
+Wed Mar 23 08:05:48 2016 daemon.notice netifd: wan (1288): udhcpc (v1.23.2) started
+Wed Mar 23 08:05:48 2016 daemon.notice netifd: wan (1288): 1. attempt - discover
+Wed Mar 23 08:05:48 2016 daemon.notice netifd: wan (1288): Sending discover...
+Wed Mar 23 08:05:48 2016 daemon.debug example: Doing something ...
+Wed Mar 23 08:05:48 2016 daemon.debug hal: Starting dispatcher loop
+Wed Mar 23 08:05:48 2016 daemon.debug rcp_orchestrator: Changing orchestration state: FROM: RCP_SLAVE_ORCH_INIT TO: RCP_SLAVE_ORCH_NO_SESSIONS
+Wed Mar 23 08:05:49 2016 daemon.notice netifd: wan (1288): 2. attempt - discover
+Wed Mar 23 08:05:49 2016 daemon.notice netifd: wan (1288): Sending discover...
+Wed Mar 23 08:05:49 2016 daemon.notice netifd: Network device 'eth1' link is up
+Wed Mar 23 08:05:49 2016 daemon.notice netifd: Interface 'lan' has link connectivity 
+Wed Mar 23 08:05:49 2016 kern.info kernel: [   13.890827] e1000: eth1 NIC Link is Up 1000 Mbps Full Duplex, Flow Control: RX
+Wed Mar 23 08:05:49 2016 kern.info kernel: [   13.901704] IPv6: ADDRCONF(NETDEV_CHANGE): eth1: link becomes ready
+Wed Mar 23 08:05:49 2016 daemon.info manager: Changing state: if_up_waiting -> dhcpv6_waiting
+Wed Mar 23 08:05:49 2016 daemon.debug it_api: Handling receive event
+Wed Mar 23 08:05:49 2016 user.notice syslog: Vendor suboption loading: 8
+Wed Mar 23 08:05:49 2016 user.notice syslog: Vendor suboption loading: 9
+Wed Mar 23 08:05:49 2016 user.notice syslog: Vendor suboption loading: 4
+Wed Mar 23 08:05:49 2016 user.notice syslog: Vendor suboption loading: 5
+Wed Mar 23 08:05:49 2016 user.notice syslog: Vendor suboption loading: 6
+Wed Mar 23 08:05:49 2016 user.notice syslog: Vendor suboption loading: 7
+Wed Mar 23 08:05:49 2016 user.notice syslog: Vendor suboption loading: 10
+Wed Mar 23 08:05:49 2016 user.notice syslog: Vendor suboption loading: 2
+Wed Mar 23 08:05:49 2016 daemon.notice odhcp6c[1301]: (re)starting transaction on eth1
+Wed Mar 23 08:05:50 2016 daemon.notice odhcp6c[1301]: Starting SOLICIT transaction (timeout 4294967295s, max rc 8)
+Wed Mar 23 08:05:50 2016 daemon.notice odhcp6c[1301]: Send SOLICIT message (elapsed 0ms, rc 0)
+Wed Mar 23 08:05:51 2016 daemon.notice netifd: wan (1288): 3. attempt - discover
+Wed Mar 23 08:05:51 2016 daemon.notice netifd: wan (1288): Sending discover...
+Wed Mar 23 08:05:51 2016 daemon.notice netifd: wan (1288): Sending select for 192.168.122.24...
+Wed Mar 23 08:05:51 2016 daemon.notice netifd: wan (1288): 1. attempt - request
+Wed Mar 23 08:05:51 2016 daemon.notice netifd: wan (1288): Lease of 192.168.122.24 obtained, lease time 3600
+Wed Mar 23 08:05:51 2016 daemon.notice netifd: Interface 'wan' is now up
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1242]: reading /tmp/resolv.conf.auto
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1242]: using local addresses only for domain lan
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1242]: using nameserver 192.168.122.1#53
+Wed Mar 23 08:05:51 2016 user.notice firewall: Reloading firewall due to ifup of wan (eth0)
+Wed Mar 23 08:05:51 2016 kern.notice kernel: [   15.169967] random: nonblocking pool is initialized
+Wed Mar 23 08:05:51 2016 daemon.notice odhcp6c[1301]: Send SOLICIT message (elapsed 1020ms, rc 1)
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1242]: exiting on receipt of SIGTERM
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1362]: started, version 2.73 cachesize 150
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1362]: compile time options: IPv6 GNU-getopt no-DBus no-i18n no-IDN DHCP no-DHCPv6 no-Lua TFTP no-conntrack no-ipset no-auth no-DNSSEC loop-detect inotify
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1362]: DNS service limited to local subnets
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1362]: using local addresses only for domain lan
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1362]: reading /tmp/resolv.conf.auto
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1362]: using local addresses only for domain lan
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1362]: using nameserver 192.168.122.1#53
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1362]: read /etc/hosts - 1 addresses
+Wed Mar 23 08:05:51 2016 daemon.info dnsmasq[1362]: read /tmp/hosts/dhcp - 0 addresses
+Wed Mar 23 08:05:51 2016 authpriv.info dropbear[1364]: Child connection from 192.168.122.1:33232
+Wed Mar 23 08:05:52 2016 authpriv.notice dropbear[1364]: Password auth succeeded for 'root' from 192.168.122.1:33232
+Wed Mar 23 08:05:52 2016 authpriv.info dropbear[1364]: Exit (root): Exited normally
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]: Send SOLICIT message (elapsed 2960ms, rc 2)
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]: Got a valid reply after 2963ms
+Wed Mar 23 08:05:53 2016 daemon.debug it_api: Handling receive event
+Wed Mar 23 08:05:53 2016 daemon.debug it_api: IPC message from fd [14] received, len[2]
+Wed Mar 23 08:05:53 2016 daemon.debug user's RX CB
+Wed Mar 23 08:05:53 2016 daemon.debug manager: Received IT API message: IT_API_RPD_GET
+Wed Mar 23 08:05:53 2016 daemon.debug manager: Response prepared
+Wed Mar 23 08:05:53 2016 daemon.debug it_api: Handling receive event
+Wed Mar 23 08:05:53 2016 daemon.info example: Data sent to manager, length[14]
+Wed Mar 23 08:05:53 2016 daemon.debug manager: IPC message from fd [12] received, len[14]
+Wed Mar 23 08:05:53 2016 daemon.debug manager: Message received: Hello world!
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]: Starting REQUEST transaction (timeout 4294967295s, max rc 8)
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]: Send REQUEST message (elapsed 0ms, rc 0)
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]: Got a valid reply after 1ms
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]: Option Vendor Opts[17] found, len: 136, vendor_id: 4491
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]: Suboption found: ccap-core[11] len: 32
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]:    addr=fd00:dead:1::1
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]:    addr=7d1::2
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]: Suboption found: log-server[34] len: 32
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]:    addr=fd00:dead:1::1
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]:    addr=8d1::2
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]: Suboption found: time-server[37] len: 48
+Wed Mar 23 08:05:53 2016 daemon.info odhcp6c[1301]: DHCP data sent to manager, length[87]
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]: entering stateful-mode on eth1
+Wed Mar 23 08:05:53 2016 daemon.notice odhcp6c[1301]: Starting <POLL> transaction (timeout 1125s, max rc 0)
+Wed Mar 23 08:05:53 2016 daemon.debug manager: IPC message from fd [24] received, len[87]
+Wed Mar 23 08:05:53 2016 daemon.debug manager: DHCP status received: UPDATED
+Wed Mar 23 08:05:53 2016 daemon.info manager: Changing state: dhcpv6_waiting -> time_waiting
+Wed Mar 23 08:05:53 2016 daemon.debug rcp_process: IPC message from manager received, len[2]
+Wed Mar 23 08:05:53 2016 daemon.info rcp_process: RCP message type: REMOVE_ALL_CCAP_CORES
+Wed Mar 23 08:05:53 2016 daemon.info rcp_orchestrator: All RCP sessions removed
+Wed Mar 23 08:05:53 2016 daemon.info manager: Data sent to RCP, length[2]
+Wed Mar 23 08:05:53 2016 daemon.info manager: CCAPCores = [u'fd00:dead:1::1', u'7d1::2']
+Wed Mar 23 08:05:53 2016 daemon.info manager: TimeServers = [u'9d1::1', u'fd00:dead:1::1', u'9d1::2']
+Wed Mar 23 08:05:53 2016 daemon.info manager: LogServers = [u'fd00:dead:1::1', u'8d1::2']
+Wed Mar 23 08:05:53 2016 daemon.info manager: TimeOffset = 7200
+Wed Mar 23 08:05:53 2016 daemon.notice netifd: Interface 'lan' is enabled
+Wed Mar 23 08:05:53 2016 daemon.notice netifd: Interface 'lan' is now up
+Wed Mar 23 08:05:53 2016 daemon.info dnsmasq[1362]: reading /tmp/resolv.conf.auto
+Wed Mar 23 08:05:53 2016 daemon.info dnsmasq[1362]: using local addresses only for domain lan
+Wed Mar 23 08:05:53 2016 daemon.info dnsmasq[1362]: using nameserver 2001:4860:4860::8888#53
+Wed Mar 23 08:05:53 2016 daemon.info dnsmasq[1362]: using nameserver 192.168.122.1#53
+Wed Mar 23 08:05:53 2016 user.notice firewall: Reloading firewall due to ifupdate of lan (eth1)
+Wed Mar 23 08:05:53 2016 user.notice firewall: Reloading firewall due to ifup of lan (eth1)
+Wed Mar 23 08:05:54 2016 daemon.debug tpc: Opening socket to time server: 9d1::1
+Wed Mar 23 08:05:54 2016 daemon.debug tpc: Sending request to server: 9d1::1
+Wed Mar 23 08:05:54 2016 daemon.err tpc: Failed connection to server 9d1::1: [Errno 13] Permission denied 
+Wed Mar 23 08:05:54 2016 daemon.debug tpc: Opening socket to time server: fd00:dead:1::1
+Wed Mar 23 08:05:54 2016 daemon.debug tpc: Sending request to server: fd00:dead:1::1
+Wed Mar 23 08:05:54 2016 daemon.err tpc: Failed connection to server fd00:dead:1::1: [Errno 13] Permission denied 
+Wed Mar 23 08:05:54 2016 daemon.debug tpc: Opening socket to time server: 9d1::2
+Wed Mar 23 08:05:54 2016 daemon.debug tpc: Sending request to server: 9d1::2
+Wed Mar 23 08:05:54 2016 daemon.err tpc: Failed connection to server 9d1::2: [Errno 13] Permission denied 
+Wed Mar 23 08:05:54 2016 daemon.debug it_api: Handling receive event
+Wed Mar 23 08:05:54 2016 daemon.debug it_api: IPC message from fd [14] received, len[2]
+Wed Mar 23 08:05:54 2016 daemon.debug user's RX CB
+Wed Mar 23 08:05:54 2016 daemon.debug manager: Received IT API message: IT_API_RPD_GET
+Wed Mar 23 08:05:54 2016 daemon.debug manager: Response prepared
+Wed Mar 23 08:05:55 2016 daemon.info tpc: Attempt[1]: result: 0
+Wed Mar 23 08:05:55 2016 daemon.info tpc: TPC data sent to manager, length[2]
+Wed Mar 23 08:05:55 2016 daemon.info tpc: Sleeping for 0 sec
+Wed Mar 23 08:05:55 2016 daemon.debug tpc: Opening socket to time server: 9d1::1
+Wed Mar 23 08:05:55 2016 daemon.debug tpc: Sending request to server: 9d1::1
+Wed Mar 23 08:05:55 2016 daemon.debug manager: IPC message from fd [12] received, len[2]
+Wed Mar 23 08:05:55 2016 daemon.debug manager: TPC status: FIRST_ATTEMPT_FAILED
+Wed Mar 23 08:05:55 2016 daemon.info manager: First attempt to get time failed - resetting time to 1.1.1970
+Wed Mar 23 08:05:55 2016 daemon.info manager: Setting system time to 1970 Jan 01 00:00:00
+Wed Mar 23 08:05:55 2016 daemon.err tpc: Failed connection to server 9d1::1: [Errno 13] Permission denied 
+Wed Mar 23 08:05:55 2016 daemon.debug tpc: Opening socket to time server: fd00:dead:1::1
+Wed Mar 23 08:05:55 2016 daemon.debug tpc: Sending request to server: fd00:dead:1::1
+Wed Mar 23 08:05:55 2016 daemon.err tpc: Failed connection to server fd00:dead:1::1: [Errno 13] Permission denied 
+Wed Mar 23 08:05:55 2016 daemon.debug tpc: Opening socket to time server: 9d1::2
+Wed Mar 23 08:05:55 2016 daemon.debug tpc: Sending request to server: 9d1::2
+Wed Mar 23 08:05:55 2016 daemon.err tpc: Failed connection to server 9d1::2: [Errno 13] Permission denied 
+Thu Jan  1 00:00:00 1970 daemon.debug it_api: Handling receive event
+Thu Jan  1 00:00:00 1970 daemon.debug it_api: IPC message from fd [14] received, len[2]
+Thu Jan  1 00:00:00 1970 daemon.debug user's RX CB
+Thu Jan  1 00:00:00 1970 daemon.debug manager: Received IT API message: IT_API_RPD_GET
+Thu Jan  1 00:00:00 1970 daemon.debug manager: Response prepared
+Thu Jan  1 00:00:00 1970 daemon.err dispatcher: Invalid time difference
+Thu Jan  1 00:00:00 1970 daemon.debug rcp_process: Dispatcher timeout error, seems that time has been changed
+Thu Jan  1 00:00:00 1970 daemon.info rcp_process: Recovered from time change
+Thu Jan  1 00:00:01 1970 daemon.info tpc: Attempt[2]: result: 0
+Thu Jan  1 00:00:01 1970 daemon.info tpc: Sleeping for 2 sec
+Thu Jan  1 00:00:01 1970 daemon.debug it_api: Handling receive event
+Thu Jan  1 00:00:01 1970 daemon.debug it_api: IPC message from fd [14] received, len[2]
+Thu Jan  1 00:00:01 1970 daemon.debug user's RX CB
+Thu Jan  1 00:00:01 1970 daemon.debug manager: Received IT API message: IT_API_RPD_GET
+Thu Jan  1 00:00:01 1970 daemon.debug manager: Response prepared
+Thu Jan  1 00:00:02 1970 daemon.debug it_api: Handling receive event
+Thu Jan  1 00:00:02 1970 daemon.debug it_api: IPC message from fd [14] received, len[2]
+Thu Jan  1 00:00:02 1970 daemon.debug user's RX CB
+Thu Jan  1 00:00:02 1970 daemon.debug manager: Received IT API message: IT_API_RPD_GET
+Thu Jan  1 00:00:02 1970 daemon.debug manager: Response prepared
+Thu Jan  1 00:00:03 1970 daemon.debug tpc: Opening socket to time server: 9d1::1
+Thu Jan  1 00:00:03 1970 daemon.debug tpc: Sending request to server: 9d1::1
+Thu Jan  1 00:00:03 1970 daemon.debug tpc: Opening socket to time server: fd00:dead:1::1
+Thu Jan  1 00:00:03 1970 daemon.debug tpc: Sending request to server: fd00:dead:1::1
+Thu Jan  1 00:00:03 1970 daemon.debug tpc: Opening socket to time server: 9d1::2
+Thu Jan  1 00:00:03 1970 daemon.debug tpc: Sending request to server: 9d1::2
+Thu Jan  1 00:00:03 1970 daemon.info tpc: Received value from '('fd00:dead:1::1', 37, 0, 0)' utc epoch Wed Mar 23 08:05:58 2016
+Thu Jan  1 00:00:03 1970 daemon.info tpc: Attempt[3]: result: 1458720358
+Thu Jan  1 00:00:03 1970 daemon.info tpc: TPC data sent to manager, length[8]
+Thu Jan  1 00:00:03 1970 daemon.debug manager: IPC message from fd [12] received, len[8]
+Thu Jan  1 00:00:03 1970 daemon.debug manager: TPC status: SUCCESS
+Thu Jan  1 00:00:03 1970 daemon.info manager: Valid timestamp received from TPC
+Thu Jan  1 00:00:03 1970 daemon.info manager: Setting system time to 2016 Mar 23 10:05:58
+Wed Mar 23 10:05:58 2016 daemon.info manager: Changing state: time_waiting -> log_waiting
+Wed Mar 23 10:05:58 2016 daemon.info manager: Changing state: log_waiting -> gcp_started
+Wed Mar 23 10:05:58 2016 daemon.info manager: Data sent to RCP, length[26]
+Wed Mar 23 10:05:58 2016 daemon.debug rcp_process: IPC message from manager received, len[26]
+Wed Mar 23 10:05:58 2016 daemon.info rcp_process: RCP message type: ADD_CCAP_CORES
+Wed Mar 23 10:05:58 2016 daemon.info rcp_orchestrator: Adding new session: SLAVE: None:None --> fd00:dead:1::1:6000
+Wed Mar 23 10:05:58 2016 daemon.info rcp_orchestrator: Adding new session: SLAVE: None:None --> 7d1::2:6000
+Wed Mar 23 10:05:59 2016 daemon.debug rcp_orchestrator: Changing orchestration state: FROM: RCP_SLAVE_ORCH_NO_SESSIONS TO: RCP_SLAVE_ORCH_LOOKING_FOR_PRINCIPAL
+Wed Mar 23 10:05:59 2016 daemon.info gcp_sessions: Opening GCP session, AF: 10, Type: 1
+Wed Mar 23 10:05:59 2016 daemon.info logread[1462]: failed to send log data to fd00:dead:1::1:514 via udp
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_sessions: IPv6 remote addr info: (10, 1, 6, '7d1::2', ('7d1::2', 6000, 0, 0))
+Wed Mar 23 10:05:59 2016 daemon.info gcp_sessions: GCP session opened: SLAVE :::0 --> None:None
+Wed Mar 23 10:05:59 2016 daemon.info gcp_sessions: Connecting to the GCP master: 7d1::2:6000
+Wed Mar 23 10:05:59 2016 daemon.err gcp_sessions: GCP slave session initiation failed: [Errno 13] Permission denied
+Wed Mar 23 10:05:59 2016 daemon.debug rcp_sessions: Failed to initiate GCP slave session, can't continue with RCP
+Wed Mar 23 10:05:59 2016 daemon.debug rcp_orchestrator: Next candidate for Principal active: SLAVE: None:None --> 7d1::2:6000
+Wed Mar 23 10:05:59 2016 daemon.debug rcp_orchestrator: Session failed: SLAVE: None:None --> 7d1::2:6000, moving it into the list of failed sessions
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_sessions: Asking for the session's socket file descriptor of non initiated session.
+Wed Mar 23 10:05:59 2016 daemon.info gcp_sessions: Session closed: SLAVE: None:None --> 7d1::2:6000 (:::52489 --> None:None)
+Wed Mar 23 10:05:59 2016 daemon.info rcp_sessions: RCP Slave session closed: SLAVE: None:None --> 7d1::2:6000
+Wed Mar 23 10:05:59 2016 daemon.info rcp_orchestrator: Principal candidate session failed
+Wed Mar 23 10:05:59 2016 daemon.info gcp_sessions: Opening GCP session, AF: 10, Type: 1
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_sessions: IPv6 remote addr info: (10, 1, 6, 'fd00:dead:1::1', ('fd00:dead:1::1', 6000, 0, 0))
+Wed Mar 23 10:05:59 2016 daemon.info gcp_sessions: GCP session opened: SLAVE :::0 --> None:None
+Wed Mar 23 10:05:59 2016 daemon.info gcp_sessions: Connecting to the GCP master: fd00:dead:1::1:6000
+Wed Mar 23 10:05:59 2016 daemon.info gcp_sessions: Slave session initiated: SLAVE: None:None --> fd00:dead:1::1:6000
+Wed Mar 23 10:05:59 2016 daemon.debug rcp_sessions: RCP Slave session has been initiated
+Wed Mar 23 10:05:59 2016 daemon.debug rcp_orchestrator: Session initiated callback: SLAVE: None:None --> fd00:dead:1::1:6000
+Wed Mar 23 10:05:59 2016 daemon.debug GCP message, message_id 2
+Wed Mar 23 10:05:59 2016 daemon.debug rcp: gcp_message_id: 2
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_object: Parent GPB without attribute: SequenceNumber
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_object: Parent GPB without attribute: Operation
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_object: Parent GPB without attribute: RpdGlobal
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_object: Parent GPB without attribute: ResponseCode
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_object: Parent GPB without attribute: ErrorMessage
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_object: Parent GPB without attribute: RpdRedirect
+Wed Mar 23 10:05:59 2016 daemon.info rcp_orchestrator: Session initiated: SLAVE: None:None --> fd00:dead:1::1:6000
+Wed Mar 23 10:05:59 2016 daemon.debug rcp_orchestrator: Next candidate for Principal active: SLAVE: None:None --> fd00:dead:1::1:6000
+Wed Mar 23 10:05:59 2016 daemon.debug rcp_orchestrator: Handling write event
+Wed Mar 23 10:05:59 2016 daemon.debug rcp_orchestrator: Sending message to the: fd00:dead:1::8a:45215 --> fd00:dead:1::1:6000
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50): RpdCapabilities
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV Parent or Repeated Leaf: RpdCapabilities, len: 117
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50.19): RpdIdentification
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV Parent or Repeated Leaf: RpdIdentification, len: 114
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50.19.2): VendorId
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV Leaf: VendorId, len: 2, val: AB
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50.19.7): DeviceDescription
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV Leaf: DeviceDescription, len: 35, val: TestingPrototypeWithHardcodedValues
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50.19.4): DeviceMacAddress
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV Leaf: DeviceMacAddress, len: 6, val: (170, 170, 170, 170, 170, 170)
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50.19.9): SerialNumber
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV Leaf: SerialNumber, len: 3, val: 777
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50.19.14): RpdRcpProtocolVersion
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV Leaf: RpdRcpProtocolVersion, len: 5, val: 0.0.1
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50.19.3): ModelNumber
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV Leaf: ModelNumber, len: 6, val: 123456
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50.19.15): RpdRcpSchemaVersion
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV Leaf: RpdRcpSchemaVersion, len: 11, val: cisco.0.0.1
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50.19.8): DeviceAlias
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV Leaf: DeviceAlias, len: 2, val: TP
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50.19.5): CurrentSwVersion
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV Leaf: CurrentSwVersion, len: 9, val: Prototype
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50.19.1): VendorName
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoding TLV Leaf: VendorName, len: 5, val: Cisco
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoded piece of TLV data of 120 bytes
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Encoded message: NotifyREQ (2), len: 146
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_sessions: Sending data (153B): 0001000100930002008f00010000000000010300840900810a000200010b000102320075130072020002414207002354657374696e6750726f746f747970655769746848617264636f64656456616c756573040006aaaaaaaaaaaa0900033737370e0005302e302e310300063132333435360f000b636973636f2e302e302e31080002545005000950726f746f74797065010005436973636f
+Wed Mar 23 10:05:59 2016 daemon.info gcp_sessions: Sent packet from SLAVE: None:None --> fd00:dead:1::1:6000
+Wed Mar 23 10:05:59 2016 daemon.debug rcp_orchestrator: Handling receive event
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_sessions: Received packet header (7B): 00010001002200
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Packet is fragmented, waiting for remaining data.
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_object: Decoding fragmented GCP message
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_sessions: Received data (40B): 0001000100220006001e00010000000000000000000001000f09000c0a000200010b000101320000
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Decoding message: DataStructREQ (6), len: 30
+Wed Mar 23 10:05:59 2016 daemon.debug rcp: gcp_message_id: 6
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_object: Parent GPB without attribute: SequenceNumber
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_object: Parent GPB without attribute: Operation
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_object: Parent GPB without attribute: RpdGlobal
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_object: Parent GPB without attribute: ResponseCode
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_object: Parent GPB without attribute: ErrorMessage
+Wed Mar 23 10:05:59 2016 daemon.warn gcp_object: Parent GPB without attribute: RpdRedirect
+Wed Mar 23 10:05:59 2016 daemon.debug rcp: Decoding RCPSequence with length: 12
+Wed Mar 23 10:05:59 2016 daemon.debug rcp: Decoding RCPSequence with number: 1
+Wed Mar 23 10:05:59 2016 daemon.debug rcp: Decoding RCPSequence with operation type: OperationRead(1)
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Decoding PARENT TLV(NTF_TLVs.50): RpdCapabilities (50), len: 0
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Decoded piece of TLV data of 3 bytes
+Wed Mar 23 10:05:59 2016 daemon.debug rcp: RCP Message: IRA (1), Decoded RCP sequence, operation: 1
+Wed Mar 23 10:05:59 2016 daemon.debug rcp: Decoded RCP message: IRA (1)
+Wed Mar 23 10:05:59 2016 daemon.debug gcp_packet: Decoded message: DataStructREQ (6)
+Wed Mar 23 10:05:59 2016 daemon.info gcp_sessions: Received GCP packet at SLAVE: None:None --> fd00:dead:1::1:6000
+Wed Mar 23 10:05:59 2016 daemon.debug rcp_orchestrator: Received GCP packet on: SLAVE: None:None --> fd00:dead:1::1:6000
+Wed Mar 23 10:05:59 2016 daemon.info rcp_msg_handling: Handling message: DataStructREQ (6) for slave: fd00:dead:1::8a:45215 --> fd00:dead:1::1:6000
+Wed Mar 23 10:05:59 2016 daemon.debug rpd_cfg_adapter: Starting processing of requests from queue
+Wed Mar 23 10:05:59 2016 daemon.debug rpd_cfg_adapter: REQ queue is not empty, continue with next REQ
+Wed Mar 23 10:05:59 2016 daemon.info rcp_process: Data sent to manager, length[40]
+Wed Mar 23 10:05:59 2016 daemon.debug rpd_cfg_adapter: Current REQ: oper: RD, oper_id: 1
+Wed Mar 23 10:06:00 2016 daemon.info logread[1462]: Logread connected to fd00:dead:1::1:514
+Wed Mar 23 10:06:00 2016 daemon.debug rcp_orchestrator: Principal candidate is initiated, but waiting for CCAP core capabilities.
+Wed Mar 23 10:06:00 2016 daemon.info logread[1462]: failed to send log data to fd00:dead:1::1:514 via udp
+Wed Mar 23 10:06:00 2016 daemon.debug rpd_cfg_adapter: Data chunk processing timeouted
+Wed Mar 23 10:06:00 2016 daemon.debug rpd_cfg_adapter: REQ queue is empty, calling registered response CB
+Wed Mar 23 10:06:00 2016 daemon.debug rcp_packet_director: Operation processing failed with result: Timeouted
+Wed Mar 23 10:06:00 2016 daemon.debug rcp_orchestrator: RSP added to TX queue
+Wed Mar 23 10:06:00 2016 daemon.debug rcp_orchestrator: Handling write event
+Wed Mar 23 10:06:00 2016 daemon.debug rcp_orchestrator: Sending message to the: fd00:dead:1::8a:45215 --> fd00:dead:1::1:6000
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Encoding TLV(RCP_MSG.3.9.19): ResponseCode
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Encoding TLV Leaf: ResponseCode, len: 1, val: 1
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.50): RpdCapabilities
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Encoding TLV Parent or Repeated Leaf: RpdCapabilities, len: 0
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Encoded piece of TLV data of 7 bytes
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Encoded message: DataStructRSP (7), len: 37
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_sessions: Sending data (44B): 000100010026000700220001000000000000000000000100130900100a000200010b00010413000101320000
+Wed Mar 23 10:06:00 2016 daemon.info gcp_sessions: Sent packet from SLAVE: None:None --> fd00:dead:1::1:6000
+Wed Mar 23 10:06:00 2016 daemon.debug rcp_orchestrator: Handling receive event
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_sessions: Received packet header (7B): 00020001005e00
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Packet is fragmented, waiting for remaining data.
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_object: Decoding fragmented GCP message
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_sessions: Received data (100B): 00020001005e0006005a00020000000000000000000002004b0900480a000200020b0001023c003c010001060400010103001000000000000000000000000000000000050012536572766963655375697465434341507636020004363030300600020000
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoding message: DataStructREQ (6), len: 90
+Wed Mar 23 10:06:00 2016 daemon.debug rcp: gcp_message_id: 6
+Wed Mar 23 10:06:00 2016 daemon.warn gcp_object: Parent GPB without attribute: SequenceNumber
+Wed Mar 23 10:06:00 2016 daemon.warn gcp_object: Parent GPB without attribute: Operation
+Wed Mar 23 10:06:00 2016 daemon.warn gcp_object: Parent GPB without attribute: RpdGlobal
+Wed Mar 23 10:06:00 2016 daemon.warn gcp_object: Parent GPB without attribute: ResponseCode
+Wed Mar 23 10:06:00 2016 daemon.warn gcp_object: Parent GPB without attribute: ErrorMessage
+Wed Mar 23 10:06:00 2016 daemon.warn gcp_object: Parent GPB without attribute: RpdRedirect
+Wed Mar 23 10:06:00 2016 daemon.debug rcp: Decoding RCPSequence with length: 72
+Wed Mar 23 10:06:00 2016 daemon.debug rcp: Decoding RCPSequence with number: 2
+Wed Mar 23 10:06:00 2016 daemon.debug rcp: Decoding RCPSequence with operation type: OperationWrite(2)
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoding REPEATED TLV(NTF_TLVs.60): CcapCoreIdentification (60), len: 60
+Wed Mar 23 10:06:00 2016 daemon.warn gcp_object: Parent GPB without attribute: CcapCoreIdentification
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoding LEAF TLV(NTF_TLVs.60.1): Index (1), len: 1
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoded LEAF TLV(NTF_TLVs.60.1): Index (1), len: 1, value: 6
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoding LEAF TLV(NTF_TLVs.60.4): IsPrincipal (4), len: 1
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoded LEAF TLV(NTF_TLVs.60.4): IsPrincipal (4), len: 1, value: 1
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoding LEAF TLV(NTF_TLVs.60.3): CoreIpAddress (3), len: 16
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoded LEAF TLV(NTF_TLVs.60.3): CoreIpAddress (3), len: 16, value: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoding LEAF TLV(NTF_TLVs.60.5): CoreName (5), len: 18
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoded LEAF TLV(NTF_TLVs.60.5): CoreName (5), len: 18, value: ServiceSuiteCCAPv6
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoding LEAF TLV(NTF_TLVs.60.2): CoreId (2), len: 4
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoded LEAF TLV(NTF_TLVs.60.2): CoreId (2), len: 4, value: 6000
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoding LEAF TLV(NTF_TLVs.60.6): VendorId (6), len: 2
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoded LEAF TLV(NTF_TLVs.60.6): VendorId (6), len: 2, value: 0
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoded piece of TLV data of 63 bytes
+Wed Mar 23 10:06:00 2016 daemon.debug rcp: RCP Message: REX (2), Decoded RCP sequence, operation: 2
+Wed Mar 23 10:06:00 2016 daemon.debug rcp: Decoded RCP message: REX (2)
+Wed Mar 23 10:06:00 2016 daemon.debug gcp_packet: Decoded message: DataStructREQ (6)
+Wed Mar 23 10:06:00 2016 daemon.info gcp_sessions: Received GCP packet at SLAVE: None:None --> fd00:dead:1::1:6000
+Wed Mar 23 10:06:00 2016 daemon.debug rcp_orchestrator: Received GCP packet on: SLAVE: None:None --> fd00:dead:1::1:6000
+Wed Mar 23 10:06:00 2016 daemon.info rcp_msg_handling: Handling message: DataStructREQ (6) for slave: fd00:dead:1::8a:45215 --> fd00:dead:1::1:6000
+Wed Mar 23 10:06:00 2016 daemon.info rcp_msg_handling: Handling CCAP Capabilities update
+Wed Mar 23 10:06:00 2016 daemon.debug rpd_cfg_adapter: Starting processing of requests from queue
+Wed Mar 23 10:06:00 2016 daemon.debug rpd_cfg_adapter: REQ queue is not empty, continue with next REQ
+Wed Mar 23 10:06:00 2016 daemon.info rcp_process: Data sent to manager, length[99]
+Wed Mar 23 10:06:00 2016 daemon.debug rpd_cfg_adapter: Current REQ: oper: WR, oper_id: 2
+Wed Mar 23 10:06:01 2016 daemon.info logread[1462]: Logread connected to fd00:dead:1::1:514
+Wed Mar 23 10:06:01 2016 daemon.debug rcp_orchestrator: Principal candidate initiated: Principal: True, Active: True
+Wed Mar 23 10:06:01 2016 daemon.info logread[1462]: failed to send log data to fd00:dead:1::1:514 via udp
+Wed Mar 23 10:06:01 2016 daemon.debug rcp_orchestrator: Changing orchestration state: FROM: RCP_SLAVE_ORCH_LOOKING_FOR_PRINCIPAL TO: RCP_SLAVE_ORCH_PRINCIPAL_CONNECTED
+Wed Mar 23 10:06:01 2016 daemon.debug rpd_cfg_adapter: Data chunk processing timeouted
+Wed Mar 23 10:06:01 2016 daemon.debug rpd_cfg_adapter: REQ queue is empty, calling registered response CB
+Wed Mar 23 10:06:01 2016 daemon.debug rcp_packet_director: Operation processing failed with result: Timeouted
+Wed Mar 23 10:06:01 2016 daemon.debug rcp_orchestrator: RSP added to TX queue
+Wed Mar 23 10:06:01 2016 daemon.debug rcp_orchestrator: Handling write event
+Wed Mar 23 10:06:01 2016 daemon.debug rcp_orchestrator: Sending message to the: fd00:dead:1::8a:45215 --> fd00:dead:1::1:6000
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV(RCP_MSG.3.9.19): ResponseCode
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV Leaf: ResponseCode, len: 1, val: 1
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.60): CcapCoreIdentification
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding repeated TLVs: CcapCoreIdentification, len: 63
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.60): CcapCoreIdentification
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV Parent or Repeated Leaf: CcapCoreIdentification, len: 60
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.60.1): Index
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV Leaf: Index, len: 1, val: 6
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.60.4): IsPrincipal
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV Leaf: IsPrincipal, len: 1, val: 1
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.60.3): CoreIpAddress
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV Leaf: CoreIpAddress, len: 16, val: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.60.5): CoreName
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV Leaf: CoreName, len: 18, val: ServiceSuiteCCAPv6
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.60.2): CoreId
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV Leaf: CoreId, len: 4, val: 6000
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV(NTF_TLVs.60.6): VendorId
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoding TLV Leaf: VendorId, len: 2, val: 0
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoded piece of TLV data of 67 bytes
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_packet: Encoded message: DataStructRSP (7), len: 97
+Wed Mar 23 10:06:01 2016 daemon.debug gcp_sessions: Sending data (104B): 0002000100620007005e00020000000000000000000002004f09004c0a000200020b000105130001013c003c010001060400010103001000000000000000000000000000000000050012536572766963655375697465434341507636020004363030300600020000
+Wed Mar 23 10:06:01 2016 daemon.info gcp_sessions: Sent packet from SLAVE: None:None --> fd00:dead:1::1:6000
+Wed Mar 23 10:06:02 2016 daemon.info logread[1462]: Logread connected to fd00:dead:1::1:514
+Wed Mar 23 10:06:03 2016 daemon.debug it_api: Handling receive event
+Wed Mar 23 10:06:03 2016 daemon.debug it_api: IPC message from fd [14] received, len[2]
+Wed Mar 23 10:06:03 2016 daemon.debug user's RX CB
+Wed Mar 23 10:06:03 2016 daemon.debug manager: Received IT API message: IT_API_RPD_GET
+Wed Mar 23 10:06:03 2016 daemon.info logread[1462]: failed to send log data to fd00:dead:1::1:514 via udp
+Wed Mar 23 10:06:03 2016 daemon.debug manager: Response prepared
+Wed Mar 23 10:06:03 2016 daemon.debug manager: IPC message from fd [19] received, len[40]
+Wed Mar 23 10:06:03 2016 daemon.info manager: RCP message type: RPD_CONFIGURATION
+Wed Mar 23 10:06:03 2016 daemon.debug manager: Handling config operation READ
+Wed Mar 23 10:06:03 2016 daemon.warn There's not implemented support for partialreads
+Wed Mar 23 10:06:03 2016 daemon.debug Data prepared for operation: 2, path: {'cfg': None}
+Wed Mar 23 10:06:03 2016 daemon.debug rcp_process: IPC message from manager received, len[141]
+Wed Mar 23 10:06:03 2016 daemon.info rcp_process: RCP message type: RPD_CONFIGURATION
+Wed Mar 23 10:06:03 2016 daemon.debug rpd_cfg_adapter: Data chunk processed cb called: waiting_req: None
+Wed Mar 23 10:06:03 2016 daemon.err rcp_process: IPC RCP callback call failed: 'NoneType' object has no attribute 'result'
+Wed Mar 23 10:06:03 2016 daemon.info manager: Data sent to RCP, length[141]
+Wed Mar 23 10:06:03 2016 daemon.debug manager: IPC message from fd [19] received, len[99]
+Wed Mar 23 10:06:03 2016 daemon.info manager: RCP message type: RPD_CONFIGURATION
+Wed Mar 23 10:06:03 2016 daemon.debug manager: Handling config operation WR
+Wed Mar 23 10:06:03 2016 daemon.debug Data prepared for operation: 1, path: ['cfg']
+Wed Mar 23 10:06:03 2016 daemon.debug hal: IPC message from fd [24] received, len[99]
+Wed Mar 23 10:06:03 2016 daemon.debug hal: IPC Message decoded successfully
+Wed Mar 23 10:06:03 2016 daemon.info hal: Received configuration message from Manager
+Wed Mar 23 10:06:03 2016 daemon.info manager: Data sent to HAL, length[99]
+Wed Mar 23 10:06:04 2016 daemon.info logread[1462]: Logread connected to fd00:dead:1::1:514
+Wed Mar 23 10:06:04 2016 daemon.debug it_api: Handling receive event
+Wed Mar 23 10:06:04 2016 daemon.info logread[1462]: failed to send log data to fd00:dead:1::1:514 via udp
+Wed Mar 23 10:06:04 2016 daemon.debug it_api: IPC message from fd [14] received, len[2]
+Wed Mar 23 10:06:04 2016 daemon.debug user's RX CB
+Wed Mar 23 10:06:04 2016 daemon.debug manager: Received IT API message: IT_API_RPD_GET
+Wed Mar 23 10:06:04 2016 daemon.debug manager: Response prepared
+Wed Mar 23 10:06:04 2016 daemon.debug it_api: IPC message from fd [14] received, len[2]
+Wed Mar 23 10:06:04 2016 daemon.debug user's RX CB
+Wed Mar 23 10:06:04 2016 daemon.debug manager: Received IT API message: IT_API_RPD_GET
+Wed Mar 23 10:06:04 2016 daemon.debug manager: Response prepared
+Wed Mar 23 10:06:05 2016 daemon.info logread[1462]: Logread connected to fd00:dead:1::1:514
+Wed Mar 23 10:15:39 2016 authpriv.info dropbear[1465]: Child connection from 192.168.122.1:33237
+Wed Mar 23 10:15:39 2016 daemon.info logread[1462]: failed to send log data to fd00:dead:1::1:514 via udp
+Wed Mar 23 10:15:40 2016 daemon.info logread[1462]: Logread connected to fd00:dead:1::1:514
+Wed Mar 23 10:15:57 2016 authpriv.notice dropbear[1465]: Password auth succeeded for 'root' from 192.168.122.1:33237
+Wed Mar 23 10:15:57 2016 daemon.info logread[1462]: failed to send log data to fd00:dead:1::1:514 via udp
+Wed Mar 23 10:15:58 2016 daemon.info logread[1462]: Logread connected to fd00:dead:1::1:514
+Wed Mar 23 10:16:00 2016 authpriv.info dropbear[1465]: Exit (root): Disconnect received
+Wed Mar 23 10:16:00 2016 daemon.info logread[1462]: failed to send log data to fd00:dead:1::1:514 via udp
+Wed Mar 23 10:16:01 2016 daemon.info logread[1462]: Logread connected to fd00:dead:1::1:514
+Wed Mar 23 10:16:32 2016 authpriv.info dropbear[1471]: Child connection from 192.168.122.1:33238
+Wed Mar 23 10:16:32 2016 daemon.info logread[1462]: failed to send log data to fd00:dead:1::1:514 via udp
+Wed Mar 23 10:16:33 2016 daemon.info logread[1462]: Logread connected to fd00:dead:1::1:514
+Wed Mar 23 10:16:34 2016 authpriv.notice dropbear[1471]: Password auth succeeded for 'root' from 192.168.122.1:33238
+Wed Mar 23 10:16:34 2016 daemon.info logread[1462]: failed to send log data to fd00:dead:1::1:514 via udp

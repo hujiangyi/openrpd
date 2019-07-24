@@ -1,0 +1,13 @@
+{
+    "index" : 1,
+    "core_id" : "PYTHON_GCPP",
+    "core_ip_addr" : "2001:9:9:9::2",
+    "is_principal" : "True",
+    "core_name" : "GCPP_Master_SIM",
+    "vendor_id" : 2,
+    "core_mode" : 1,
+    "initial_configuration_complete" : "False",
+    "move_to_operational" : "False",
+    "core_function" : 3,
+    "resource_set_index" : 4
+}

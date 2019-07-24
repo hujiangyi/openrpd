@@ -1,0 +1,173 @@
+/*
+ * Copyright (c) 2017 Cisco and/or its affiliates, and
+ *                    Cable Television Laboratories, Inc. ("CableLabs")
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package L2tp;
+
+enum L2tpCommand{
+	CONNECTION_SETUP = 1;
+	CONNECTION_TEARDOWN = 2;
+	SESSION_SETUP = 3;
+	SESSION_TEARDOWN = 4;
+	CONNECTION_INFO = 5; 
+	SESSION_INFO = 6;
+	CONNECTION_STATS = 7;
+	SESSION_STATS = 8;
+	SYSTEM_INFO = 9;
+	DEBUG = 10;
+	TEST = 11;
+
+    BIND_LOCAL_ADDRESS = 12;
+    UNBIND_LOCAL_ADDRESS = 13;
+    STATS_INFO = 14;
+    CLEAR_STATS_INFO = 15;
+    MCAST_INFO = 16;
+    STATIC_SESSION_INFO = 17;
+    STATIC_SYSTEM_INFO = 18;
+}
+
+message ConnectionSetupPara {
+	required string remoteAddr = 1; 
+	optional uint32 connectionID =2;
+	optional string hostName =3; 
+	optional string vendorName =4; 
+	optional string routerID =5; 
+	optional int32 frameCapbility =6; 
+	optional int32 firmwareVersion =7; 
+	optional int32 receiveWinSize =8;
+	repeated int32 pseudowireList =9;
+	optional uint32 protoVer = 10;
+	optional uint32 draftAvpVer = 11; 
+	optional uint32 mcmtsSimplification = 12; 
+	/*Please add the remaining fields here*/
+}
+
+message SessionSetupPara {
+	optional uint32 localSessionID = 1; 
+	/*Please add the remaining fields here*/
+}
+
+message ConnectionPara { /* For connection teardown, query, stats*/
+	required string remoteAddr = 1;
+	required string localAddr = 2;
+	required uint32 connectionID = 3;
+}
+
+message SessionPara { /* For connecion teardown, query, stats*/
+	required ConnectionPara conn = 1;
+	required uint32 localSessionID = 2;
+	optional bool icrqReq = 3 [default = false];
+}
+
+message DebugPara {
+	required string module = 1;
+	required string level = 2;
+}
+
+message TestPara {
+	required string para1 = 1;
+	required string para2 = 2;
+	optional string para3 = 3;
+}
+
+message BindIPPara {
+    required string localIP = 1;
+}
+
+message L2tpCommandReq {
+	required L2tpCommand cmd = 1;
+	optional ConnectionSetupPara connSetup = 2;
+	optional SessionSetupPara  sessionSetup = 3; 
+	optional ConnectionPara conn = 4; 
+	optional SessionPara sess = 5; 
+	optional DebugPara debug = 6;
+	optional TestPara test = 7;
+    optional BindIPPara bindIP = 8;
+} 
+
+message ConnectionQueryResult {
+	required uint32 connectionID = 1;
+	required uint32 remoteConnectionID = 2;
+	required string remoteAddr = 3;
+	required string localAddr = 4;
+	required string hostname = 5;
+	required string currentState = 6;
+	repeated uint32 localSessionID = 7;
+}
+
+message SessionQueryResult {
+	required uint32 connectionID = 1;
+	required string currentState = 2;
+	required uint32 localSessionID = 3;
+	required uint32 remoteSessionID = 4;
+	required string lastchangetime = 5;
+	required string sessionType = 6;
+	optional bytes  icrqPktAvps = 7;
+	optional bool   status = 8 [default = false];
+}
+message DispatcherStats {
+    optional uint32 exception = 1;
+    optional uint32 error = 2;
+    optional uint32 pkt_error = 3;
+    optional uint32 zmq_error = 4;
+    optional uint32 unexpected_else = 5;
+}
+
+message HalClientStats {
+    optional uint32 exception = 1;
+    optional uint32 error = 2;
+    optional uint32 zmq_error = 3;
+}
+message StatsQueryResult {
+    optional DispatcherStats dispacher_stats = 1;
+    optional HalClientStats halclient_stats = 2;
+}
+
+message McastInfo {
+    optional string grp = 1;
+    optional string src = 2;
+    optional string local_ip = 3;
+    optional string status = 4;
+    repeated string session = 5;
+    optional string interface = 6;
+    optional string lastchange = 7;
+}
+
+message McastQueryResult {
+    repeated McastInfo mcastInfoList = 1;
+}
+
+message SystemQueryResult {
+    repeated ConnectionQueryResult conns = 1;
+}
+
+enum ResponseCode {
+    SUCCESS = 1;
+    FAILURE = 2;
+}
+
+message L2tpCommandRsp {
+    required ResponseCode rsp = 1;
+    /* we should add some read counters */
+    required string retMsg = 2;
+
+    /* For the return results */
+    optional ConnectionQueryResult connInfo = 10;
+    optional SessionQueryResult sessInfo = 11;
+    optional SystemQueryResult sysInfo = 12;
+    optional StatsQueryResult stats_info = 13;
+    optional McastQueryResult mcast_info = 14;
+}

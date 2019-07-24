@@ -1,0 +1,33 @@
+# Copyright (C) 2006 OpenWrt.org
+# Portions Copyright (c) 2016 Cisco and/or its affiliates, and 
+#                             Cable Television Laboratories, Inc. ("CableLabs")
+
+config interface loopback
+	option ifname	lo
+	option proto	static
+	option ipaddr	127.0.0.1
+	option netmask	255.0.0.0
+
+# Protocol must be set to DHCPv6 for odhcp6c
+# script to run correctly. (ubus check)
+# udhcpc (DHCPv4) does not care about it.
+
+config interface lan
+	option ifname	eth1
+#	option proto	dhcpv6
+#	option auto		0
+	option proto 'static'
+	option ipaddr '192.168.5.1'
+	option netmask '255.255.255.0'
+
+config interface 'lanV6'
+        option ifname 'eth1'
+        option proto 'static'
+        option ip6addr 'fd00:dead:1::1/48'
+
+config interface wan
+    option ifname   eth0
+    option proto    dhcp
+
+config globals globals
+	option ula_prefix auto

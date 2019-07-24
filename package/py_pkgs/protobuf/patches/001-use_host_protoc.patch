@@ -1,0 +1,13 @@
+Index: protobuf-2.6.1/python/setup.py
+===================================================================
+--- protobuf-2.6.1.orig/python/setup.py	2014-10-23 03:00:24.000000000 +0800
++++ protobuf-2.6.1/python/setup.py	2016-09-12 23:19:43.398921790 +0800
+@@ -39,6 +39,8 @@
+ else:
+   protoc = find_executable("protoc")
+ 
++protoc = "../../../host/protobuf-2.6.1/src/.libs/protoc"
++
+ def generate_proto(source):
+   """Invokes the Protocol Compiler to generate a _pb2.py from the given
+   .proto file.  Does nothing if the output already exists and is newer than

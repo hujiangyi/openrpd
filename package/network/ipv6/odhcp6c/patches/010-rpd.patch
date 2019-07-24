@@ -1,0 +1,835 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,8 +1,11 @@
++# Portions Copyright (c) 2016 Cisco and/or its affiliates, and
++#                             Cable Television Laboratories, Inc. ("CableLabs")
+ cmake_minimum_required(VERSION 2.8)
+ cmake_policy(SET CMP0015 NEW)
+ 
+ # Project Definition
+ project(odhcp6c C)
++
+ set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -std=c99")
+ add_definitions(-D_GNU_SOURCE -Wall -Werror -Wextra -pedantic)
+@@ -16,7 +19,7 @@ if(${EXT_CER_ID})
+ endif(${EXT_CER_ID})
+ 
+ add_executable(odhcp6c src/odhcp6c.c src/dhcpv6.c src/ra.c src/script.c src/md5.c)
+-target_link_libraries(odhcp6c resolv)
++target_link_libraries(odhcp6c resolv czmq protobuf-c ipc_defs zmq)
+ 
+ # Installation
+ install(TARGETS odhcp6c DESTINATION sbin/)
+--- a/src/dhcpv6.c
++++ b/src/dhcpv6.c
+@@ -1,5 +1,7 @@
+ /**
+  * Copyright (C) 2012-2014 Steven Barth <steven@midlink.org>
++ * Portions Copyright (c) 2016 Cisco and/or its affiliates, and
++ *                             Cable Television Laboratories, Inc. ("CableLabs")
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License v2 as published by
+@@ -15,6 +17,7 @@
+ #include <time.h>
+ #include <fcntl.h>
+ #include <errno.h>
++#include <inttypes.h>
+ #include <stdlib.h>
+ #include <signal.h>
+ #include <limits.h>
+@@ -27,6 +30,7 @@
+ #include <sys/ioctl.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
++#include <arpa/inet.h>
+ 
+ #include <net/if.h>
+ #include <net/ethernet.h>
+@@ -47,6 +51,10 @@
+ #define DHCPV6_INF_MAX_RT_MIN 60
+ #define DHCPV6_INF_MAX_RT_MAX 86400
+ 
++#define DHCPV6_SUBOPT_STR_LEN_MAX 20
++#define DHCPV6_IPV6_SIZE sizeof(struct in6_addr)
++#define DHCPV6_IP_ADDR_LIST_MAX_SIZE 20
++
+ static bool dhcpv6_response_is_valid(const void *buf, ssize_t len,
+ 		const uint8_t transaction[3], enum dhcpv6_msg type,
+ 		const struct in6_addr *daddr);
+@@ -77,9 +85,9 @@ static int dhcpv6_commit_advert(void);
+ static struct dhcpv6_retx dhcpv6_retx[_DHCPV6_MSG_MAX] = {
+ 	[DHCPV6_MSG_UNKNOWN] = {false, 1, 120, 0, "<POLL>",
+ 			dhcpv6_handle_reconfigure, NULL},
+-	[DHCPV6_MSG_SOLICIT] = {true, 1, DHCPV6_SOL_MAX_RT, 0, "SOLICIT",
++	[DHCPV6_MSG_SOLICIT] = {true, 1, DHCPV6_SOL_MAX_RT, 8, "SOLICIT",
+ 			dhcpv6_handle_advert, dhcpv6_commit_advert},
+-	[DHCPV6_MSG_REQUEST] = {true, 1, DHCPV6_REQ_MAX_RT, 10, "REQUEST",
++	[DHCPV6_MSG_REQUEST] = {true, 1, DHCPV6_REQ_MAX_RT, 8, "REQUEST",
+ 			dhcpv6_handle_reply, NULL},
+ 	[DHCPV6_MSG_RENEW] = {false, 10, DHCPV6_REN_MAX_RT, 0, "RENEW",
+ 			dhcpv6_handle_reply, NULL},
+@@ -108,6 +116,9 @@ static uint8_t reconf_key[16];
+ // client options
+ static unsigned int client_options = 0;
+ 
++//ifname
++static char *interface_name = NULL;
++
+ 
+ int init_dhcpv6(const char *ifname, unsigned int options, int sol_timeout)
+ {
+@@ -118,6 +129,7 @@ int init_dhcpv6(const char *ifname, unsi
+ 	if (sock < 0)
+ 		return -1;
+ 
++	interface_name = (char*)ifname;
+ 	// Detect interface
+ 	struct ifreq ifr;
+ 	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+@@ -167,8 +179,6 @@ int init_dhcpv6(const char *ifname, unsi
+ 			htons(DHCPV6_OPT_SIP_SERVER_A),
+ 			htons(DHCPV6_OPT_DNS_SERVERS),
+ 			htons(DHCPV6_OPT_DNS_DOMAIN),
+-			htons(DHCPV6_OPT_SNTP_SERVERS),
+-			htons(DHCPV6_OPT_NTP_SERVER),
+ 			htons(DHCPV6_OPT_AFTR_NAME),
+ 			htons(DHCPV6_OPT_PD_EXCLUDE),
+ 			htons(DHCPV6_OPT_SOL_MAX_RT),
+@@ -179,6 +189,7 @@ int init_dhcpv6(const char *ifname, unsi
+ 			htons(DHCPV6_OPT_S46_CONT_MAPE),
+ 			htons(DHCPV6_OPT_S46_CONT_MAPT),
+ 			htons(DHCPV6_OPT_S46_CONT_LW),
++			htons(DHCPV6_OPT_VENDOR_OPTS),
+ 		};
+ 		odhcp6c_add_state(STATE_ORO, oro, sizeof(oro));
+ 	}
+@@ -206,6 +217,8 @@ enum {
+ 	IOV_SRV_ID,
+ 	IOV_VENDOR_CLASS_HDR,
+ 	IOV_VENDOR_CLASS,
++	IOV_VENDOR_OPTS_HDR,
++	IOV_VENDOR_OPTS,
+ 	IOV_USER_CLASS_HDR,
+ 	IOV_USER_CLASS,
+ 	IOV_RECONF_ACCEPT,
+@@ -216,6 +229,287 @@ enum {
+ 	IOV_TOTAL
+ };
+ 
++static const char vendor_subopt_names [][DHCPV6_SUBOPT_STR_LEN_MAX] = {
++		[VENDOR_SUB_ORO] 		= "requested_opts",
++		[VENDOR_SUB_DEVICE] 	= "device_type",
++		[VENDOR_SUB_SN] 		= "serial_number",
++		[VENDOR_SUB_HW_VER]		= "hw_version",
++		[VENDOR_SUB_SW_VER]		= "sw_version",
++		[VENDOR_SUB_ROM_VER]	= "boot_rom_version",
++		[VENDOR_SUB_OUI]		= "org_uniq_id",
++		[VENDOR_SUB_MODEL]		= "model_number",
++		[VENDOR_SUB_V_NAME]		= "vendor_name",
++		[VENDOR_SUB_CCAP]		= "ccap-core",
++		[VENDOR_SUB_SYSLOG]		= "log-server",
++		[VENDOR_SUB_TIME]		= "time-server",
++		[VENDOR_SUB_TIME_OFF]	= "time-offset",
++};
++/* Minimum size of one element stored in suboption */
++static const uint8_t vendor_subopt_lengths [] = {
++		[VENDOR_SUB_ORO] 		= 2,
++		[VENDOR_SUB_DEVICE] 	= 0,
++		[VENDOR_SUB_SN] 		= 0,
++		[VENDOR_SUB_HW_VER]		= 0,
++		[VENDOR_SUB_SW_VER]		= 0,
++		[VENDOR_SUB_ROM_VER]	= 0,
++		[VENDOR_SUB_OUI]		= 6,
++		[VENDOR_SUB_MODEL]		= 0,
++		[VENDOR_SUB_V_NAME]		= 0,
++		[VENDOR_SUB_CCAP]		= DHCPV6_IPV6_SIZE,
++		[VENDOR_SUB_SYSLOG]		= DHCPV6_IPV6_SIZE,
++		[VENDOR_SUB_TIME]		= DHCPV6_IPV6_SIZE,
++		[VENDOR_SUB_TIME_OFF]	= 4,
++};
++bool dhcpv6_is_vendor_sub_known(uint16_t opt_type) {
++	switch (opt_type) {
++	case VENDOR_SUB_ORO:
++	case VENDOR_SUB_DEVICE:
++	case VENDOR_SUB_SN:
++	case VENDOR_SUB_HW_VER:
++	case VENDOR_SUB_SW_VER:
++	case VENDOR_SUB_ROM_VER:
++	case VENDOR_SUB_OUI:
++	case VENDOR_SUB_MODEL:
++	case VENDOR_SUB_V_NAME:
++	case VENDOR_SUB_CCAP:
++	case VENDOR_SUB_SYSLOG:
++	case VENDOR_SUB_TIME:
++	case VENDOR_SUB_TIME_OFF:
++		return true;
++	}
++	return false;
++}
++const char * dhcpv6_vendor_subopt_str(uint16_t opt_type) {
++	if (dhcpv6_is_vendor_sub_known(opt_type)) {
++		return vendor_subopt_names[opt_type];
++	}
++	return "unknown";
++}
++uint16_t dhcpv6_parse_subopt_type(const char *str) {
++	char *endptr;
++	errno = 0;
++	long subopt = strtoul(str, &endptr, 0);
++	if (0 != errno || '\0' != *endptr || str == endptr) {
++		return 0;
++	}
++	syslog(LOG_NOTICE, "Vendor suboption loading: %lu", subopt);
++	if (subopt > UINT16_MAX || !dhcpv6_is_vendor_sub_known(subopt)) {
++		syslog(LOG_ERR, "Unknown suboption found");
++		return 0;
++	}
++	return (uint8_t)subopt;
++}
++void dhcpv6_free_string_array(char **str_array, size_t length) {
++	size_t i;
++	if (NULL == str_array) {
++		return;
++	}
++	for (i = 0; i < length; i++) {
++		if (NULL != str_array[i]) {
++			free(str_array[i]);
++		}
++	}
++	free(str_array);
++}
++void dhcpv6_send_ipc_message(zsock_t *sock, TDhcpMessage *msg) {
++	void *ipc_buffer = NULL;
++	zframe_t *frame = NULL;
++	size_t ipc_msg_len = 0;
++	if (NULL == sock || NULL == msg) {
++		return;
++	}
++	msg->client = T__DHCP_MESSAGE__T__CLIENT__DHCPV6;
++	ipc_msg_len = t__dhcp_message__get_packed_size(msg);
++	if (0 == ipc_msg_len) {
++		return;
++	}
++	ipc_buffer = malloc(ipc_msg_len);
++	if (NULL == ipc_buffer) {
++		return;
++	}
++	t__dhcp_message__pack(msg, ipc_buffer);
++	frame = zframe_new(ipc_buffer, ipc_msg_len);
++	if (NULL == frame) {
++		syslog(LOG_ERR, "Failed to create zframe");
++	} else {
++		// frame is automatically destroyed after send
++		if (-1 == zframe_send(&frame, sock, 0)) {
++			syslog(LOG_ERR, "Failed to send data to manager: %s",
++					zmq_strerror(zmq_errno()));
++		} else {
++			syslog(LOG_INFO, "DHCP data sent to manager, length[%zd]",
++					ipc_msg_len);
++		}
++	}
++	free(ipc_buffer);
++}
++/* Send error message and !!!destroy!!! socket */
++void dhcpv6_send_ipc_error_msg(zsock_t *sock, char* error_str) {
++	if (NULL == sock) {
++		return;
++	}
++	TDhcpMessage ipc_msg = T__DHCP_MESSAGE__INIT;
++	ipc_msg.status = T__DHCP_MESSAGE__T__STATUS__FAILED;
++	if (NULL != interface_name) {
++        int len= strlen(interface_name) + 1;
++        ipc_msg.interfacename = malloc(len);
++        strncpy(ipc_msg.interfacename, interface_name, len);
++    }
++	if (NULL != error_str) {
++		ipc_msg.errormessage = error_str;
++	}
++	dhcpv6_send_ipc_message(sock, &ipc_msg);
++	syslog(LOG_INFO, "Destroying IPC socket");
++	zsock_destroy(&sock);
++}
++void dhcpv6_parse_vendor_opts_data(uint8_t *buf, size_t opt_size,
++		zsock_t *sock) {
++	uint32_t vendor_id;
++	uint16_t stype, slen;
++	uint8_t *sdata;
++	char ipv6_buf[INET6_ADDRSTRLEN];
++	TDhcpMessage ipc_msg = T__DHCP_MESSAGE__INIT;
++	TDhcpData ipc_data = T__DHCP_DATA__INIT;
++	if (NULL == buf || 0 == opt_size) {
++		syslog(LOG_NOTICE, "Nothing to parse here");
++		return;
++	}
++	if (DHCPV6_VENDOR_ID_SIZE > opt_size) {
++		syslog(LOG_NOTICE, "Received short Vendor Opts");
++		return;
++	}
++	ipc_msg.status = T__DHCP_MESSAGE__T__STATUS__UPDATED;
++	ipc_msg.dhcpdata = &ipc_data;
++	vendor_id = ntohl(*((uint32_t *)buf));
++	syslog(LOG_NOTICE, "Option Vendor Opts[%d] found, len: %zd, vendor_id: %d",
++				DHCPV6_OPT_VENDOR_OPTS, opt_size, vendor_id);
++	if (NULL != interface_name) {
++        int len= strlen(interface_name) + 1;
++        ipc_msg.interfacename = malloc(len);
++        strncpy(ipc_msg.interfacename, interface_name, len);
++    }
++	// skip vendor ID
++	buf += DHCPV6_VENDOR_ID_SIZE;
++	opt_size -= DHCPV6_VENDOR_ID_SIZE;
++	dhcpv6_for_each_option(buf, buf + opt_size, stype, slen, sdata) {
++		size_t *gpb_count_ptr = NULL;
++		char ***gpb_list_ptr = NULL;
++		uint16_t exp_elem_size = 0;
++		size_t count = 0, i = 0;
++		syslog(LOG_NOTICE, "Suboption found: %s[%d] len: %d",
++				dhcpv6_vendor_subopt_str(stype), stype, slen);
++		// Size of one element in TLV value (for example, if value is list of
++		// IPv4 addresses, then exp_elem_size will be 4)
++		if (dhcpv6_is_vendor_sub_known(stype)) {
++			exp_elem_size = vendor_subopt_lengths[stype];
++			if (0 != exp_elem_size) {
++				if (0 != slen % exp_elem_size) {
++					syslog(LOG_ERR, "Unexpected suboption len: %d", slen);
++					continue;
++				}
++				// Number of elements in TLV value
++				count = slen / exp_elem_size;
++				// Let's define some reasonable maximum of IP address count,
++				// process only this number of addresses and ignore all others
++				if (DHCPV6_IP_ADDR_LIST_MAX_SIZE < count) {
++					syslog(LOG_WARNING, "Too long list of IP addresses for %s, "
++							"using only first %d of %zd",
++							dhcpv6_vendor_subopt_str(stype),
++							DHCPV6_IP_ADDR_LIST_MAX_SIZE, count);
++					count = DHCPV6_IP_ADDR_LIST_MAX_SIZE;
++				}
++			}
++		}
++		// Map SubTLV type to GPB structure
++		switch(stype) {
++		case VENDOR_SUB_CCAP:
++			gpb_count_ptr = &ipc_data.n_ccapcores;
++			gpb_list_ptr = &ipc_data.ccapcores;
++			break;
++		case VENDOR_SUB_SYSLOG:
++			gpb_count_ptr = &ipc_data.n_logservers;
++			gpb_list_ptr = &ipc_data.logservers;
++			break;
++		case VENDOR_SUB_TIME:
++			gpb_count_ptr = &ipc_data.n_timeservers;
++			gpb_list_ptr = &ipc_data.timeservers;
++			break;
++		}
++		switch (stype) {
++		case VENDOR_SUB_ORO: {
++			// Requested options - ignored (using hard-coded list of options)
++			uint16_t oro_opt;
++			for (i = 0; i < count; ++i) {
++				oro_opt = ntohs(*((uint16_t *)(sdata + i*exp_elem_size)));
++				syslog(LOG_NOTICE, "   opt=%d", oro_opt);
++			}
++			break;
++		}
++		case VENDOR_SUB_CCAP:
++		case VENDOR_SUB_SYSLOG:
++		case VENDOR_SUB_TIME:
++			if (*gpb_list_ptr) {
++				// Multiple identical suboptions in one message are not properly supported,
++				// only the last one is handled. However at least avoid a memory leak
++				syslog(LOG_WARNING, "received more than one %d suboption, only handling the last one", (int)stype);
++				dhcpv6_free_string_array(*gpb_list_ptr, *gpb_count_ptr);
++			}
++			*gpb_count_ptr = 0;
++			*gpb_list_ptr = malloc(count * sizeof(char*));
++			if (!*gpb_list_ptr) {
++				syslog(LOG_ERR, "failed to alloc array of char pointers, len: %zd, subopt: %d", count, (int)stype);
++				break;
++			}
++			for (i = 0; i < count; ++i) {
++				if (inet_ntop(AF_INET6, sdata + i*exp_elem_size, ipv6_buf,
++						INET6_ADDRSTRLEN)){
++					size_t addr_str_len = strlen(ipv6_buf) + 1;
++					syslog(LOG_NOTICE, "   addr=%s", ipv6_buf);
++					(*gpb_list_ptr)[*gpb_count_ptr] = malloc(addr_str_len * sizeof(char));
++					if ((*gpb_list_ptr)[*gpb_count_ptr]) {
++						memcpy((*gpb_list_ptr)[*gpb_count_ptr], ipv6_buf, addr_str_len);
++						++(*gpb_count_ptr);
++					} else {
++						syslog(LOG_ERR, "failed to alloc buffer for ip address '%s' len: %zd", ipv6_buf, addr_str_len);
++					}
++				} else {
++					syslog(LOG_ERR, "Parsing ipv6 address failed");
++				}
++			}
++			break;
++		case VENDOR_SUB_TIME_OFF:
++			if (1 != count) {
++				syslog(LOG_ERR, "Unexpected data format received");
++			} else {
++				uint32_t time_offset = ntohl(*((uint32_t *)sdata));
++				syslog(LOG_NOTICE, "   %s=%"PRId32"",
++						dhcpv6_vendor_subopt_str(stype), time_offset);
++				//ipc_data.has_timeoffset = true;
++				ipc_data.timeoffset = time_offset;
++			}
++			break;
++		default:
++			if (dhcpv6_is_vendor_sub_known(stype)) {
++				syslog(LOG_ERR, "Unexpected suboption: %s[%d]",
++						dhcpv6_vendor_subopt_str(stype), stype);
++			} else {
++				syslog(LOG_ERR, "Unknown suboption: %d len: %d", stype, slen);
++			}
++			break;
++		}
++	}
++	// send parsed value to manager process
++	if (NULL == sock) {
++		syslog(LOG_NOTICE, "Socket to parent not ready, skipping sending info");
++	} else {
++		dhcpv6_send_ipc_message(sock, &ipc_msg);
++	}
++	// cleanup
++	dhcpv6_free_string_array(ipc_data.logservers, ipc_data.n_logservers);
++	dhcpv6_free_string_array(ipc_data.ccapcores, ipc_data.n_ccapcores);
++	dhcpv6_free_string_array(ipc_data.timeservers, ipc_data.n_timeservers);
++}
++
+ int dhcpv6_set_ia_mode(enum odhcp6c_ia_mode na, enum odhcp6c_ia_mode pd)
+ {
+ 	int mode = DHCPV6_UNKNOWN;
+@@ -411,9 +705,10 @@ static void dhcpv6_send(enum dhcpv6_msg
+ 	uint16_t oro_refresh = htons(DHCPV6_OPT_INFO_REFRESH);
+ 
+ 	// Build vendor-class option
+-	size_t vendor_class_len, user_class_len;
++	size_t vendor_class_len, user_class_len, vendor_opts_len;
+ 	struct dhcpv6_vendorclass *vendor_class = odhcp6c_get_state(STATE_VENDORCLASS, &vendor_class_len);
+ 	void *user_class = odhcp6c_get_state(STATE_USERCLASS, &user_class_len);
++	void *vendor_opts = odhcp6c_get_state(STATE_VENDOR_OPTS, &vendor_opts_len);
+ 
+ 	struct {
+ 		uint16_t type;
+@@ -423,6 +718,11 @@ static void dhcpv6_send(enum dhcpv6_msg
+ 	struct {
+ 		uint16_t type;
+ 		uint16_t length;
++	} vendor_opts_hdr = {htons(DHCPV6_OPT_VENDOR_OPTS), htons(vendor_opts_len)};
++
++	struct {
++		uint16_t type;
++		uint16_t length;
+ 	} user_class_hdr = {htons(DHCPV6_OPT_USER_CLASS), htons(user_class_len)};
+ 
+ 	// Prepare Header
+@@ -453,6 +753,8 @@ static void dhcpv6_send(enum dhcpv6_msg
+ 		[IOV_VENDOR_CLASS] = {vendor_class, vendor_class_len},
+ 		[IOV_USER_CLASS_HDR] = {&user_class_hdr, user_class_len ? sizeof(user_class_hdr) : 0},
+ 		[IOV_USER_CLASS] = {user_class, user_class_len},
++		[IOV_VENDOR_OPTS_HDR] = {&vendor_opts_hdr, vendor_opts_len ? sizeof(vendor_opts_hdr) : 0},
++		[IOV_VENDOR_OPTS] = {vendor_opts, vendor_opts_len},
+ 		[IOV_RECONF_ACCEPT] = {&reconf_accept, sizeof(reconf_accept)},
+ 		[IOV_FQDN] = {&fqdn, fqdn_len},
+ 		[IOV_HDR_IA_NA] = {&hdr_ia_na, sizeof(hdr_ia_na)},
+@@ -462,11 +764,11 @@ static void dhcpv6_send(enum dhcpv6_msg
+ 
+ 	size_t cnt = IOV_TOTAL;
+ 	if (type == DHCPV6_MSG_INFO_REQ) {
+-		cnt = 9;
++		cnt = 11;
+ 		iov[IOV_ORO_REFRESH].iov_len = sizeof(oro_refresh);
+ 		hdr.oro_len = htons(oro_len + sizeof(oro_refresh));
+ 	} else if (!request_prefix) {
+-		cnt = 13;
++		cnt = 15;
+ 	}
+ 
+ 	// Disable IAs if not used
+@@ -564,11 +866,11 @@ int dhcpv6_request(enum dhcpv6_msg type)
+ 		case DHCPV6_MSG_UNKNOWN:
+ 			break;
+ 		default:
+-			syslog(LOG_NOTICE, "Send %s message (elapsed %llums, rc %d)",
+-					retx->name, (unsigned long long)elapsed, rc);
+ 			// Fall through
+ 		case DHCPV6_MSG_SOLICIT:
+ 		case DHCPV6_MSG_INFO_REQ:
++			syslog(LOG_NOTICE, "Send %s message (elapsed %llums, rc %d)",
++					retx->name, (unsigned long long)elapsed, rc);
+ 			dhcpv6_send(type, trid, elapsed / 10);
+ 			rc++;
+ 		}
+@@ -941,6 +1243,7 @@ static int dhcpv6_handle_reply(enum dhcp
+ 		odhcp6c_clear_state(STATE_S46_LW);
+ 		odhcp6c_clear_state(STATE_PASSTHRU);
+ 		odhcp6c_clear_state(STATE_CUSTOM_OPTS);
++		odhcp6c_clear_state(STATE_VENDOR_OPTS);
+ 
+ 		// Parse and find all matching IAs
+ 		dhcpv6_for_each_option(opt, end, otype, olen, odata) {
+@@ -1064,6 +1367,22 @@ static int dhcpv6_handle_reply(enum dhcp
+ 			} else if (otype == DHCPV6_OPT_S46_CONT_MAPT) {
+ 				odhcp6c_add_state(STATE_S46_MAPT, odata, olen);
+ 				passthru = false;
++			} else if (otype == DHCPV6_OPT_VENDOR_OPTS && olen >= DHCPV6_VENDOR_ID_SIZE) {
++				uint32_t vendor_id = ntohl(*((uint32_t *)odata));
++				if (DHCPV6_CABLELABS_VENDOR_ID == vendor_id) {
++					// only add the content of the first received DHCPV6_OPT_VENDOR_OPTS
++					// option, because multiple concatenated options cannot properly be
++					// parsed due to the initial vendor id
++					size_t cur_len;
++					odhcp6c_get_state(STATE_VENDOR_OPTS, &cur_len);
++					if (cur_len == 0)
++						odhcp6c_add_state(STATE_VENDOR_OPTS, odata, olen);
++					else
++						syslog(LOG_WARNING, "received more than one DHCPV6_OPT_VENDOR_OPTS option in one packet, only handling the first one");
++				} else {
++					syslog(LOG_ERR, "Unknown vendor ID found: %d", vendor_id);
++				}
++				passthru = false;
+ 			} else if (otype == DHCPV6_OPT_S46_CONT_MAPE) {
+ 				size_t mape_len;
+ 				odhcp6c_get_state(STATE_S46_MAPE, &mape_len);
+@@ -1234,7 +1553,7 @@ static int dhcpv6_parse_ia(void *opt, void *end)
+ 			if (entry.t1 > entry.t2)
+ 				entry.t1 = entry.t2;
+ 
+-			entry.length = 128;
++			entry.length = 64;
+ 			entry.target = addr->addr;
+ 
+ 			odhcp6c_update_entry(STATE_IA_NA, &entry, 0, false);
+--- a/src/odhcp6c.c
++++ b/src/odhcp6c.c
+@@ -1,5 +1,7 @@
+ /**
+  * Copyright (C) 2012-2014 Steven Barth <steven@midlink.org>
++ * Portions Copyright (c) 2016 Cisco and/or its affiliates, and
++ *                             Cable Television Laboratories, Inc. ("CableLabs")
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License v2 as published by
+@@ -27,6 +29,7 @@
+ #include <net/if.h>
+ #include <sys/wait.h>
+ #include <sys/syscall.h>
++#include <sys/types.h>
+ #include <arpa/inet.h>
+ 
+ #include "odhcp6c.h"
+@@ -67,6 +70,8 @@ int main(_unused int argc, char* const a
+ 	static struct in6_addr ifid = IN6ADDR_ANY_INIT;
+ 	int sol_timeout = DHCPV6_SOL_MAX_RT;
+ 	int verbosity = 0;
++	bool vendor_init_done = false;
++	zsock_t *sock = NULL;
+ 
+ 
+ 	bool help = false, daemonize = false;
+@@ -74,7 +79,8 @@ int main(_unused int argc, char* const a
+ 	int c;
+ 	unsigned int client_options = DHCPV6_CLIENT_FQDN | DHCPV6_ACCEPT_RECONFIGURE;
+ 
+-	while ((c = getopt(argc, argv, "S::N:V:P:FB:c:i:r:Ru:s:kt:m:hedp:fav")) != -1) {
++	while ((c = getopt(argc, argv,
++			"S::N:V:P:FB:c:i:r:Ru:s:kt:m:hedp:favx:I:")) != -1) {
+ 		switch (c) {
+ 		case 'S':
+ 			allow_slaac_only = (optarg) ? atoi(optarg) : -1;
+@@ -175,6 +181,52 @@ int main(_unused int argc, char* const a
+ 			odhcp6c_add_state(STATE_USERCLASS, &optlen, 2);
+ 			odhcp6c_add_state(STATE_USERCLASS, optarg, strlen(optarg));
+ 			break;
++		case 'x':
++			optpos = strtok(optarg, ":");
++			if (NULL == optpos) {
++				syslog(LOG_ERR,"Parsing option -x failed");
++				break;
++			}
++			struct {
++				uint16_t type;
++				uint16_t len;
++			} opt_hdr;
++
++			opt_hdr.type = htons(dhcpv6_parse_subopt_type(optpos));
++			if (0 == opt_hdr.type) {
++				syslog(LOG_ERR, "Suboption type parsing failed");
++				break;
++			}
++
++			optpos = strtok(NULL, ":");
++			if (NULL == optpos) {
++				syslog(LOG_ERR,"Parsing option -x failed");
++				break;
++			}
++			opt_hdr.len = htons(strlen(optpos));
++
++			if (!vendor_init_done) {
++				uint32_t vendor_id = htonl(DHCPV6_CABLELABS_VENDOR_ID);
++				odhcp6c_add_state(STATE_VENDOR_OPTS, &vendor_id, 4);
++				vendor_init_done = true;
++			}
++			odhcp6c_add_state(STATE_VENDOR_OPTS, &opt_hdr, sizeof(opt_hdr));
++			odhcp6c_add_state(STATE_VENDOR_OPTS, optpos, strlen(optpos));
++			break;
++
++		case 'I':
++			if (NULL != optarg) {
++				sock = zsock_new_push(optarg);
++				if (NULL == sock) {
++					syslog(LOG_ERR,"Failed to create sock to addr: %s",
++							optarg);
++					// No socket -> no way how to inform manager about failure
++					return EXIT_FAILURE;
++				}
++			} else {
++				syslog(LOG_ERR,"No address for IPC found");
++			}
++			break;
+ 
+ 		case 's':
+ 			script = optarg;
+@@ -222,15 +274,20 @@ int main(_unused int argc, char* const a
+ 		}
+ 	}
+ 
+-	openlog("odhcp6c", logopt, LOG_DAEMON);
++	openlog("odhcp6c", logopt, LOG_LOCAL7);
+ 	if (!verbosity)
+-		setlogmask(LOG_UPTO(LOG_WARNING));
++		setlogmask(LOG_UPTO(LOG_DEBUG));
+ 
+ 	const char *ifname = argv[optind];
+ 
+ 	if (help || !ifname)
+ 		return usage();
+ 
++	/* Unblock signals blocked by parent */
++	sigset_t sigset;
++	sigemptyset (&sigset);
++	sigprocmask(SIG_SETMASK, &sigset, NULL);
++
+ 	signal(SIGIO, sighandler);
+ 	signal(SIGHUP, sighandler);
+ 	signal(SIGINT, sighandler);
+@@ -241,13 +298,14 @@ int main(_unused int argc, char* const a
+ 
+ 	if ((urandom_fd = open("/dev/urandom", O_CLOEXEC | O_RDONLY)) < 0 ||
+ 			init_dhcpv6(ifname, client_options, sol_timeout) ||
+-			ra_init(ifname, &ifid) || script_init(script, ifname)) {
++			ra_init(ifname, &ifid) ||
++			script_init(script, ifname, sock)) {
+ 		syslog(LOG_ERR, "failed to initialize: %s", strerror(errno));
+ 		return 3;
+ 	}
+ 
+ 	if (daemonize) {
+-		openlog("odhcp6c", LOG_PID, LOG_DAEMON); // Disable LOG_PERROR
++		openlog("odhcp6c", LOG_PID, LOG_LOCAL7); // Disable LOG_PERROR
+ 		if (daemon(0, 0)) {
+ 			syslog(LOG_ERR, "Failed to daemonize: %s",
+ 					strerror(errno));
+@@ -288,8 +346,11 @@ int main(_unused int argc, char* const a
+ 			mode = dhcpv6_request(DHCPV6_MSG_SOLICIT);
+ 		odhcp6c_signal_process();
+ 
+-		if (mode < 0)
++		if (mode < 0) {
++			syslog(LOG_ERR, "No lease obtained, exiting ...");
++			signal_term = true;
+ 			continue;
++		}
+ 
+ 		do {
+ 			int res = dhcpv6_request(mode == DHCPV6_STATELESS ?
+@@ -306,8 +367,11 @@ int main(_unused int argc, char* const a
+ 			mode = dhcpv6_promote_server_cand();
+ 		} while (mode > DHCPV6_UNKNOWN);
+ 
+-		if (mode < 0)
++		if (mode < 0) {
++			syslog(LOG_ERR, "No lease obtained, exiting ...");
++			signal_term = true;
+ 			continue;
++		}
+ 
+ 		switch (mode) {
+ 		case DHCPV6_STATELESS:
+@@ -414,8 +478,17 @@ int main(_unused int argc, char* const a
+ 		odhcp6c_clear_state(STATE_IA_PD);
+ 	}
+ 
++	// Notify parent about exiting
++	syslog(LOG_ERR, "66070316:DHCP failed - DHCP Solicit sent, No DHCP Advertise received");
++
++	if (NULL == sock) {
++		syslog(LOG_NOTICE, "Socket to parent not ready, skipping sending info");
++	} else {
++		dhcpv6_send_ipc_error_msg(sock, NULL);
++	}
++
+ 	script_call("stopped");
+-	return 0;
++	return EXIT_SUCCESS;
+ }
+ 
+ 
+@@ -443,6 +516,8 @@ static int usage(void)
+ 	"\nInvocation options:\n"
+ 	"	-p <pidfile>	Set pidfile (/var/run/odhcp6c.pid)\n"
+ 	"	-d		Daemonize\n"
++	"	-x		Add Vendor Specific Sub-option in format 0xNUM:VALUE"
++	"	-I		Provide PID of parent process"
+ 	"	-e		Write logmessages to stderr\n"
+ 	"	-v		Increase logging verbosity\n"
+ 	"	-h		Show this help\n\n";
+--- a/src/odhcp6c.h
++++ b/src/odhcp6c.h
+@@ -1,5 +1,7 @@
+ /**
+  * Copyright (C) 2012-2014 Steven Barth <steven@midlink.org>
++ * Portions Copyright (c) 2016 Cisco and/or its affiliates, and
++ *                             Cable Television Laboratories, Inc. ("CableLabs")
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License v2 as published by
+@@ -15,6 +17,9 @@
+ #include <stdint.h>
+ #include <stdbool.h>
+ #include <netinet/in.h>
++#include <sys/types.h>
++#include <czmq.h>
++#include <dhcp.pb-c.h>
+ 
+ #define _unused __attribute__((unused))
+ #define _packed __attribute__((packed))
+@@ -30,6 +35,8 @@
+ #define DHCPV6_REN_MAX_RT 600
+ #define DHCPV6_REB_MAX_RT 600
+ #define DHCPV6_INF_MAX_RT 120
++#define DHCPV6_CABLELABS_VENDOR_ID 4491
++#define DHCPV6_VENDOR_ID_SIZE 4
+ 
+ #define DEFAULT_MIN_UPDATE_INTERVAL 30
+ 
+@@ -49,6 +56,7 @@ enum dhcvp6_opt {
+ 	DHCPV6_OPT_RAPID_COMMIT = 14,
+ 	DHCPV6_OPT_USER_CLASS = 15,
+ 	DHCPV6_OPT_VENDOR_CLASS = 16,
++	DHCPV6_OPT_VENDOR_OPTS = 17,
+ 	DHCPV6_OPT_RECONF_MESSAGE = 19,
+ 	DHCPV6_OPT_RECONF_ACCEPT = 20,
+ 	DHCPV6_OPT_DNS_SERVERS = 23,
+@@ -118,6 +126,22 @@ enum dhcpv6_config {
+ 	DHCPV6_ACCEPT_RECONFIGURE = 4,
+ };
+ 
++enum {
++	VENDOR_SUB_ORO = 1,
++	VENDOR_SUB_DEVICE = 2,
++	VENDOR_SUB_SN = 4,
++	VENDOR_SUB_HW_VER = 5,
++	VENDOR_SUB_SW_VER = 6,
++	VENDOR_SUB_ROM_VER = 7,
++	VENDOR_SUB_OUI = 8,
++	VENDOR_SUB_MODEL = 9,
++	VENDOR_SUB_V_NAME = 10,
++	VENDOR_SUB_SYSLOG = 34,
++	VENDOR_SUB_TIME = 37,
++	VENDOR_SUB_TIME_OFF = 38,
++	VENDOR_SUB_CCAP = 61,
++};
++
+ typedef int(reply_handler)(enum dhcpv6_msg orig, const int rc,
+ 		const void *opt, const void *end, const struct sockaddr_in6 *from);
+ 
+@@ -259,6 +283,7 @@ enum odhcp6c_state {
+ 	STATE_AFTR_NAME,
+ 	STATE_VENDORCLASS,
+ 	STATE_USERCLASS,
++	STATE_VENDOR_OPTS,
+ 	STATE_CER,
+ 	STATE_S46_MAPT,
+ 	STATE_S46_MAPE,
+@@ -308,6 +333,11 @@ struct odhcp6c_request_prefix {
+ };
+ 
+ int init_dhcpv6(const char *ifname, unsigned int client_options, int sol_timeout);
++uint16_t dhcpv6_parse_subopt_type(const char *str);
++void dhcpv6_parse_vendor_opts_data(uint8_t *buf, size_t opt_size,
++		zsock_t *sock);
++void dhcpv6_send_ipc_message(zsock_t *sock, TDhcpMessage *msg);
++void dhcpv6_send_ipc_error_msg(zsock_t *sock, char* error_str);
+ int dhcpv6_set_ia_mode(enum odhcp6c_ia_mode na, enum odhcp6c_ia_mode pd);
+ int dhcpv6_request(enum dhcpv6_msg type);
+ int dhcpv6_poll_reconfigure(void);
+@@ -322,7 +352,7 @@ int ra_conf_mtu(int newvalue);
+ int ra_conf_reachable(int newvalue);
+ int ra_conf_retransmit(int newvalue);
+ 
+-int script_init(const char *path, const char *ifname);
++int script_init(const char *path, const char *ifname, zsock_t *sock);
+ ssize_t script_unhexlify(uint8_t *dst, size_t len, const char *src);
+ void script_call(const char *status);
+ 
+--- a/src/script.c
++++ b/src/script.c
+@@ -1,5 +1,7 @@
+ /**
+  * Copyright (C) 2012-2014 Steven Barth <steven@midlink.org>
++ * Portions Copyright (c) 2016 Cisco and/or its affiliates, and
++ *                             Cable Television Laboratories, Inc. ("CableLabs")
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License v2 as published by
+@@ -41,12 +43,18 @@ static const int8_t hexvals[] = {
+ 
+ 
+ static char *argv[4] = {NULL, NULL, NULL, NULL};
++static zsock_t *ipc_sock = NULL;
+ 
+ 
+-int script_init(const char *path, const char *ifname)
++int script_init(const char *path, const char *ifname,  zsock_t *sock)
+ {
+ 	argv[0] = (char*)path;
+ 	argv[1] = (char*)ifname;
++	if (NULL == sock) {
++		syslog(LOG_WARNING, "No socket for IPC found");
++	}
++	ipc_sock = sock;
++
+ 	return 0;
+ }
+ 
+@@ -341,6 +349,7 @@ void script_call(const char *status)
+ 	size_t dns_len, search_len, custom_len, sntp_ip_len, ntp_ip_len, ntp_dns_len;
+ 	size_t sip_ip_len, sip_fqdn_len, aftr_name_len, cer_len, addr_len;
+ 	size_t s46_mapt_len, s46_mape_len, s46_lw_len, passthru_len;
++	size_t vendor_opts_len;
+ 
+ 	odhcp6c_expire();
+ 
+@@ -368,6 +377,7 @@ void script_call(const char *status)
+ 	uint8_t *ra_route = odhcp6c_get_state(STATE_RA_ROUTE, &ra_route_len);
+ 	uint8_t *ra_dns = odhcp6c_get_state(STATE_RA_DNS, &ra_dns_len);
+ 	uint8_t *ra_search = odhcp6c_get_state(STATE_RA_SEARCH, &ra_search_len);
++	uint8_t *vendor = odhcp6c_get_state(STATE_VENDOR_OPTS, &vendor_opts_len);
+ 
+ 	// Don't set environment before forking, because env is leaky.
+ 	if (fork() == 0) {
+@@ -410,4 +420,10 @@ void script_call(const char *status)
+ 		execv(argv[0], argv);
+ 		_exit(128);
+ 	}
++
++	bool is_bound = (strcmp(status, "bound") == 0);
++	if (NULL != vendor && 0 != vendor_opts_len && is_bound) {
++		dhcpv6_parse_vendor_opts_data(vendor, vendor_opts_len, ipc_sock);
++	}
++
+ }

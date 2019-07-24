@@ -1,0 +1,161 @@
+Index: Python-2.7.9/Modules/socketmodule.c
+===================================================================
+--- Python-2.7.9.orig/Modules/socketmodule.c	2014-12-10 23:59:55.000000000 +0800
++++ Python-2.7.9/Modules/socketmodule.c	2017-04-25 10:15:02.757507697 +0800
+@@ -1309,7 +1309,13 @@
+     {
+         struct sockaddr_in* addr;
+         char *host;
++#ifdef HAVE_LINUX_L2TP
++	struct sockaddr_l2tpip l2tpaddr;
++	int result;
++	unsigned int port;
++#else
+         int port, result;
++#endif
+         if (!PyTuple_Check(args)) {
+             PyErr_Format(
+                 PyExc_TypeError,
+@@ -1318,7 +1324,11 @@
+                 Py_TYPE(args)->tp_name);
+             return 0;
+         }
++#ifdef HAVE_LINUX_L2TP
++        if (!PyArg_ParseTuple(args, "etI:getsockaddrarg",
++#else
+         if (!PyArg_ParseTuple(args, "eti:getsockaddrarg",
++#endif
+                               "idna", &host, &port))
+             return 0;
+         addr=(struct sockaddr_in*)addr_ret;
+@@ -1327,15 +1337,31 @@
+         PyMem_Free(host);
+         if (result < 0)
+             return 0;
++#ifdef HAVE_LINUX_L2TP
++	if (s->sock_proto != IPPROTO_L2TP) {
++#endif
+         if (port < 0 || port > 0xffff) {
+             PyErr_SetString(
+                 PyExc_OverflowError,
+                 "getsockaddrarg: port must be 0-65535.");
+             return 0;
+         }
++#ifdef HAVE_LINUX_L2TP
++	}
++#endif
+         addr->sin_family = AF_INET;
+         addr->sin_port = htons((short)port);
+         *len_ret = sizeof *addr;
++#ifdef HAVE_LINUX_L2TP
++	if (s->sock_proto == IPPROTO_L2TP) {
++		l2tpaddr.l2tp_addr = addr->sin_addr;
++		l2tpaddr.l2tp_conn_id = port;
++		l2tpaddr.l2tp_family = AF_INET;
++
++		*(struct sockaddr_l2tpip*)addr_ret = l2tpaddr;
++		*len_ret = sizeof(struct sockaddr_l2tpip);
++	}
++#endif
+         return 1;
+     }
+ 
+@@ -1344,7 +1370,13 @@
+     {
+         struct sockaddr_in6* addr;
+         char *host;
++#ifdef HAVE_LINUX_L2TP
++        struct sockaddr_l2tpip6 l2tpaddr;
++        int result;
++        unsigned int port;
++#else
+         int port, result;
++#endif
+         unsigned int flowinfo, scope_id;
+         flowinfo = scope_id = 0;
+         if (!PyTuple_Check(args)) {
+@@ -1355,7 +1387,11 @@
+                 Py_TYPE(args)->tp_name);
+             return 0;
+         }
++#ifdef HAVE_LINUX_L2TP
++        if (!PyArg_ParseTuple(args, "etI|II",
++#else
+         if (!PyArg_ParseTuple(args, "eti|II",
++#endif
+                               "idna", &host, &port, &flowinfo,
+                               &scope_id)) {
+             return 0;
+@@ -1366,6 +1402,9 @@
+         PyMem_Free(host);
+         if (result < 0)
+             return 0;
++#ifdef HAVE_LINUX_L2TP
++     if (s->sock_proto != IPPROTO_L2TP) {
++ #endif
+         if (port < 0 || port > 0xffff) {
+             PyErr_SetString(
+                 PyExc_OverflowError,
+@@ -1378,11 +1417,26 @@
+                 "getsockaddrarg: flowinfo must be 0-1048575.");
+             return 0;
+         }
++#ifdef HAVE_LINUX_L2TP
++     }
++#endif
+         addr->sin6_family = s->sock_family;
+         addr->sin6_port = htons((short)port);
+         addr->sin6_flowinfo = htonl(flowinfo);
+         addr->sin6_scope_id = scope_id;
+         *len_ret = sizeof *addr;
++#ifdef HAVE_LINUX_L2TP
++    if (s->sock_proto == IPPROTO_L2TP) {
++        l2tpaddr.l2tp_addr = addr->sin6_addr;
++        l2tpaddr.l2tp_conn_id = port;
++        l2tpaddr.l2tp_scope_id = scope_id;
++        l2tpaddr.l2tp_flowinfo = htonl(flowinfo);
++        l2tpaddr.l2tp_family = AF_INET6;
++
++        *(struct sockaddr_l2tpip6*)addr_ret = l2tpaddr;
++        *len_ret = sizeof(struct sockaddr_l2tpip6);
++    }
++#endif
+         return 1;
+     }
+ #endif
+@@ -5015,6 +5069,9 @@
+ #else
+     PyModule_AddIntConstant(m, "IPPROTO_IP", 0);
+ #endif
++#ifdef HAVE_LINUX_L2TP
++    PyModule_AddIntConstant(m, "IPPROTO_L2TP", IPPROTO_L2TP);
++#endif
+ #ifdef  IPPROTO_HOPOPTS
+     PyModule_AddIntConstant(m, "IPPROTO_HOPOPTS", IPPROTO_HOPOPTS);
+ #endif
+Index: Python-2.7.9/Modules/socketmodule.h
+===================================================================
+--- Python-2.7.9.orig/Modules/socketmodule.h	2014-12-10 23:59:55.000000000 +0800
++++ Python-2.7.9/Modules/socketmodule.h	2017-04-25 10:14:51.877507991 +0800
+@@ -11,6 +11,10 @@
+ # if !(defined(__BEOS__) || defined(__CYGWIN__) || (defined(PYOS_OS2) && defined(PYCC_VACPP)))
+ #  include <netinet/tcp.h>
+ # endif
++#define HAVE_LINUX_L2TP
++#ifdef HAVE_LINUX_L2TP
++# include <linux/l2tp.h>
++#endif
+ 
+ #else /* MS_WINDOWS */
+ # include <winsock2.h>
+@@ -96,6 +100,10 @@
+ /* Socket address */
+ typedef union sock_addr {
+     struct sockaddr_in in;
++#ifdef HAVE_LINUX_L2TP
++    struct sockaddr_l2tpip   l2tp;
++    struct sockaddr_l2tpip6  l2tpip6;
++#endif
+ #ifdef AF_UNIX
+     struct sockaddr_un un;
+ #endif

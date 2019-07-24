@@ -1,0 +1,14 @@
+{
+    "fake_agent" : {
+        "interface" : "real",
+        "macsec" : "real",
+        "dhcp" : "real",
+        "tod" : "real",
+        "rcp" : "real",
+        "ipsec" : "real",
+        "ptp_1588" : "real",
+        "l2tpv3" : "real",
+        "comments": "This node define to load fake agent of RPD to debug. The value is 'real'|'fake'. If the agent name is not present, the default value is 'real'.",
+        "example": "l2tpv3 : fake, rcp : real"
+    }
+}

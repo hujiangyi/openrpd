@@ -1,0 +1,214 @@
+Index: tftpy-0.6.2/tftpy/TftpContexts.py
+===================================================================
+--- tftpy-0.6.2.orig/tftpy/TftpContexts.py	2013-09-27 09:07:38.000000000 +0800
++++ tftpy-0.6.2/tftpy/TftpContexts.py	2017-12-03 12:24:53.855782480 +0800
+@@ -74,15 +74,17 @@
+         self.fileobj = None
+         self.options = None
+         self.packethook = None
+-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+-        self.sock.settimeout(timeout)
+         self.timeout = timeout
++        self.sock = None
++        self.sockaddr = None
++        self.address = None	
+         self.state = None
+         self.next_block = 0
+         self.factory = TftpPacketFactory()
++        self.port = port
++        self.__host = None
+         # Note, setting the host will also set self.address, as it's a property.
+         self.host = host
+-        self.port = port
+         # The port associated with the TID
+         self.tidport = None
+         # Metrics
+@@ -134,8 +136,43 @@
+     def sethost(self, host):
+         """Setter method that also sets the address property as a result
+         of the host that is set."""
+-        self.__host = host
+-        self.address = socket.gethostbyname(host)
++
++        try:
++            info = socket.getaddrinfo(host, self.port, socket.AF_UNSPEC, socket.SOCK_DGRAM)
++        except socket.gaierror, (errno, msg):
++            log.error("Failed to get address information with error %s." % (msg))
++            raise TftpException, "Failed to get address information with error %s." % (msg)
++
++        for (fam, stype, proto, cname, saddr) in info:
++            if (fam is socket.AF_INET6):
++                log.debug("trying IPV6 socket")
++            elif (fam is socket.AF_INET):
++                log.debug("trying IPV4 socket")
++            else:
++                log.debug("skipping unknown address family %d" % (fam))
++                continue
++            try:
++                self.sock = socket.socket(fam, stype, proto)
++                self.sock.settimeout(self.timeout)
++            except socket.error, (errno, msg):
++                self.sock = None
++                log.info("failed to open socket")
++                continue
++            if self.sock:
++                self.sockaddr = saddr;
++                # Strip off scope id
++                try:
++                    self.address = saddr[0][:saddr[0].rindex("%")];
++                except:
++                    self.address = saddr[0]
++                
++                self.__host = self.address
++                break
++		
++        if self.sock is None:
++            log.error("unable to open socket")
++            raise TftpException, "unable to open socket"
++
+ 
+     host = property(gethost, sethost)
+ 
+@@ -154,11 +191,17 @@
+         """Here we wait for a response from the server after sending it
+         something, and dispatch appropriate action to that response."""
+         try:
+-            (buffer, (raddress, rport)) = self.sock.recvfrom(MAX_BLKSIZE)
++            (buffer, rsockaddr) = self.sock.recvfrom(MAX_BLKSIZE)
+         except socket.timeout:
+             log.warn("Timeout waiting for traffic, retrying...")
+             raise TftpTimeout, "Timed-out waiting for traffic"
+ 
++        # Strip off scope id
++        try:
++            raddress = rsockaddr[0][:rsockaddr[0].rindex("%")]
++        except:
++            raddress = rsockaddr[0]
++        rport = rsockaddr[1]
+         # Ok, we've received a packet. Log it.
+         log.debug("Received %d bytes from %s:%s",
+                         len(buffer), raddress, rport)
+@@ -171,13 +214,13 @@
+         # Check for known "connection".
+         if raddress != self.address:
+             log.warn("Received traffic from %s, expected host %s. Discarding"
+-                        % (raddress, self.host))
++                        % (raddress, self.address))
+ 
+         if self.tidport and self.tidport != rport:
+             log.warn("Received traffic from %s:%s but we're "
+                         "connected to %s:%s. Discarding."
+                         % (raddress, rport,
+-                        self.host, self.tidport))
++                        self.address, self.tidport))
+ 
+         # If there is a packethook defined, call it. We unconditionally
+         # pass all packets, it's up to the client to screen out different
+@@ -284,7 +327,7 @@
+         pkt.filename = self.file_to_transfer
+         pkt.mode = "octet" # FIXME - shouldn't hardcode this
+         pkt.options = self.options
+-        self.sock.sendto(pkt.encode().buffer, (self.host, self.port))
++        self.sock.sendto(pkt.encode().buffer, self.sockaddr)
+         self.next_block = 1
+         self.last_pkt = pkt
+         # FIXME: should we centralize sendto operations so we can refactor all
+@@ -363,7 +406,7 @@
+         pkt.filename = self.file_to_transfer
+         pkt.mode = "octet" # FIXME - shouldn't hardcode this
+         pkt.options = self.options
+-        self.sock.sendto(pkt.encode().buffer, (self.host, self.port))
++        self.sock.sendto(pkt.encode().buffer, self.sockaddr)
+         self.next_block = 1
+         self.last_pkt = pkt
+ 
+Index: tftpy-0.6.2/tftpy/TftpServer.py
+===================================================================
+--- tftpy-0.6.2.orig/tftpy/TftpServer.py	2014-11-16 00:29:05.000000000 +0800
++++ tftpy-0.6.2/tftpy/TftpServer.py	2017-12-03 12:30:00.027789779 +0800
+@@ -59,7 +59,7 @@
+     def listen(self,
+                listenip="",
+                listenport=DEF_TFTP_PORT,
+-               timeout=SOCK_TIMEOUT):
++               timeout=SOCK_TIMEOUT, addrfam=socket.AF_INET):
+         """Start a server listening on the supplied interface and port. This
+         defaults to INADDR_ANY (all interfaces) and UDP port 69. You can also
+         supply a different socket timeout value, if desired."""
+@@ -72,7 +72,7 @@
+                 % (listenip, listenport))
+         try:
+             # FIXME - sockets should be non-blocking
+-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++            self.sock = socket.socket(addrfam, socket.SOCK_DGRAM)
+             self.sock.bind((listenip, listenport))
+             _, self.listenport = self.sock.getsockname()
+         except socket.error, err:
+Index: tftpy-0.6.2/tftpy/TftpStates.py
+===================================================================
+--- tftpy-0.6.2.orig/tftpy/TftpStates.py	2017-12-02 22:42:56.638606666 +0800
++++ tftpy-0.6.2/tftpy/TftpStates.py	2017-12-03 12:34:52.387796750 +0800
+@@ -97,8 +97,7 @@
+         dat.blocknumber = blocknumber
+         self.context.metrics.bytes += len(dat.data)
+         log.debug("Sending DAT packet %d", dat.blocknumber)
+-        self.context.sock.sendto(dat.encode().buffer,
+-                                 (self.context.host, self.context.tidport))
++        self.context.sock.sendto(dat.encode().buffer, self.context.sockaddr)
+         if self.context.packethook:
+             self.context.packethook(dat)
+         self.context.last_pkt = dat
+@@ -114,9 +113,7 @@
+         log.info("Sending ack to block %d" % blocknumber)
+         ackpkt = TftpPacketACK()
+         ackpkt.blocknumber = blocknumber
+-        self.context.sock.sendto(ackpkt.encode().buffer,
+-                                 (self.context.host,
+-                                  self.context.tidport))
++        self.context.sock.sendto(ackpkt.encode().buffer, self.context.sockaddr)
+         self.context.last_pkt = ackpkt
+ 
+     def sendError(self, errorcode):
+@@ -125,9 +122,7 @@
+         log.debug("In sendError, being asked to send error %d", errorcode)
+         errpkt = TftpPacketERR()
+         errpkt.errorcode = errorcode
+-        self.context.sock.sendto(errpkt.encode().buffer,
+-                                 (self.context.host,
+-                                  self.context.tidport))
++        self.context.sock.sendto(errpkt.encode().buffer, self.context.sockaddr)
+         self.context.last_pkt = errpkt
+ 
+     def sendOACK(self):
+@@ -136,9 +131,7 @@
+         log.debug("In sendOACK with options %s", self.context.options)
+         pkt = TftpPacketOACK()
+         pkt.options = self.context.options
+-        self.context.sock.sendto(pkt.encode().buffer,
+-                                 (self.context.host,
+-                                  self.context.tidport))
++        self.context.sock.sendto(pkt.encode().buffer, self.context.sockaddr)
+         self.context.last_pkt = pkt
+ 
+     def resendLast(self):
+@@ -154,7 +147,7 @@
+             # there.
+             sendto_port = self.context.port
+         self.context.sock.sendto(self.context.last_pkt.encode().buffer,
+-                                 (self.context.host, sendto_port))
++                                 self.context.sockaddr)
+         if self.context.packethook:
+             self.context.packethook(self.context.last_pkt)
+ 
+@@ -532,9 +525,10 @@
+         """Handle the packet in response to an RRQ to the server."""
+         if not self.context.tidport:
+             self.context.tidport = rport
++            self.context.sockaddr = (self.context.sockaddr[0], rport)
+             log.info("Set remote port for session to %s" % rport)
+         if self.context.host != raddress:
+-            self.context.host = raddress
++            self.context.sockaddr = (raddress, self.context.sockaddr[1])
+             log.info("Set remote host for session to %s" % raddress)
+ 
+         # Now check the packet type and dispatch it properly.

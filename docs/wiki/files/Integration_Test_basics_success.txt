@@ -1,0 +1,738 @@
+tjanciga@ubuntu:/ws/ws_ext2$ sudo -E sh -c 'export PYTHONPATH=/ws/ws_ext2/openwrt14.07/package/network/config; python openwrt14.07/package/network/config/rpd_service_suite/its_basic.py --rpd-image=/ws/ws_new_stable/openwrt/bin/x86/openwrt-x86-generic-combined-ext4.vmdk --server-image=/ws/ws_ext2/openwrt14.07/bin/x86/openwrt-x86-generic-combined-ext4.vmdk' 2>&1 | tee ~/it_basics_output.txt
+2016-03-23 00:57:13,421 topology:_start_virtual_net:494:INFO:Creating virtual network[virbr1]
+2016-03-23 00:57:13,422 its_basic:test_01_basic_init:85:INFO:Starting ServiceSuite VM
+2016-03-23 00:57:13,422 topology:create_vm:483:INFO:Creating VM[ServiceSuite1], path[/ws/ws_ext2/openwrt14.07/bin/x86/openwrt-x86-generic-combined-ext4.vmdk]
+2016-03-23 00:57:13,422 topology:start_vm:516:INFO:Starting virtual network
+Network virbr1 created from /ws/ws_ext2/virbr1.xml
+
+2016-03-23 00:57:13,576 topology:start_vm:518:INFO:Starting VM[ServiceSuite1]
+2016-03-23 00:57:13,576 topology:_convert_image:170:DEBUG:vmdk path: '/ws/ws_ext2/ServiceSuite1.vmdk'
+    (100.00/100%)
+Domain ServiceSuite1 created from /ws/ws_ext2/ServiceSuite1.xml
+
+2016-03-23 00:57:15,609 topology:_wait_for_boot:645:INFO:Waiting for machines to boot up
+2016-03-23 00:57:33,704 topology:run_command:328:DEBUG:remote IP '192.168.122.159' - command for execution: ':'
+2016-03-23 00:57:34,078 topology:run_command:347:DEBUG:Stdout rc[0]:
+
+2016-03-23 00:57:34,078 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:57:34,080 topology:run_command:328:DEBUG:remote IP '192.168.122.159' - command for execution: 'uci show network.lan.proto'
+2016-03-23 00:57:34,486 topology:run_command:347:DEBUG:Stdout rc[0]:
+network.lan.proto=static
+
+2016-03-23 00:57:34,487 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:57:34,490 topology:run_command:328:DEBUG:remote IP '192.168.122.159' - command for execution: 'uci set network.lan.ipaddr=192.168.5.1; uci commit network; ifup lan'
+2016-03-23 00:57:35,172 topology:run_command:347:DEBUG:Stdout rc[0]:
+
+2016-03-23 00:57:35,172 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:57:35,174 it_api_topology:change_eth1_ip_addr:172:DEBUG:Changed IP address of eth1 to 192.168.5.1
+2016-03-23 00:57:35,174 topology:run_command:328:DEBUG:remote IP '192.168.122.159' - command for execution: 'uci show network.lanV6.proto'
+2016-03-23 00:57:35,598 topology:run_command:347:DEBUG:Stdout rc[0]:
+network.lanV6.proto=static
+
+2016-03-23 00:57:35,598 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:57:35,601 topology:run_command:328:DEBUG:remote IP '192.168.122.159' - command for execution: 'uci set network.lanV6.ip6addr=fd00:dead:1::1/64; uci commit network; ifup lanV6'
+2016-03-23 00:57:36,057 topology:run_command:347:DEBUG:Stdout rc[0]:
+
+2016-03-23 00:57:36,057 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:57:36,059 it_api_topology:change_eth1_ip_addr:172:DEBUG:Changed IP address of eth1 to fd00:dead:1::1
+2016-03-23 00:57:37,061 it_api_topology:connect_to_it_api_server:67:DEBUG:ItApiVM: ServiceSuite1, ServiceSuiteVM: Connecting to VM's IT API server, IP address: 192.168.122.159
+2016-03-23 00:57:37,061 it_api:connect:202:DEBUG:Openning socket and connecting to server: 192.168.122.159:7777
+2016-03-23 00:57:37,062 it_api:connect:208:INFO:Connected to IT API server: 192.168.122.159:7777
+2016-03-23 00:57:37,062 its_basic:test_01_basic_init:88:INFO:Configuring ServiceSuite VM
+2016-03-23 00:57:37,062 it_api:it_api_send_msg:257:INFO:IT API message sent: length[20]
+2016-03-23 00:57:39,080 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[22]
+2016-03-23 00:57:39,080 its_basic:test_01_basic_init:93:DEBUG:Received reply to service configuration:
+2016-03-23 00:57:39,080 its_basic:test_01_basic_init:94:DEBUG:MessageType: IT_API_SERVICE_SUITE_CONFIGURE
+ServiceConfigureMessage {
+  DHCPv4 {
+    enable: true
+  }
+  DHCPv6 {
+    enable: true
+  }
+  Tp {
+    enable: true
+  }
+  CcapCoreV6 {
+    enable: true
+  }
+}
+MessageResult: IT_API_SERVICE_SUITE_RESULT_OK
+
+2016-03-23 00:57:39,081 its_basic:test_01_basic_init:101:INFO:Starting RPD VM
+2016-03-23 00:57:39,081 topology:create_vm:483:INFO:Creating VM[RPD1], path[/ws/ws_new_stable/openwrt/bin/x86/openwrt-x86-generic-combined-ext4.vmdk]
+2016-03-23 00:57:39,081 topology:start_vm:518:INFO:Starting VM[RPD1]
+2016-03-23 00:57:39,081 topology:_convert_image:170:DEBUG:vmdk path: '/ws/ws_ext2/RPD1.vmdk'
+    (100.00/100%)
+Domain RPD1 created from /ws/ws_ext2/RPD1.xml
+
+2016-03-23 00:57:41,788 topology:_wait_for_boot:645:INFO:Waiting for machines to boot up
+2016-03-23 00:58:01,898 topology:run_command:328:DEBUG:remote IP '192.168.122.60' - command for execution: ':'
+2016-03-23 00:58:02,270 topology:run_command:347:DEBUG:Stdout rc[0]:
+
+2016-03-23 00:58:02,271 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:58:03,276 it_api_topology:connect_to_it_api_server:67:DEBUG:ItApiVM: RPD1, OpenRPD_VM: Connecting to VM's IT API server, IP address: 192.168.122.60
+2016-03-23 00:58:03,276 it_api:connect:202:DEBUG:Openning socket and connecting to server: 192.168.122.60:7777
+2016-03-23 00:58:03,277 it_api:connect:208:INFO:Connected to IT API server: 192.168.122.60:7777
+2016-03-23 00:58:03,277 its_basic:poll_result:53:DEBUG:Attempt 1
+2016-03-23 00:58:03,277 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:58:03,281 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[116]
+2016-03-23 00:58:03,281 its_basic:check_session:68:DEBUG:TESTING: RPD DB:
+2016-03-23 00:58:03,281 its_basic:check_session:69:DEBUG:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "6c:b1:8a:bb:2c:9f"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+  }
+}
+
+2016-03-23 00:58:04,283 its_basic:poll_result:53:DEBUG:Attempt 2
+2016-03-23 00:58:04,283 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:58:04,285 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[116]
+2016-03-23 00:58:04,285 its_basic:check_session:68:DEBUG:TESTING: RPD DB:
+2016-03-23 00:58:04,285 its_basic:check_session:69:DEBUG:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "6c:b1:8a:bb:2c:9f"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+  }
+}
+
+2016-03-23 00:58:05,287 its_basic:poll_result:53:DEBUG:Attempt 3
+2016-03-23 00:58:05,288 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:58:05,290 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[202]
+2016-03-23 00:58:05,290 its_basic:check_session:68:DEBUG:TESTING: RPD DB:
+2016-03-23 00:58:05,290 its_basic:check_session:69:DEBUG:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+    DhcpData {
+      CCAPCores: "fd00:dead:1::1"
+      CCAPCores: "7d1::2"
+      TimeServers: "9d1::1"
+      TimeServers: "fd00:dead:1::1"
+      TimeServers: "9d1::2"
+      LogServers: "fd00:dead:1::1"
+      LogServers: "8d1::2"
+      TimeOffset: 7200
+    }
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "6c:b1:8a:bb:2c:9f"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+  }
+}
+
+2016-03-23 00:58:06,292 its_basic:poll_result:53:DEBUG:Attempt 4
+2016-03-23 00:58:06,292 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:58:06,294 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[202]
+2016-03-23 00:58:06,294 its_basic:check_session:68:DEBUG:TESTING: RPD DB:
+2016-03-23 00:58:06,294 its_basic:check_session:69:DEBUG:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+    DhcpData {
+      CCAPCores: "fd00:dead:1::1"
+      CCAPCores: "7d1::2"
+      TimeServers: "9d1::1"
+      TimeServers: "fd00:dead:1::1"
+      TimeServers: "9d1::2"
+      LogServers: "fd00:dead:1::1"
+      LogServers: "8d1::2"
+      TimeOffset: 7200
+    }
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "6c:b1:8a:bb:2c:9f"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+  }
+}
+
+2016-03-23 00:58:07,296 its_basic:poll_result:53:DEBUG:Attempt 5
+2016-03-23 00:58:07,297 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:58:11,995 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[202]
+2016-03-23 00:58:11,996 its_basic:check_session:68:DEBUG:TESTING: RPD DB:
+2016-03-23 00:58:11,996 its_basic:check_session:69:DEBUG:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+    DhcpData {
+      CCAPCores: "fd00:dead:1::1"
+      CCAPCores: "7d1::2"
+      TimeServers: "9d1::1"
+      TimeServers: "fd00:dead:1::1"
+      TimeServers: "9d1::2"
+      LogServers: "fd00:dead:1::1"
+      LogServers: "8d1::2"
+      TimeOffset: 7200
+    }
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "6c:b1:8a:bb:2c:9f"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+  }
+}
+
+2016-03-23 00:58:12,999 its_basic:poll_result:53:DEBUG:Attempt 6
+2016-03-23 00:58:12,999 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:58:13,001 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[279]
+2016-03-23 00:58:13,001 its_basic:check_session:68:DEBUG:TESTING: RPD DB:
+2016-03-23 00:58:13,001 its_basic:check_session:69:DEBUG:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+    DhcpData {
+      CCAPCores: "fd00:dead:1::1"
+      CCAPCores: "7d1::2"
+      TimeServers: "9d1::1"
+      TimeServers: "fd00:dead:1::1"
+      TimeServers: "9d1::2"
+      LogServers: "fd00:dead:1::1"
+      LogServers: "8d1::2"
+      TimeOffset: 7200
+    }
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "6c:b1:8a:bb:2c:9f"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+    CcapCoreIdentification {
+      Index: 6
+      CoreId: "6000"
+      CoreIpAddress: "0000:0000:0000:0000:0000:0000:0000:0000"
+      IsPrincipal: 1
+      CoreName: "ServiceSuiteCCAPv6"
+      VendorId: 0
+    }
+  }
+}
+
+2016-03-23 00:58:13,002 its_basic:check_session:72:INFO:Session established successfully
+2016-03-23 00:58:13,002 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:58:13,003 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[279]
+2016-03-23 00:58:13,004 its_basic:test_01_basic_init:110:INFO:Received DatabaseContent:
+2016-03-23 00:58:13,004 its_basic:test_01_basic_init:111:INFO:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+    DhcpData {
+      CCAPCores: "fd00:dead:1::1"
+      CCAPCores: "7d1::2"
+      TimeServers: "9d1::1"
+      TimeServers: "fd00:dead:1::1"
+      TimeServers: "9d1::2"
+      LogServers: "fd00:dead:1::1"
+      LogServers: "8d1::2"
+      TimeOffset: 7200
+    }
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "6c:b1:8a:bb:2c:9f"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+    CcapCoreIdentification {
+      Index: 6
+      CoreId: "6000"
+      CoreIpAddress: "0000:0000:0000:0000:0000:0000:0000:0000"
+      IsPrincipal: 1
+      CoreName: "ServiceSuiteCCAPv6"
+      VendorId: 0
+    }
+  }
+}
+
+2016-03-23 00:58:13,004 topology:cleanup:587:INFO:Removing files created for VMs
+Domain ServiceSuite1 destroyed
+
+Domain RPD1 destroyed
+
+2016-03-23 00:58:13,657 topology:stop:216:DEBUG:VM already stopped
+Network virbr1 destroyed
+
+2016-03-23 00:58:13,770 topology:stop:216:DEBUG:VM already stopped
+.2016-03-23 00:58:13,770 topology:_start_virtual_net:494:INFO:Creating virtual network[virbr1]
+2016-03-23 00:58:13,771 its_basic:test_02_basic_redirect:116:INFO:Starting ServiceSuite VMs
+2016-03-23 00:58:13,771 topology:create_vm:483:INFO:Creating VM[ServiceSuite1], path[/ws/ws_ext2/openwrt14.07/bin/x86/openwrt-x86-generic-combined-ext4.vmdk]
+2016-03-23 00:58:13,771 topology:create_vm:483:INFO:Creating VM[ServiceSuite2], path[/ws/ws_ext2/openwrt14.07/bin/x86/openwrt-x86-generic-combined-ext4.vmdk]
+2016-03-23 00:58:13,771 topology:start_vm:516:INFO:Starting virtual network
+Network virbr1 created from /ws/ws_ext2/virbr1.xml
+
+2016-03-23 00:58:13,916 topology:start_vm:518:INFO:Starting VM[ServiceSuite1]
+2016-03-23 00:58:13,916 topology:_convert_image:170:DEBUG:vmdk path: '/ws/ws_ext2/ServiceSuite1.vmdk'
+    (100.00/100%)
+Domain ServiceSuite1 created from /ws/ws_ext2/ServiceSuite1.xml
+
+2016-03-23 00:58:16,015 topology:start_vm:518:INFO:Starting VM[ServiceSuite2]
+2016-03-23 00:58:16,015 topology:_convert_image:170:DEBUG:vmdk path: '/ws/ws_ext2/ServiceSuite2.vmdk'
+    (100.00/100%)
+Domain ServiceSuite2 created from /ws/ws_ext2/ServiceSuite2.xml
+
+2016-03-23 00:58:18,020 topology:_wait_for_boot:645:INFO:Waiting for machines to boot up
+2016-03-23 00:58:36,118 topology:run_command:328:DEBUG:remote IP '192.168.122.183' - command for execution: ':'
+2016-03-23 00:58:36,535 topology:run_command:347:DEBUG:Stdout rc[0]:
+
+2016-03-23 00:58:36,535 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:58:36,537 topology:run_command:328:DEBUG:remote IP '192.168.122.183' - command for execution: 'uci show network.lan.proto'
+2016-03-23 00:58:36,938 topology:run_command:347:DEBUG:Stdout rc[0]:
+network.lan.proto=static
+
+2016-03-23 00:58:36,938 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:58:36,941 topology:run_command:328:DEBUG:remote IP '192.168.122.183' - command for execution: 'uci set network.lan.ipaddr=192.168.5.2; uci commit network; ifup lan'
+2016-03-23 00:58:37,613 topology:run_command:347:DEBUG:Stdout rc[0]:
+
+2016-03-23 00:58:37,613 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:58:37,615 it_api_topology:change_eth1_ip_addr:172:DEBUG:Changed IP address of eth1 to 192.168.5.2
+2016-03-23 00:58:37,615 topology:run_command:328:DEBUG:remote IP '192.168.122.183' - command for execution: 'uci show network.lanV6.proto'
+2016-03-23 00:58:38,052 topology:run_command:347:DEBUG:Stdout rc[0]:
+network.lanV6.proto=static
+
+2016-03-23 00:58:38,052 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:58:38,056 topology:run_command:328:DEBUG:remote IP '192.168.122.183' - command for execution: 'uci set network.lanV6.ip6addr=fd00:dead:1::2/64; uci commit network; ifup lanV6'
+2016-03-23 00:58:38,486 topology:run_command:347:DEBUG:Stdout rc[0]:
+
+2016-03-23 00:58:38,486 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:58:38,488 it_api_topology:change_eth1_ip_addr:172:DEBUG:Changed IP address of eth1 to fd00:dead:1::2
+2016-03-23 00:58:38,492 topology:run_command:328:DEBUG:remote IP '192.168.122.170' - command for execution: ':'
+2016-03-23 00:58:38,898 topology:run_command:347:DEBUG:Stdout rc[0]:
+
+2016-03-23 00:58:38,898 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:58:38,900 topology:run_command:328:DEBUG:remote IP '192.168.122.170' - command for execution: 'uci show network.lan.proto'
+2016-03-23 00:58:39,270 topology:run_command:347:DEBUG:Stdout rc[0]:
+network.lan.proto=static
+
+2016-03-23 00:58:39,270 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:58:39,273 topology:run_command:328:DEBUG:remote IP '192.168.122.170' - command for execution: 'uci set network.lan.ipaddr=192.168.5.3; uci commit network; ifup lan'
+2016-03-23 00:58:39,945 topology:run_command:347:DEBUG:Stdout rc[0]:
+
+2016-03-23 00:58:39,945 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:58:39,947 it_api_topology:change_eth1_ip_addr:172:DEBUG:Changed IP address of eth1 to 192.168.5.3
+2016-03-23 00:58:39,947 topology:run_command:328:DEBUG:remote IP '192.168.122.170' - command for execution: 'uci show network.lanV6.proto'
+2016-03-23 00:58:40,388 topology:run_command:347:DEBUG:Stdout rc[0]:
+network.lanV6.proto=static
+
+2016-03-23 00:58:40,388 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:58:40,391 topology:run_command:328:DEBUG:remote IP '192.168.122.170' - command for execution: 'uci set network.lanV6.ip6addr=fd00:dead:1::3/64; uci commit network; ifup lanV6'
+2016-03-23 00:58:40,847 topology:run_command:347:DEBUG:Stdout rc[0]:
+
+2016-03-23 00:58:40,847 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:58:40,849 it_api_topology:change_eth1_ip_addr:172:DEBUG:Changed IP address of eth1 to fd00:dead:1::3
+2016-03-23 00:58:41,851 it_api_topology:connect_to_it_api_server:67:DEBUG:ItApiVM: ServiceSuite1, ServiceSuiteVM: Connecting to VM's IT API server, IP address: 192.168.122.183
+2016-03-23 00:58:41,852 it_api:connect:202:DEBUG:Openning socket and connecting to server: 192.168.122.183:7777
+2016-03-23 00:58:41,852 it_api:connect:208:INFO:Connected to IT API server: 192.168.122.183:7777
+2016-03-23 00:58:41,852 it_api_topology:connect_to_it_api_server:67:DEBUG:ItApiVM: ServiceSuite2, ServiceSuiteVM: Connecting to VM's IT API server, IP address: 192.168.122.170
+2016-03-23 00:58:41,852 it_api:connect:202:DEBUG:Openning socket and connecting to server: 192.168.122.170:7777
+2016-03-23 00:58:41,852 it_api:connect:208:INFO:Connected to IT API server: 192.168.122.170:7777
+2016-03-23 00:58:41,852 its_basic:test_02_basic_redirect:122:INFO:Configuring ServiceSuite1 VM
+2016-03-23 00:58:41,853 its_basic:test_02_basic_redirect:127:DEBUG:Setting CCAP IPv6: fd00:dead:1::2
+2016-03-23 00:58:41,853 it_api:it_api_send_msg:257:INFO:IT API message sent: length[56]
+2016-03-23 00:58:43,897 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[58]
+2016-03-23 00:58:43,897 its_basic:test_02_basic_redirect:133:DEBUG:Received reply to service configuration:
+2016-03-23 00:58:43,898 its_basic:test_02_basic_redirect:134:DEBUG:MessageType: IT_API_SERVICE_SUITE_CONFIGURE
+ServiceConfigureMessage {
+  DHCPv4 {
+    enable: true
+  }
+  DHCPv6 {
+    enable: true
+  }
+  Tp {
+    enable: true
+  }
+  CcapCoreV6 {
+    enable: true
+    ClientScenarios {
+      ScenarioType: SCENARIO_REDIRECT
+      redirect_ip_addr: "fd00:dead:1::3"
+    }
+    IPv6Address: "fd00:dead:1::2"
+  }
+}
+MessageResult: IT_API_SERVICE_SUITE_RESULT_OK
+
+2016-03-23 00:58:43,898 its_basic:test_02_basic_redirect:142:INFO:Configuring ServiceSuite2 VM
+2016-03-23 00:58:43,898 its_basic:test_02_basic_redirect:147:DEBUG:Setting CCAP IPv6: fd00:dead:1::3
+2016-03-23 00:58:43,898 it_api:it_api_send_msg:257:INFO:IT API message sent: length[36]
+2016-03-23 00:58:43,920 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[38]
+2016-03-23 00:58:43,920 its_basic:test_02_basic_redirect:149:DEBUG:Received reply to service configuration:
+2016-03-23 00:58:43,920 its_basic:test_02_basic_redirect:150:DEBUG:MessageType: IT_API_SERVICE_SUITE_CONFIGURE
+ServiceConfigureMessage {
+  DHCPv4 {
+    enable: false
+  }
+  DHCPv6 {
+    enable: false
+  }
+  Tp {
+    enable: false
+  }
+  CcapCoreV6 {
+    enable: true
+    IPv6Address: "fd00:dead:1::3"
+  }
+}
+MessageResult: IT_API_SERVICE_SUITE_RESULT_OK
+
+2016-03-23 00:58:43,920 its_basic:test_02_basic_redirect:157:INFO:Starting RPD VM
+2016-03-23 00:58:43,920 topology:create_vm:483:INFO:Creating VM[RPD1], path[/ws/ws_new_stable/openwrt/bin/x86/openwrt-x86-generic-combined-ext4.vmdk]
+2016-03-23 00:58:43,921 topology:start_vm:518:INFO:Starting VM[RPD1]
+2016-03-23 00:58:43,921 topology:_convert_image:170:DEBUG:vmdk path: '/ws/ws_ext2/RPD1.vmdk'
+    (100.00/100%)
+Domain RPD1 created from /ws/ws_ext2/RPD1.xml
+
+2016-03-23 00:58:47,277 topology:_wait_for_boot:645:INFO:Waiting for machines to boot up
+2016-03-23 00:59:07,385 topology:run_command:328:DEBUG:remote IP '192.168.122.89' - command for execution: ':'
+2016-03-23 00:59:07,791 topology:run_command:347:DEBUG:Stdout rc[0]:
+
+2016-03-23 00:59:07,792 topology:run_command:348:DEBUG:Stderr:
+
+2016-03-23 00:59:08,796 it_api_topology:connect_to_it_api_server:67:DEBUG:ItApiVM: RPD1, OpenRPD_VM: Connecting to VM's IT API server, IP address: 192.168.122.89
+2016-03-23 00:59:08,796 it_api:connect:202:DEBUG:Openning socket and connecting to server: 192.168.122.89:7777
+2016-03-23 00:59:08,796 it_api:connect:208:INFO:Connected to IT API server: 192.168.122.89:7777
+2016-03-23 00:59:08,796 its_basic:poll_result:53:DEBUG:Attempt 1
+2016-03-23 00:59:08,797 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:59:08,801 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[202]
+2016-03-23 00:59:08,801 its_basic:check_session:68:DEBUG:TESTING: RPD DB:
+2016-03-23 00:59:08,801 its_basic:check_session:69:DEBUG:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+    DhcpData {
+      CCAPCores: "fd00:dead:1::2"
+      CCAPCores: "7d1::2"
+      TimeServers: "9d1::1"
+      TimeServers: "fd00:dead:1::2"
+      TimeServers: "9d1::2"
+      LogServers: "fd00:dead:1::2"
+      LogServers: "8d1::2"
+      TimeOffset: 7200
+    }
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "52:e1:6b:6f:fb:a8"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+  }
+}
+
+2016-03-23 00:59:09,804 its_basic:poll_result:53:DEBUG:Attempt 2
+2016-03-23 00:59:09,804 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:59:09,806 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[202]
+2016-03-23 00:59:09,806 its_basic:check_session:68:DEBUG:TESTING: RPD DB:
+2016-03-23 00:59:09,806 its_basic:check_session:69:DEBUG:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+    DhcpData {
+      CCAPCores: "fd00:dead:1::2"
+      CCAPCores: "7d1::2"
+      TimeServers: "9d1::1"
+      TimeServers: "fd00:dead:1::2"
+      TimeServers: "9d1::2"
+      LogServers: "fd00:dead:1::2"
+      LogServers: "8d1::2"
+      TimeOffset: 7200
+    }
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "52:e1:6b:6f:fb:a8"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+  }
+}
+
+2016-03-23 00:59:10,808 its_basic:poll_result:53:DEBUG:Attempt 3
+2016-03-23 00:59:10,809 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:59:11,205 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[202]
+2016-03-23 00:59:11,205 its_basic:check_session:68:DEBUG:TESTING: RPD DB:
+2016-03-23 00:59:11,205 its_basic:check_session:69:DEBUG:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+    DhcpData {
+      CCAPCores: "fd00:dead:1::2"
+      CCAPCores: "7d1::2"
+      TimeServers: "9d1::1"
+      TimeServers: "fd00:dead:1::2"
+      TimeServers: "9d1::2"
+      LogServers: "fd00:dead:1::2"
+      LogServers: "8d1::2"
+      TimeOffset: 7200
+    }
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "52:e1:6b:6f:fb:a8"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+  }
+}
+
+2016-03-23 00:59:12,208 its_basic:poll_result:53:DEBUG:Attempt 4
+2016-03-23 00:59:12,208 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:59:16,249 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[202]
+2016-03-23 00:59:16,250 its_basic:check_session:68:DEBUG:TESTING: RPD DB:
+2016-03-23 00:59:16,250 its_basic:check_session:69:DEBUG:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+    DhcpData {
+      CCAPCores: "fd00:dead:1::2"
+      CCAPCores: "7d1::2"
+      TimeServers: "9d1::1"
+      TimeServers: "fd00:dead:1::2"
+      TimeServers: "9d1::2"
+      LogServers: "fd00:dead:1::2"
+      LogServers: "8d1::2"
+      TimeOffset: 7200
+    }
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "52:e1:6b:6f:fb:a8"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+  }
+}
+
+2016-03-23 00:59:17,251 its_basic:poll_result:53:DEBUG:Attempt 5
+2016-03-23 00:59:17,252 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:59:17,254 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[279]
+2016-03-23 00:59:17,254 its_basic:check_session:68:DEBUG:TESTING: RPD DB:
+2016-03-23 00:59:17,254 its_basic:check_session:69:DEBUG:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+    DhcpData {
+      CCAPCores: "fd00:dead:1::2"
+      CCAPCores: "7d1::2"
+      TimeServers: "9d1::1"
+      TimeServers: "fd00:dead:1::2"
+      TimeServers: "9d1::2"
+      LogServers: "fd00:dead:1::2"
+      LogServers: "8d1::2"
+      TimeOffset: 7200
+    }
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "52:e1:6b:6f:fb:a8"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+    CcapCoreIdentification {
+      Index: 6
+      CoreId: "6000"
+      CoreIpAddress: "FD00:DEAD:0001:0000:0000:0000:0000:0003"
+      IsPrincipal: 1
+      CoreName: "ServiceSuiteCCAPv6"
+      VendorId: 0
+    }
+  }
+}
+
+2016-03-23 00:59:17,255 its_basic:check_session:72:INFO:Session established successfully
+2016-03-23 00:59:17,255 it_api:it_api_send_msg:257:INFO:IT API message sent: length[2]
+2016-03-23 00:59:17,257 it_api:it_api_client_read_msg:221:DEBUG:IPC message received, len[279]
+2016-03-23 00:59:17,257 its_basic:test_02_basic_redirect:166:INFO:Received DatabaseContent:
+2016-03-23 00:59:17,257 its_basic:test_02_basic_redirect:167:INFO:ItApiRpdMessageType: IT_API_RPD_GET
+DatabaseContent {
+  oper {
+    HwVersion: "OPENWRT v1"
+    DhcpData {
+      CCAPCores: "fd00:dead:1::2"
+      CCAPCores: "7d1::2"
+      TimeServers: "9d1::1"
+      TimeServers: "fd00:dead:1::2"
+      TimeServers: "9d1::2"
+      LogServers: "fd00:dead:1::2"
+      LogServers: "8d1::2"
+      TimeOffset: 7200
+    }
+  }
+  cfg {
+    RpdCapabilities {
+      RpdIdentification {
+        VendorName: "XYZ Broadband"
+        VendorId: "DF"
+        ModelNumber: "Xman 200"
+        DeviceMacAddress: "52:e1:6b:6f:fb:a8"
+        CurrentSwVersion: "V3.2.1"
+        BootRomVersion: "Boot 4.5.6"
+        DeviceDescription: "RPD"
+        DeviceAlias: "OpenWrt"
+        SerialNumber: "123456"
+      }
+    }
+    CcapCoreIdentification {
+      Index: 6
+      CoreId: "6000"
+      CoreIpAddress: "FD00:DEAD:0001:0000:0000:0000:0000:0003"
+      IsPrincipal: 1
+      CoreName: "ServiceSuiteCCAPv6"
+      VendorId: 0
+    }
+  }
+}
+
+2016-03-23 00:59:17,258 its_basic:test_02_basic_redirect:175:INFO:Comparing CCAP IPs: received: FD00:DEAD:0001:0000:0000:0000:0000:0003, expected: FD00:DEAD:0001:0000:0000:0000:0000:0003
+2016-03-23 00:59:17,258 topology:cleanup:587:INFO:Removing files created for VMs
+Domain ServiceSuite1 destroyed
+
+Domain ServiceSuite2 destroyed
+
+Domain RPD1 destroyed
+
+2016-03-23 00:59:18,247 topology:stop:216:DEBUG:VM already stopped
+2016-03-23 00:59:18,248 topology:stop:216:DEBUG:VM already stopped
+Network virbr1 destroyed
+
+2016-03-23 00:59:18,352 topology:stop:216:DEBUG:VM already stopped
+.
+----------------------------------------------------------------------
+Ran 2 tests in 124.932s
+
+OK
+tjanciga@ubuntu:/ws/ws_ext2$

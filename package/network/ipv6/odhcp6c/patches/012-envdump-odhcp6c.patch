@@ -1,0 +1,14 @@
+Index: odhcp6c-2015-07-13/src/script.c
+===================================================================
+--- odhcp6c-2015-07-13.orig/src/script.c	2017-12-10 21:31:32.946984026 +0800
++++ odhcp6c-2015-07-13/src/script.c	2017-12-10 21:38:53.370994527 +0800
+@@ -416,6 +416,9 @@
+ 		strncpy(buf, "PASSTHRU=", 10);
+ 		script_hexlify(&buf[9], passthru, passthru_len);
+ 		putenv(buf);
++                syslog(LOG_ERR, "envdump: prefix%s: address%s: ra_routes%s: ra_address:%s",
++                        getenv("PREFIXES"), getenv("ADDRESSES"), getenv("RA_ROUTES"), getenv("RA_ADDRESSES"));
++
+ 
+ 		argv[2] = (char*)status;
+ 		execv(argv[0], argv);

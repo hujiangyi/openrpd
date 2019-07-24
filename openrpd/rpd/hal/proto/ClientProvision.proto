@@ -1,0 +1,82 @@
+/*
+ * Copyright (c) 2016 Cisco and/or its affiliates, and 
+ *                    Cable Television Laboratories, Inc. ("CableLabs")
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import "HalCommon.proto";
+package ClientProvision;
+
+message HalClientRegister {
+    required string MsgType = 1 [default= "HalClientRegister"];
+
+    //The client description
+    required string ClientName = 10;
+    required string ClientDescription = 11;
+    required string ClientVersion = 12;
+    optional string ClientID = 13;
+    //Client Supported messages
+    repeated int32 ClientSupportedMessages = 20;
+    //Driver supported notification msg types
+    repeated int32 ClientSupportedNotificationMessages = 21;
+}
+
+message HalClientRegisterRsp {
+    required string MsgType = 1 [default = "HalClientRegisterRsp"];
+
+    //The return status part, this common for all the rsp
+    required HalCommon.Rsp Rsp = 10;
+
+    //The client ID, which is used to identify the client
+    required string ClientID = 20;
+
+    // The path which is used by the driver to connect to the agent
+    optional string PathFromHalToClient = 30;
+    optional string PathFromClientToHal = 31;
+}
+
+// Client query
+
+message HalClientQuery {
+    required string MsgType = 1 [default= "HalClientQuery"];
+    required string ClientID = 2; //A client UUID to identify the client
+}
+
+message HalClientInfo {
+	required string ClientID=1;
+	required string ClientName= 2;
+	required string ClientDescription= 3;
+    required string ClientVersion = 4;
+    repeated int32 ClientSupportedMessages = 5;
+    repeated int32 ClientSupportedNotificationMessages = 6;
+}
+
+message HalClientQueryRsp {
+    required string  MsgType = 1 [default= "HalClientQueryRsp"];
+	required string ClientID=2; //A client UUID to identify the client
+	repeated HalClientInfo Clients = 3;
+}
+
+// Client Interested msg configuration
+message HalClientInterestNotificationCfg {
+    required string  MsgType = 1 [default= "HalClientInterestNotificationCfg"];
+	required string ClientID=10; //A client UUID to identify the client
+    repeated int32 ClientNotificationMessages = 20;
+}
+
+message HalClientInterestNotificationCfgRsp {
+    required string  MsgType = 1 [default= "HalClientInterestNotificationCfgRsp"];
+	required string ClientID=10;
+    required HalCommon.Rsp Rsp = 20;
+}

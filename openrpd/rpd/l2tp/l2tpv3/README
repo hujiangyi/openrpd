@@ -1,0 +1,63 @@
+
+#
+# Copyright (c) 2016 Cisco and/or its affiliates, and 
+#                    Cable Television Laboratories, Inc. ("CableLabs")
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at:
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#1. This is the core layer of the L2TPV3, for the application layer usage, please add your own AVP, don't add the app AVP or handler into this core package.  The Cable labs AVP will implmented in another package. 
+
+2. This package only processes minimal set of the RFC3991 defined AVP, including the flollowing AVPS:
+	Control Message AVP 
+	Protol Version AVP 
+	Frame Capability AVP 
+	Tie Breaker AVP 
+	Firmware Version AVP 
+	Hostname AVP 
+	VerdorName AVP 
+	Receive Window Size AVP 
+	Router ID AVP 
+	Assigned control Connection ID AVP 
+	pseudowire Capability AVP
+	Assigned Connection ID AVP / Cisco 
+	Pseudowire Capability List /Cisco 
+	Draft AVP version /Cisco 
+
+	Local session AVP 
+	Remote session AVP 
+	Remote End ID AVP 
+	Pseudowire Type AVP 
+	Layer2 Specific Sublayer AVP 
+	Data Sequence AVP 
+	Local Session /Cisco 
+	Remote Session /Cisco 
+	PesudoWire Type /Cisco 
+	Session Tie Breaker /Cisco 
+	 
+	
+3. The package will not provide the lowlevel function, such as the timer/Receive packets/Send Packets function, It's the package users' responsiblility to provide these fucntions. 
+
+4. Directories:	
+	Src folder holds all the source files exception the testing file
+	Conf folder holds the configuration file, including the log level
+	pkts hold some pkts for investigation and testing, the pkts are captured from cisco's UBR10K and RFGW. 
+	testing folder, holds the testing source file
+
+5. The following feature is not supported:
+    Extended vendor ID
+
+6. the following external pakages are used:
+    sortedcontainer: which is used to as the receive window
+    dpkt: which is used to process the pcap file
+    pidfile: which saved a pid into filesystem, for control the process
+    pyzmq: zmq
+    protobuf: used by the API

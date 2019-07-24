@@ -1,0 +1,49 @@
+/*
+ * Copyright (c) 2016 Cisco and/or its affiliates, and 
+ *                    Cable Television Laboratories, Inc. ("CableLabs")
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+import "provisiontest.proto";
+import "provision.proto";
+import "ikev2.proto";
+import "l2tp.proto";
+import "gcpcli.proto";
+import "macsec.proto";
+
+message t_PrivisionApiMessage {
+	enum t_CliDataOperation {
+		CLI_OPER_NONE = 0;
+		CLI_CFG_WRITE = 1;
+		CLI_CFG_READ = 2;
+		CLI_CFG_DELETE = 3;
+	}
+	required t_CliDataOperation CliDataOperation = 1;
+
+	enum t_CliDataResult {
+		CLI_RESULT_NONE = 0;
+		CLI_RESULT_OK = 1;
+		CLI_RESULT_FAIL = 2;
+	}
+	optional t_CliDataResult CliDataResult = 2;
+	optional uint32 CliMsgType = 3;
+	optional t_ProvisionTest CliData = 4;
+	optional t_Provision CliProvision = 5;
+	optional t_Ikev2 CliIkev2 = 6;
+	optional t_L2tp CliL2tp = 7;
+	optional t_Gcp CliGcp = 8;
+	optional t_8021x Cli8021x = 9;
+}

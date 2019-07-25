@@ -40,15 +40,15 @@ class AgentsStarter(object):
     PROCESS_INIT_PERIOD = 3
     WAITING_FOR_AGENT_STARTUP_RETRY = 60
 
-    #RAW_RPD_DEBUG_JSON is present in the original packet, instead of
-    #WORKING_RPD_DEBUG_JSON.
+    # RAW_RPD_DEBUG_JSON is present in the original packet, instead of
+    # WORKING_RPD_DEBUG_JSON.
     #
-    #RPD will read the WORKING_RPD_DEBUG_JSON to impact the startup.
-    #If there is no WORKING_RPD_DEBUG_JSON (first startup), RPD will copy
-    #RAW_RPD_DEBUG_JSON to WORKING_RPD_DEBUG_JSON
+    # RPD will read the WORKING_RPD_DEBUG_JSON to impact the startup.
+    # If there is no WORKING_RPD_DEBUG_JSON (first startup), RPD will copy
+    # RAW_RPD_DEBUG_JSON to WORKING_RPD_DEBUG_JSON
     #
-    #Note, RAW_RPD_DEBUG_JSON will be restored after reboot RPD.
-    #      WORKING_RPD_DEBUG_JSON won't be impacted by reboot RPD.
+    # Note, RAW_RPD_DEBUG_JSON will be restored after reboot RPD.
+    # WORKING_RPD_DEBUG_JSON won't be impacted by reboot RPD.
     RAW_RPD_DEBUG_JSON = '/etc/config/rpd_debug.json'
     WORKING_RPD_DEBUG_JSON = '/rpd/config/rpd_debug.json'
 
@@ -66,26 +66,21 @@ class AgentsStarter(object):
             self.hal_cmd_line = None
             self.fake_driver_cmd_line = None
             self.ptp_driver_cmd_line = None
-            self.monitor_driver_cmd_line = None
-            self.rpdinfo_hal_cmd_line = None
             self.ssd_driver_cmd_line = None
-            self.hostresources_hal_cmd_line = None
+            self.res_hal_cmd_line = None
         else:
             self.manager_cmd_line = "python -m rpd.provision.manager.src.manager_process".split()
             self.hal_cmd_line = "python -m rpd.hal.src.HalMain --conf=/etc/config/hal.conf".split()
-            self.rpdinfo_hal_cmd_line = "python -m rpd.rpdinfo.src.RpdInfoHalClient".split()
-            self.hostresources_hal_cmd_line = "python -m rpd.hostresources.src.RpdHostResHalClient".split()
+            self.res_hal_cmd_line = "python -m rpd.resource.src.RpdResHalClient".split()
 
             if SysTools.is_vrpd():
                 self.fake_driver_cmd_line = "python -m rpd.hal.lib.drivers.HalDriver0".split()
                 self.ptp_driver_cmd_line = "python -m rpd.hal.lib.drivers.HalPtpDriver".split()
                 self.ssd_driver_cmd_line = None
-                self.monitor_driver_cmd_line = None
             else:  # pragma: no cover
                 self.fake_driver_cmd_line = "python -m rpdHalDrv.HalDriverClient".split()
                 self.ptp_driver_cmd_line = "python -m rpdPtpHalDrv.PtpHalDriverClient".split()
                 self.ssd_driver_cmd_line = "python -m rpd.ssd.HalSsdDriver".split()
-                self.monitor_driver_cmd_line = "python -m rpdMonitorDrv.MonitorHalDriverClient".split()
 
         self.fault_manager_cmd_line = "python -m rpd.common.rpd_fault_manager".split()
 
@@ -95,8 +90,7 @@ class AgentsStarter(object):
         self.fake_driver_process = None
         self.ptp_driver_process = None
         self.monitor_driver_process = None
-        self.rpdinfo_driver_process = None
-        self.hostresources_driver_process = None
+        self.res_driver_process = None
         self.ssd_driver_process = None
 
     def check_debug_conf_file(self, target_file):
@@ -165,7 +159,7 @@ class AgentsStarter(object):
         agents = {}
         for agent_name in self.real_agent_dict:
             if fake_agent_conf.get(agent_name, 'real') == 'real':
-               agents[agent_name] = self.real_agent_dict[agent_name]
+                agents[agent_name] = self.real_agent_dict[agent_name]
             else:
                 agents[agent_name] = self.fake_agent_dict[agent_name]
         return agents
@@ -209,9 +203,9 @@ class AgentsStarter(object):
 
     def cleanup(self):
         """Clean up process started."""
-        process_set = [self.hal_process, self.fake_driver_process,
-                       self.manager_process, self.ptp_driver_process,
-                       self.rpdinfo_driver_process, self.hostresources_driver_process,
+        process_set = [self.hal_process,
+                       self.manager_process, self.ptp_driver_process, self.fake_driver_process,
+                       self.res_driver_process,
                        self.monitor_driver_process, self.ssd_driver_process]
         process_set.extend(self.agent_obj)
 
@@ -234,16 +228,6 @@ class AgentsStarter(object):
                 "retries": 0,
             }
             manager_debugability.debugability_process_monitor(self.hal_process)
-
-        if self.monitor_driver_cmd_line:
-            self.logger.info("Start the monitor driver client process...")
-            process_obj = self.start_process(self.monitor_driver_cmd_line)
-            self.monitor_driver_process = {
-                "process": process_obj,
-                "retries": 0,
-            }
-            manager_debugability.debugability_process_monitor(self.monitor_driver_process)
-
 
         # wait a period for process start and init complete
         time.sleep(self.PROCESS_INIT_PERIOD)
@@ -273,7 +257,8 @@ class AgentsStarter(object):
                 time.sleep(1)
         if not alive_status:
             self.logger.error('Not all agent startup normally, reboot the system.')
-            SysTools.sys_failure_reboot('Not all agent startup')
+            SysTools.sys_failure_reboot(reason='Not all agent startup')
+            SysTools.diagnostic_self_test_fail('Communication error', 'Not all agent startup', 'Severity level=error')
 
         # start the manager process
         self.logger.info("Start the manager process...")
@@ -302,23 +287,14 @@ class AgentsStarter(object):
             }
             manager_debugability.debugability_process_monitor(self.ptp_driver_process)
 
-        if self.rpdinfo_hal_cmd_line:
-            self.logger.info("Start the rpdinfo hal client process...")
-            process_obj = self.start_process(self.rpdinfo_hal_cmd_line)
-            self.rpdinfo_driver_process = {
+        if self.res_hal_cmd_line:
+            self.logger.info("Start the resource hal client process...")
+            process_obj = self.start_process(self.res_hal_cmd_line)
+            self.res_driver_process = {
                 "process": process_obj,
                 "retries": 0,
             }
-            manager_debugability.debugability_process_monitor(self.rpdinfo_driver_process)
-
-        if self.hostresources_hal_cmd_line:
-            self.logger.info("Start the host resources hal client process...")
-            process_obj = self.start_process(self.hostresources_hal_cmd_line)
-            self.hostresources_driver_process = {
-                "process": process_obj,
-                "retries": 0,
-            }
-            manager_debugability.debugability_process_monitor(self.hostresources_driver_process)
+            manager_debugability.debugability_process_monitor(self.res_driver_process)
 
         if self.ssd_driver_cmd_line:
             self.logger.info("Start the ssd driver client process...")
@@ -342,6 +318,8 @@ class AgentsStarter(object):
                     sys.exit(-1)
                 else:
                     SysTools.sys_failure_reboot(reason="Manager process is not up")
+                    SysTools.diagnostic_self_test_fail('Processing error', 'Manager process is not up',
+                                                       'Severity level=error')
 
             for agent in self.agent_obj:
                 # check if agent instance create succeed, retry if failure
@@ -358,16 +336,24 @@ class AgentsStarter(object):
                         # FixMe: reboot system or ?
                         self.logger.error('Agent %s retries times exceed, will reboot...', agent)
                         SysTools.sys_failure_reboot(reason="Agent {0} retries times exceed".format(agent))
+                        SysTools.diagnostic_self_test_fail('Communication error',
+                                                           "Agent {0} retries times exceed".format(agent),
+                                                           'Severity level=error')
 
                 if self.check_process_status(self.agent_obj[agent]["process"]) != self.PROCESSSTATE_ALIVE:
                     self.logger.error(
                         '%s process is dead, reboot the system.', agent)
                     # FixMe: reboot system or restart agent
                     SysTools.sys_failure_reboot(reason="{0} process is dead".format(agent))
+                    SysTools.diagnostic_self_test_fail('Processing error', "{0} process is dead".format(agent),
+                                                       'Severity level=error')
             # check other critical processes
-            if self.check_process_status(self.ptp_driver_process["process"]) != self.PROCESSSTATE_ALIVE:
-                self.logger.error("ptp hal driver process is dead")
-                SysTools.sys_failure_reboot(reason="ptp hal driver process is dead")
+            if self.ptp_driver_cmd_line:
+                if self.check_process_status(self.ptp_driver_process["process"]) != self.PROCESSSTATE_ALIVE:
+                    self.logger.error("ptp hal driver process is dead")
+                    SysTools.sys_failure_reboot(reason="ptp hal driver process is dead")
+                    SysTools.diagnostic_self_test_fail('Processing error', "ptp hal driver process is dead",
+                                                       'Severity level=error')
 
 
 if __name__ == "__main__":  # pragma: no cover
@@ -392,7 +378,7 @@ if __name__ == "__main__":  # pragma: no cover
     # check dependencies
     manager_debugability = Debugability()
     manager_debugability.rpd_dependency()
-   
+
     parser = argparse.ArgumentParser(description="RCP provision")
     # parse the daemon settings.
     parser.add_argument("-s", "--simulator",

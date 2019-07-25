@@ -19,16 +19,22 @@ import zmq
 import rpd.provision.proto.provision_pb2 as provision_pb2
 import time
 import json
+import os
 import threading
 from rpd.provision.manager.src.manager_process import ManagerProcess
 from rpd.provision.manager.src.manager_ccap_core import CCAPCore
 from rpd.provision.process_agent.agent.agent import ProcessAgent
 from rpd.statistics.provision_stat import ProvisionStateMachineRecord
 from rpd.provision.manager.src.manager_api import ManagerApi
-
+from rpd.confdb.rpd_redis_db import RCPDB
+from rpd.confdb.testing.test_rpd_redis_db import create_db_conf,\
+    start_redis, stop_redis
 
 uTMgrProcess = None
 uTMgrApiDispatch = None
+CONF_FILE = '/tmp/rcp_db.conf'
+SOCKET_PATH = '/tmp/testRedis.sock'
+
 
 def demoMgrProcess():
     global uTMgrProcess
@@ -40,8 +46,18 @@ def demoMgrProcess():
     print "demoMgrProcess thread done!"
 
 
+def stop_dispatcher_loop(disp):
+    disp.end_loop()
+    start_time = time.time()
+    time_elapsed = 0
+    while (not disp.loop_stopped) and time_elapsed < disp.max_timeout_sec:
+        time.sleep(0.1)
+        time_elapsed = time.time() - start_time
+
+
 class TestClassManagerApi(ManagerApi):
     API_SOCK_PATH = "ipc:///tmp/_tmp_ut_rpd_provision_manager_api.sock"
+
 
 class TestManagerAPI(unittest.TestCase):
     """test CLI or other external module request to provision.
@@ -54,6 +70,9 @@ class TestManagerAPI(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         global uTMgrProcess
+        create_db_conf()
+        start_redis()
+        RCPDB.DB_CFG_FILE = CONF_FILE
         t = threading.Thread(target=demoMgrProcess)
         t.start()
         time.sleep(2)
@@ -64,6 +83,11 @@ class TestManagerAPI(unittest.TestCase):
     def tearDownClass(cls):
         global uTMgrApiDispatch
         global uTMgrProcess
+        stop_redis()
+        os.remove(CONF_FILE)
+        if uTMgrApiDispatch is not None:
+            print "end loop here"
+            stop_dispatcher_loop(uTMgrApiDispatch)
         if cls.api:
             uTMgrProcess.dispatcher.fd_unregister(cls.api.manager_api_sock.sock)
             time.sleep(1)
@@ -72,10 +96,6 @@ class TestManagerAPI(unittest.TestCase):
             uTMgrProcess.dispatcher.fd_unregister(uTMgrProcess.mgr_api.manager_api_sock.sock)
             time.sleep(1)
             uTMgrProcess.mgr_api.manager_api_sock.sock.close()
-        if uTMgrApiDispatch is not None:
-            print "end loop here"
-            uTMgrApiDispatch.end_loop()
-            time.sleep(2)
 
     def setUp(self):
         time.sleep(1)
@@ -640,7 +660,7 @@ class TestManagerAPI(unittest.TestCase):
         msg.ParseFromString(data)
         parameter = json.loads(msg.parameter)
         print msg, parameter, len(parameter)
-        print '*'*80
+        print '*' * 80
 
         CCAPCore.ccap_core_db.pop('none')
 
@@ -655,7 +675,20 @@ class TestManagerAPI(unittest.TestCase):
         msg.ParseFromString(data)
         parameter = json.loads(msg.parameter)
         print msg, parameter, len(parameter)
-        print '*'*80
+        print '*' * 80
+
+        print '*' * 80
+        print 'Simulate show provision core from external module'
+        msg = provision_pb2.t_Provision()
+        msg.MsgType = provision_pb2.t_Provision.SHOW_PROVISION_CCAP_CORE_ALL
+        self.sock.send(msg.SerializeToString())
+
+        data = self.sock.recv()
+        msg = provision_pb2.t_Provision()
+        msg.ParseFromString(data)
+        parameter = json.loads(msg.parameter)
+        print msg, parameter, len(parameter)
+        print '*' * 80
 
         # get_provision_ccap_core_info
         core, reason = CCAPCore.add_ccap_core(
@@ -665,7 +698,7 @@ class TestManagerAPI(unittest.TestCase):
             test_flag=True)
         print core.ccap_core_id
         print '*' * 80
-        print 'Simulate show provision  ccap core information from external module'
+        print 'Simulate show provision ccap core information from external module'
         msg = provision_pb2.t_Provision()
         msg.MsgType = provision_pb2.t_Provision.SHOW_PROVISION_CCAP_CORE
         msg.parameter = core.ccap_core_id
@@ -719,6 +752,7 @@ class TestManagerAPI(unittest.TestCase):
         self.api.manager_api_sock = None
         self.api._handle_manager_api("dummy sock", self.mgr.dispatcher.EV_FD_ERR)
         self.api.manager_api_sock = tmp_api_sock
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -124,8 +124,7 @@ define CopyUnitTests
 	$(call CopyPy,$(1),l2tp/docsisAVPs/testing)
 	$(call CopyPy,$(1),l2tp/vendorAVPs/testing)
 	$(call CopyPy,$(1),l2tp/l2tpv3/testing)
-	$(call CopyPy,$(1),rpdinfo/testing)
-	$(call CopyPy,$(1),hostresources/testing)
+	$(call CopyPy,$(1),resource/testing)
 	$(call CopyPy,$(1),ssd/testing)
 
 endef
@@ -187,10 +186,8 @@ define Package/rpd/install
 	$(call CopyPy,$(1),provision/simulator)
 	$(call CopyPy,$(1),provision/proto)
 	$(call CopyPy,$(1),provision/testing)
-	$(call CopyPy,$(1),rpdinfo)
-	$(call CopyPy,$(1),rpdinfo/src)
-	$(call CopyPy,$(1),hostresources)
-	$(call CopyPy,$(1),hostresources/src)
+	$(call CopyPy,$(1),resource)
+	$(call CopyPy,$(1),resource/src)
 	$(call CopyPy,$(1),statistics)
 	$(call CopyCli,$(1))
 

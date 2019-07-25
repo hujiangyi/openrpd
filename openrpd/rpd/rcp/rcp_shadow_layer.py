@@ -19,7 +19,7 @@ import redis
 import json
 import ast
 
-from rpd.hal.src.HalConfigMsg import *
+import rpd.hal.src.HalConfigMsg as HalConfig
 from rpd.gpb.rcp_pb2 import t_RpdDataMessage
 from rpd.gpb.cfg_pb2 import config
 from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
@@ -43,32 +43,33 @@ class RcpConfigFilter(object):
     def __init__(self, config_path=None):
         """Initializes an configuration filter."""
         self.ConfigFilterHandler = {
-            MsgTypeRpdCapabilities: None,
-            MsgTypeCcapCoreIdentification: None,
-            MsgTypeSsd: None,
-            MsgTypeDsRfPort: self.processDsRfPort,
-            MsgTypeDsScQamChannelConfig: self.processDsScQamChannelConfig,
-            MsgTypeDsOfdmChannelConfig: None,
-            MsgTypeDsOfdmProfile: None,
-            MsgTypeDsRfPortPerf: None,
-            MsgTypeDsScQamChannelPerf: None,
-            MsgTypeDsOfdmChannelPerf: None,
-            MsgTypeDsOob551IPerf: None,
-            MsgTypeDsOob552Perf: None,
-            MsgTypeNdfPerf: None,
-            MsgTypeUsRfPortPerf: None,
-            MsgTypeUsScQamChannelConfig: self.processUsScQamChannelConfig,
-            MsgTypeUsOfdmaChannelConfig: None,
-            MsgTypeUsOfdmaInitialRangingIuc: None,
-            MsgTypeUsOfdmaFineRangingIuc: None,
-            MsgTypeUsOfdmaDataRangingIuc: None,
-            MsgTypeUsOfdmaSubcarrierCfgState: None,
-            MsgTypeUsScQamChannelPerf: None,
-            MsgTypeUsOfdmaChannelPerf: None,
-            MsgTypeUsOob551IPerf: None,
-            MsgTypeUsOob552Perf: None,
-            MsgTypeNdrPerf: None,
-            MsgTypeSidQos: self.processSidQos,
+            HalConfig.MsgTypeRpdCapabilities: None,
+            HalConfig.MsgTypeCcapCoreIdentification: None,
+            HalConfig.MsgTypeSsd: None,
+            HalConfig.MsgTypeDsRfPort: self.processDsRfPort,
+            HalConfig.MsgTypeDsScQamChannelConfig: self.processDsScQamChannelConfig,
+            HalConfig.MsgTypeDsOfdmChannelConfig: None,
+            HalConfig.MsgTypeDsOfdmProfile: None,
+            HalConfig.MsgTypeDsRfPortPerf: None,
+            HalConfig.MsgTypeDsScQamChannelPerf: None,
+            HalConfig.MsgTypeDsOfdmChannelPerf: None,
+            HalConfig.MsgTypeDsOob551IPerf: None,
+            HalConfig.MsgTypeDsOob552Perf: None,
+            HalConfig.MsgTypeNdfPerf: None,
+            HalConfig.MsgTypeUsRfPortPerf: None,
+            HalConfig.MsgTypeUsScQamChannelConfig: self.processUsScQamChannelConfig,
+            HalConfig.MsgTypeUsOfdmaChannelConfig: self.processUsOfdmaChannelConfig,
+            HalConfig.MsgTypeUsOfdmaInitialRangingIuc: None,
+            HalConfig.MsgTypeUsOfdmaFineRangingIuc: None,
+            HalConfig.MsgTypeUsOfdmaDataRangingIuc: None,
+            HalConfig.MsgTypeUsOfdmaSubcarrierCfgState: None,
+            HalConfig.MsgTypeUsScQamChannelPerf: None,
+            HalConfig.MsgTypeUsOfdmaChannelPerf: None,
+            HalConfig.MsgTypeUsOfdmaDataIuc: None,
+            HalConfig.MsgTypeUsOob551IPerf: None,
+            HalConfig.MsgTypeUsOob552Perf: None,
+            HalConfig.MsgTypeNdrPerf: None,
+            HalConfig.MsgTypeSidQos: self.processSidQos,
         }
         if config_path is None:
             config_path = CONF_PATH
@@ -328,7 +329,7 @@ class RcpConfigFilter(object):
             if (RfPort.HasField("DsRfPort") and
                     RfPort.HasField("RfPortSelector")):
                 rfPort = RfPort.RfPortSelector.RfPortIndex
-                key = str(MsgTypeDsRfPort) + "-" + str(rfPort)
+                key = str(HalConfig.MsgTypeDsRfPort) + "-" + str(rfPort)
 
                 # filter DsRfPort
                 if self.ConfigFilterEnable:
@@ -339,11 +340,11 @@ class RcpConfigFilter(object):
 
                 # process DsRfPort internal policy
                 if self.internalPolicyEnable:
-                    self.processInternalPolicy(key, MsgTypeDsRfPort,
+                    self.processInternalPolicy(key, HalConfig.MsgTypeDsRfPort,
                                                RfPort.DsRfPort)
             else:
                 self.logger.warn("Msg type %d has no RfPortSelector "
-                                 "or DsRfPort" % MsgTypeDsRfPort)
+                                 "or DsRfPort" % HalConfig.MsgTypeDsRfPort)
                 continue
         if cfgMsg.RfPort:
             return True
@@ -357,7 +358,7 @@ class RcpConfigFilter(object):
             if (RfPort.HasField("DsRfPort") and
                     RfPort.HasField("RfPortSelector")):
                 rfPort = RfPort.RfPortSelector.RfPortIndex
-                key = str(MsgTypeDsRfPort) + "-" + str(rfPort)
+                key = str(HalConfig.MsgTypeDsRfPort) + "-" + str(rfPort)
 
                 ret = self.getCfgMsg(key, RfPort_Rsp.DsRfPort)
                 if ret:
@@ -366,7 +367,7 @@ class RcpConfigFilter(object):
                     cfgMsg.RfPort.remove(RfPort)
             else:
                 self.logger.warn("Msg type %d has no RfPortSelector "
-                                 "or DsRfPort" % MsgTypeDsRfPort)
+                                 "or DsRfPort" % HalConfig.MsgTypeDsRfPort)
                 cfgRsp.RfPort.remove(RfPort_Rsp)
                 continue
         if cfgMsg.RfPort:
@@ -380,12 +381,12 @@ class RcpConfigFilter(object):
             if (RfPort.HasField("DsRfPort") and
                     RfPort.HasField("RfPortSelector")):
                 rfPort = RfPort.RfPortSelector.RfPortIndex
-                key = str(MsgTypeDsRfPort) + "-" + str(rfPort)
+                key = str(HalConfig.MsgTypeDsRfPort) + "-" + str(rfPort)
 
                 self.saveCfgMsg(key, RfPort.DsRfPort)
             else:
                 self.logger.warn("Msg type %d has no RfPortSelector or DsRfPort"
-                                 % MsgTypeDsRfPort)
+                                 % HalConfig.MsgTypeDsRfPort)
                 continue
         return True
 
@@ -419,8 +420,8 @@ class RcpConfigFilter(object):
                     RfChannel.HasField("RfChannelSelector")):
                 rfPort = RfChannel.RfChannelSelector.RfPortIndex
                 rfChannel = RfChannel.RfChannelSelector.RfChannelIndex
-                key = str(MsgTypeDsScQamChannelConfig) + "-" + str(rfPort) + \
-                                                         "-" + str(rfChannel)
+                key = str(HalConfig.MsgTypeDsScQamChannelConfig) + "-" + str(rfPort) + \
+                    "-" + str(rfChannel)
                 # filter DsScQamChannelConfig
                 if self.ConfigFilterEnable:
                     ret = self.filterCfgMsg(
@@ -432,11 +433,11 @@ class RcpConfigFilter(object):
                 # process DsScQamChannelConfig internal policy
                 if self.internalPolicyEnable:
                     self.processInternalPolicy(
-                        key, MsgTypeDsScQamChannelConfig,
+                        key, HalConfig.MsgTypeDsScQamChannelConfig,
                         RfChannel.DsScQamChannelConfig)
             else:
                 self.logger.warn("Msg type %d has no RfChannelSelector or"
-                                 " DsScQamChannelConfig" % MsgTypeDsScQamChannelConfig)
+                                 " DsScQamChannelConfig" % HalConfig.MsgTypeDsScQamChannelConfig)
                 continue
         if cfgMsg.RfChannel:
             return True
@@ -450,8 +451,8 @@ class RcpConfigFilter(object):
             if RfChannel.HasField("RfChannelSelector"):
                 rfPort = RfChannel.RfChannelSelector.RfPortIndex
                 rfChannel = RfChannel.RfChannelSelector.RfChannelIndex
-                key = str(MsgTypeDsScQamChannelConfig) + "-" + str(rfPort) + \
-                                                         "-" + str(rfChannel)
+                key = str(HalConfig.MsgTypeDsScQamChannelConfig) + "-" + str(rfPort) + \
+                    "-" + str(rfChannel)
                 ret = self.getCfgMsg(key, RfChannel_Rsp.DsScQamChannelConfig)
                 if ret:
                     cfgRsp.RfChannel.remove(RfChannel_Rsp)
@@ -459,7 +460,7 @@ class RcpConfigFilter(object):
                     cfgMsg.RfChannel.remove(RfChannel)
             else:
                 self.logger.warn("Msg type %d has no RfChannelSelector"
-                                 % MsgTypeDsScQamChannelConfig)
+                                 % HalConfig.MsgTypeDsScQamChannelConfig)
                 cfgRsp.RfChannel.remove(RfChannel_Rsp)
                 continue
         if cfgMsg.RfChannel:
@@ -475,12 +476,12 @@ class RcpConfigFilter(object):
                     RfChannel.HasField("RfChannelSelector")):
                 rfPort = RfChannel.RfChannelSelector.RfPortIndex
                 rfChannel = RfChannel.RfChannelSelector.RfChannelIndex
-                key = str(MsgTypeDsScQamChannelConfig) + "-" + str(rfPort) + \
-                                                         "-" + str(rfChannel)
+                key = str(HalConfig.MsgTypeDsScQamChannelConfig) + "-" + str(rfPort) + \
+                    "-" + str(rfChannel)
                 self.saveCfgMsg(key, RfChannel.DsScQamChannelConfig)
             else:
                 self.logger.warn("Msg type %d has no RfChannelSelector or"
-                                 " DsScQamChannelConfig" % MsgTypeDsScQamChannelConfig)
+                                 " DsScQamChannelConfig" % HalConfig.MsgTypeDsScQamChannelConfig)
                 continue
         return True
 
@@ -507,13 +508,15 @@ class RcpConfigFilter(object):
 
     def writeUsScQamChannelConfig(self, cfgMsg):
         """Filter UsScQamChannelConfig config."""
+        self.logger.info("writeUsScQamChannelConfig")
+
         for RfChannel in cfgMsg.RfChannel:
             if (RfChannel.HasField("UsScQamChannelConfig") and
                     RfChannel.HasField("RfChannelSelector")):
                 rfPort = RfChannel.RfChannelSelector.RfPortIndex
                 rfChannel = RfChannel.RfChannelSelector.RfChannelIndex
-                key = str(MsgTypeUsScQamChannelConfig) + "-" + str(rfPort) + \
-                                                         "-" + str(rfChannel)
+                key = str(HalConfig.MsgTypeUsScQamChannelConfig) + "-" + str(rfPort) + \
+                    "-" + str(rfChannel)
                 # filter UsScQamChannelConfig
                 if self.ConfigFilterEnable:
                     ret = self.filterCfgMsg(
@@ -525,11 +528,11 @@ class RcpConfigFilter(object):
                 # process UsScQamChannelConfig internal policy
                 if self.internalPolicyEnable:
                     self.processInternalPolicy(
-                        key, MsgTypeUsScQamChannelConfig,
+                        key, HalConfig.MsgTypeUsScQamChannelConfig,
                         RfChannel.UsScQamChannelConfig)
             else:
                 self.logger.warn("Msg type %d has no RfChannelSelector or"
-                                 " UsScQamChannelConfig" % MsgTypeUsScQamChannelConfig)
+                                 " UsScQamChannelConfig" % HalConfig.MsgTypeUsScQamChannelConfig)
                 continue
         if cfgMsg.RfChannel:
             return True
@@ -539,12 +542,14 @@ class RcpConfigFilter(object):
     def readUsScQamChannelConfig(self, cfgMsg, cfgRsp):
         """If all request fields can get valid value, For read operation will
         get the values from db directly."""
+        self.logger.info("readUsScQamChannelConfig")
+
         for RfChannel, RfChannel_Rsp in zip(cfgMsg.RfChannel, cfgRsp.RfChannel):
             if RfChannel.HasField("RfChannelSelector"):
                 rfPort = RfChannel.RfChannelSelector.RfPortIndex
                 rfChannel = RfChannel.RfChannelSelector.RfChannelIndex
-                key = str(MsgTypeUsScQamChannelConfig) + "-" + str(rfPort) + \
-                                                         "-" + str(rfChannel)
+                key = str(HalConfig.MsgTypeUsScQamChannelConfig) + "-" + str(rfPort) + \
+                    "-" + str(rfChannel)
                 ret = self.getCfgMsg(key, RfChannel_Rsp.UsScQamChannelConfig)
                 if ret:
                     cfgRsp.RfChannel.remove(RfChannel_Rsp)
@@ -552,7 +557,7 @@ class RcpConfigFilter(object):
                     cfgMsg.RfChannel.remove(RfChannel)
             else:
                 self.logger.warn("Msg type %d has no RfChannelSelector or"
-                                 " UsScQamChannelConfig" % MsgTypeUsScQamChannelConfig)
+                                 " UsScQamChannelConfig" % HalConfig.MsgTypeUsScQamChannelConfig)
                 cfgRsp.RfChannel.remove(RfChannel_Rsp)
                 continue
         if cfgMsg.RfChannel:
@@ -563,29 +568,32 @@ class RcpConfigFilter(object):
     def saveUsScQamChannelConfig(self, cfgMsg):
         """Save UsScQamChannelConfig config to db when rcp hal receive success
         rsp."""
+        self.logger.info("saveUsScQamChannelConfig")
         for RfChannel in cfgMsg.RfChannel:
             if (RfChannel.HasField("UsScQamChannelConfig") and
                     RfChannel.HasField("RfChannelSelector")):
                 rfPort = RfChannel.RfChannelSelector.RfPortIndex
                 rfChannel = RfChannel.RfChannelSelector.RfChannelIndex
-                key = str(MsgTypeUsScQamChannelConfig) + "-" + str(rfPort) + \
-                                                         "-" + str(rfChannel)
+                key = str(HalConfig.MsgTypeUsScQamChannelConfig) + "-" + str(rfPort) + \
+                    "-" + str(rfChannel)
                 self.saveCfgMsg(key, RfChannel.UsScQamChannelConfig)
             else:
                 self.logger.warn("Msg type %d has no RfChannelSelector or"
-                                 " UsScQamChannelConfig" % MsgTypeUsScQamChannelConfig)
+                                 " UsScQamChannelConfig" % HalConfig.MsgTypeUsScQamChannelConfig)
                 continue
         return True
 
     def processUsScQamChannelConfig(self, op, reqMsg, rspMsg):
         """Start processing UsScQamChannelConfig."""
+        self.logger.info("processUsScQamChannelConfig")
+
         if not isinstance(op, int) or not isinstance(reqMsg, config):
             self.logger.warn("processUsScQamChannelConfig receive invalid"
                              " parameter")
             return False
 
-        self.logger.debug("Start processing UsScQamChannelConfig op: %d,"
-                          " reqmsg: %s" % (op, str(reqMsg)))
+        self.logger.info("Start processing UsScQamChannelConfig op: %d,"
+                         " reqmsg: %s" % (op, str(reqMsg)))
         if op == t_RpdDataMessage.RPD_CFG_WRITE:
             ret = self.writeUsScQamChannelConfig(reqMsg)
         elif op == t_RpdDataMessage.RPD_CFG_READ:
@@ -595,6 +603,103 @@ class RcpConfigFilter(object):
         else:
             self.logger.warn("Invalid operation %d for UsScQamChannelConfig"
                              % op)
+            return False
+        return ret
+
+# @todo Do we need this for initial config?
+    def writeUsOfdmaChannelConfig(self, cfgMsg):
+        """Filter UsOfdmaChannelConfig config."""
+        self.logger.info("writeUsOfdmaChannelConfig" % HalConfig.MsgTypeUsOfdmaChannelConfig)
+        for RfChannel in cfgMsg.RfChannel:
+            if (RfChannel.HasField("UsOfdmaChannelConfig") and
+                    RfChannel.HasField("RfChannelSelector")):
+                rfPort = RfChannel.RfChannelSelector.RfPortIndex
+                rfChannel = RfChannel.RfChannelSelector.RfChannelIndex
+                key = str(HalConfig.MsgTypeUsOfdmaChannelConfig) + "-" + str(rfPort) + \
+                    "-" + str(rfChannel)
+                # filter UsOfdmaChannelConfig
+                if self.ConfigFilterEnable:
+                    ret = self.filterCfgMsg(
+                        key, RfChannel.UsOfdmaChannelConfig)
+                    if not ret:
+                        cfgMsg.RfChannel.remove(RfChannel)
+                        continue
+
+                # process UsOfdmaChannelConfig internal policy
+                if self.internalPolicyEnable:
+                    self.processInternalPolicy(
+                        key, HalConfig.MsgTypeUsOfdmaChannelConfig,
+                        RfChannel.UsOfdmaChannelConfig)
+            else:
+                self.logger.warn("Msg type %d has no RfChannelSelector or"
+                                 " UsOfdmaChannelConfig" % HalConfig.MsgTypeUsOfdmaChannelConfig)
+                continue
+        if cfgMsg.RfChannel:
+            return True
+        else:
+            return False
+
+# @todo Do we need this for initial config?
+    def readUsOfdmaChannelConfig(self, cfgMsg, cfgRsp):
+        """If all request fields can get valid value, read operation will
+        get the values from db directly."""
+        self.logger.info("readUsOfdmaChannelConfig" % HalConfig.MsgTypeUsOfdmaChannelConfig)
+        for RfChannel, RfChannel_Rsp in zip(cfgMsg.RfChannel, cfgRsp.RfChannel):
+            if RfChannel.HasField("RfChannelSelector"):
+                rfPort = RfChannel.RfChannelSelector.RfPortIndex
+                rfChannel = RfChannel.RfChannelSelector.RfChannelIndex
+                key = str(HalConfig.MsgTypeUsOfdmaChannelConfig) + "-" + str(rfPort) + \
+                    "-" + str(rfChannel)
+                ret = self.getCfgMsg(key, RfChannel_Rsp.UsOfdmaChannelConfig)
+                if ret:
+                    cfgRsp.RfChannel.remove(RfChannel_Rsp)
+                else:
+                    cfgMsg.RfChannel.remove(RfChannel)
+            else:
+                self.logger.warn("Msg type %d has no RfChannelSelector or"
+                                 " UsOfdmaChannelConfig" % HalConfig.MsgTypeUsOfdmaChannelConfig)
+                cfgRsp.RfChannel.remove(RfChannel_Rsp)
+                continue
+        if cfgMsg.RfChannel:
+            return True
+        else:
+            return False
+
+# @todo Do we need this for initial config?
+    def saveUsOfdmaChannelConfig(self, cfgMsg):
+        """Save UsOfdmaChannelConfig config to db when rcp hal receive success rsp."""
+        self.logger.info("saveUsOfdmaChannelConfig" % HalConfig.MsgTypeUsOfdmaChannelConfig)
+        for RfChannel in cfgMsg.RfChannel:
+            if (RfChannel.HasField("UsOfdmaChannelConfig") and
+                    RfChannel.HasField("RfChannelSelector")):
+                rfPort = RfChannel.RfChannelSelector.RfPortIndex
+                rfChannel = RfChannel.RfChannelSelector.RfChannelIndex
+                key = str(HalConfig.MsgTypeUsOfdmaChannelConfig) + "-" + str(rfPort) + \
+                    "-" + str(rfChannel)
+                self.saveCfgMsg(key, RfChannel.UsOfdmaChannelConfig)
+            else:
+                self.logger.warn("Msg type %d has no RfChannelSelector or"
+                                 " UsOfdmaChannelConfig" % HalConfig.MsgTypeUsOfdmaChannelConfig)
+                continue
+        return True
+
+# @todo Do we need this for initial config?
+    def processUsOfdmaChannelConfig(self, op, reqMsg, rspMsg):
+        """Start processing UsOfdmaChannelConfig prior to sending to HAL."""
+        self.logger.error("processUsOfdmaChannelConfig" % HalConfig.MsgTypeUsOfdmaChannelConfig)
+        if not isinstance(op, int) or not isinstance(reqMsg, config):
+            self.logger.warn("processUsOfdmaChannelConfig receive invalid parameter")
+            return False
+
+        self.logger.info("Start processing UsOfdmaChannelConfig op: %d, reqmsg: %s" % (op, str(reqMsg)))
+        if op == t_RpdDataMessage.RPD_CFG_WRITE:
+            ret = self.writeUsOfdmaChannelConfig(reqMsg)
+        elif op == t_RpdDataMessage.RPD_CFG_READ:
+            ret = self.readUsOfdmaChannelConfig(reqMsg, rspMsg)
+        elif op == RPD_CFG_SAVE:
+            ret = self.saveUsOfdmaChannelConfig(reqMsg)
+        else:
+            self.logger.warn("Invalid operation %d for UsOfdmaChannelConfig" % op)
             return False
         return ret
 
@@ -615,7 +720,7 @@ class RcpConfigFilter(object):
                         end = beg + SidQos.NumSids
                         changed = False
                         for SidId in range(beg, end):
-                            key = str(MsgTypeSidQos) + "-" + str(rfPort) + \
+                            key = str(HalConfig.MsgTypeSidQos) + "-" + str(rfPort) + \
                                 "-" + str(rfChannel) + "-" + str(SidId)
                             for desc, value in SidQos.ListFields():
                                 if self._validSidQosField(desc.name):
@@ -632,7 +737,7 @@ class RcpConfigFilter(object):
                     cfgMsg.RfChannel.remove(RfChannel)
             else:
                 self.logger.warn("Msg type %d has no RfChannelSelector or"
-                                 % MsgTypeSidQos)
+                                 % HalConfig.MsgTypeSidQos)
         if not cfgMsg.RfChannel:
             return False
         else:
@@ -646,7 +751,7 @@ class RcpConfigFilter(object):
             beg = SidQos.StartSid
             end = beg + SidQos.NumSids
             for SidId in range(beg, end):
-                key = str(MsgTypeSidQos) + "-" + str(rfPort) + \
+                key = str(HalConfig.MsgTypeSidQos) + "-" + str(rfPort) + \
                     "-" + str(rfChannel) + "-" + str(SidId)
                 for desc, value in SidQos.ListFields():
                     if self._validSidQosField(desc.name):
@@ -665,7 +770,7 @@ class RcpConfigFilter(object):
             last = beg
             lastDict = dict()
             for SidId in range(beg, end):
-                key = str(MsgTypeSidQos) + "-" + str(rfPort) + \
+                key = str(HalConfig.MsgTypeSidQos) + "-" + str(rfPort) + \
                     "-" + str(rfChannel) + "-" + str(SidId)
                 curDict = dict()
                 for desc, value in SidQos.ListFields():
@@ -710,7 +815,7 @@ class RcpConfigFilter(object):
                     rspMsg.RfChannel.remove(RfChannel_Rsp)
             else:
                 self.logger.warn("Msg type %d has no RfChannelSelector or"
-                                 % MsgTypeSidQos)
+                                 % HalConfig.MsgTypeSidQos)
                 rspMsg.RfChannel.remove(RfChannel_Rsp)
         if not cfgMsg.RfChannel:
             return False
@@ -727,7 +832,7 @@ class RcpConfigFilter(object):
                     beg = SidQos.StartSid
                     end = beg + SidQos.NumSids
                     for SidId in range(beg, end):
-                        key = str(MsgTypeSidQos) + "-" + str(rfPort) + \
+                        key = str(HalConfig.MsgTypeSidQos) + "-" + str(rfPort) + \
                             "-" + str(rfChannel) + "-" + str(SidId)
                         for desc, value in SidQos.ListFields():
                             if self._validSidQosField(desc.name):
@@ -744,7 +849,7 @@ class RcpConfigFilter(object):
                                         self._markSyncPhy(key, desc.name)
             else:
                 self.logger.warn("Msg type %d has no RfChannelSelector or"
-                                 % MsgTypeSidQos)
+                                 % HalConfig.MsgTypeSidQos)
         return True
 
     def processSidQos(self, op, reqMsg, rspMsg):

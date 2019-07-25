@@ -22,6 +22,7 @@ from rpd.provision.proto import GcpMsgType
 
 
 class GcpCli(object):
+
     def __init__(self, cli):
         """Instantiate a basic cli class"""
         self.cli = cli

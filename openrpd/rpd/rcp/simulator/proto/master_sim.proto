@@ -22,7 +22,6 @@
 syntax = "proto2";
 
 import "cfg.proto";
-import "RpdRedirect.proto";
 
 message t_SlaveDescriptor {
     required string addr_master =1 [default = "127.0.0.1"];

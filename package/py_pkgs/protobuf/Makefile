@@ -32,7 +32,7 @@ define Package/protobuf
   CATEGORY:=Libraries
   TITLE:=A structured data encoding library
   URL:=http://code.google.com/p/protobuf/
-  DEPENDS:=+zlib +libpthread +libstdcpp +python
+  DEPENDS:=+zlib +libpthread +libstdcpp +python +python-setuptools
   MAINTAINER:=Obinou <obconseil@gmail.com>
 endef
 

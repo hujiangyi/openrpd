@@ -143,14 +143,14 @@ class TestProcessAgent(unittest.TestCase):
         sock.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_8021X]['api'])
 
         sock2 = context.socket(zmq.PULL)
-        sock2.bind("ipc:///tmp/sock4.scok")
+        sock2.bind("ipc:///tmp/sock4.sock")
 
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
         reg.id = "abcd"
         reg.action = pb2.msg_manager_register.REG
-        # reg.path_info = "ipc:///tmp/sock4.scok"
+        # reg.path_info = "ipc:///tmp/sock4.sock"
         reg.path_info = ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_8021X]['api']
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()

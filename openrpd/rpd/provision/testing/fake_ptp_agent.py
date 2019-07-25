@@ -25,6 +25,7 @@ class PTP(FakeAgent):
     def __init__(self):
         super(PTP, self).__init__(agent.ProcessAgent.AGENTTYPE_PTP)
 
+
 if __name__ == "__main__":
     setup_logging("PROVISION", filename="provision_ptp.log")
     pagent = PTP()

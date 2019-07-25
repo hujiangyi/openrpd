@@ -33,18 +33,25 @@ import struct
 from l2tpv3.src.L2tpv3AVP import l2tpv3AVP, GeneralL2tpv3AVP
 import l2tpv3.src.L2tpv3Hal_pb2 as L2tpv3Hal_pb2
 from rpd.mcast.src.mcast import Mcast
+from rpd.confdb.testing.test_rpd_redis_db import setup_test_redis, \
+    stop_test_redis
+
 
 class fake_avp(GeneralL2tpv3AVP):
+
     def handleAvp(self, pkt, retPak):
         return False
 
+
 class fake_halclient():
+
     def __init__(self):
         self.called = 0
 
     def send_l2tp_session_req_msg(self, session, msg_type):
         self.called += 1
         return
+
 
 class testL2tpv3Session(unittest.TestCase):
 
@@ -96,7 +103,7 @@ class testL2tpv3Session(unittest.TestCase):
                                    0xc, 8, 0, 0,
                                    0, 71, 0, 2,
                                    0xc, 8, 0x11, 0x8b,
-                                   0x0, 0x2, 0x1,0x0,
+                                   0x0, 0x2, 0x1, 0x0,
                                    0xc, 8, 0x11, 0x8b,
                                    0x0, 0x4, 0x7, 0xD0,
                                    0xc, 20, 0x11, 0x8b,
@@ -119,12 +126,14 @@ class testL2tpv3Session(unittest.TestCase):
                                    0, 0, 0, 0,
                                    0, 0, 0, 0,
                                    )
+        setup_test_redis()
 
     @classmethod
     def tearDownClass(cls):
         cls.conn.CloseConnection()
         for key in Mcast.McastDb.keys():
             Mcast.McastDb.pop(key)
+        stop_test_redis()
 
     def testL2tpv3Session_init(self):
         session1 = L2tpv3Session(1, 2, 'sender', self.conn)
@@ -201,7 +210,7 @@ class testL2tpv3Session(unittest.TestCase):
         # Normal case: receive a good ICCN, return None
         avp1 = ControlMessageAVP(ControlMessageAVP.ICCN)
         avp2 = fake_avp()
-        avps = [avp1,avp2]
+        avps = [avp1, avp2]
         iccn = L2tpv3ControlPacket(0, 0, 1, avps)
         ret = session_receiver.ReceiveICCN(iccn)
         self.assertIsInstance(ret, L2tpv3CDN)
@@ -213,7 +222,6 @@ class testL2tpv3Session(unittest.TestCase):
         ret = session_receiver.ReceiveICCN(iccn)
         L2tpv3GlobalSettings.MustAvpsCheck = False
         self.assertIsInstance(ret, L2tpv3CDN)
-
 
     def test_LocalRequest(self):
         # fsm is L2tpv3SessionRecipientFsm
@@ -327,7 +335,6 @@ class testL2tpv3Session(unittest.TestCase):
         self.assertIsInstance(ret, L2tpv3CDN)
         ret = session_receiver.ReceiveSLI(sli)
         self.assertIsInstance(ret, L2tpv3CDN)
-
 
     def test_fsmStateRecipientIdle_1(self):
         session_receiver = L2tpv3Session(1, 2, 'receiver', self.conn)
@@ -480,6 +487,7 @@ class testL2tpv3Session(unittest.TestCase):
         msg.req_data.circuit_status = True
         session_receiver.ReceiveHalMsg(msg=msg)
         self.assertTrue(session_receiver.local_circuit_status)
+
 
 if __name__ == "__main__":
     unittest.main()

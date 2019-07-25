@@ -36,6 +36,7 @@ from rpd.hal.src.transport.HalTransport import HalTransport
 
 
 class HalClientError(Exception):
+
     def __init__(self, msg, expr=None):
         super(HalClientError, self).__init__(msg)
         self.msg = msg
@@ -215,7 +216,7 @@ class CliHalIpc(object):
         configMsg = HalMessage("HalClientInterestNotificationCfg", ClientID=self.clientID,
                                ClientNotificationMessages=notifications)
         self.mgrConnection.send(configMsg.Serialize())
-        #REQ/RSP
+        # REQ/RSP
         bin = self.mgrConnection.recv()
         return bin
 

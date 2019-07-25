@@ -56,6 +56,7 @@ def is_valid_ip(ipaddr):
         return True
     return False
 
+
 if __name__ == "__main__":
     if len(sys.argv) <= 1:
         print "Please specify ipv4 or ipv6\n"

@@ -26,6 +26,7 @@ from rpd.common.rpd_logging import AddLoggerToClass
 
 class HalTimeoutCallback(object):
     """This class is callback class for processing the timeout events."""
+
     def __init__(self, seq, timeout, cbObj):
         self.cbObj = cbObj
         self.seq = seq

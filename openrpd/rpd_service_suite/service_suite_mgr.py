@@ -28,7 +28,7 @@ from rpd.it_api.it_api import ItApiServerServiceSuite
 from rpd.dispatcher.dispatcher import Dispatcher
 from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 from rpd.common.utils import Convert
-from rpd.rcp.rcp_orchestrator import (RCPMasterCapabilities,
+from rpd.rcp.rcp_sessions import (CcapCoreIdentification,
                                       RCPMasterDescriptor)
 from rpd.rcp.rcp_master_orchestrator import RCPMasterOrchestrator
 from rpd.rcp.rcp_packet_director import (RCPMasterScenario, CCAPStep,
@@ -341,6 +341,30 @@ class CcapConfig(ServiceConfigAdapter):
             self.descr = None
         return True
 
+    @staticmethod
+    def _generate_default_scenario():
+        _PKT_DIRECTOR = RCPMasterPacketBuildDirector()
+        scenario = RCPMasterScenario()
+        scenario.add_next_step(
+            CCAPStep(_PKT_DIRECTOR.get_rpd_capabilities_read_packet,
+                     description="DEFAULT: Read RPD Capabilities"))
+        scenario.add_next_step(
+            CCAPStep(_PKT_DIRECTOR.get_ccap_core_ident_write_packet,
+                     description="DEFAULT: Write CCAP Capabilities"))
+        scenario.add_next_step(
+            CCAPStep(_PKT_DIRECTOR.get_gdm_packet,
+                     description="DEFAULT: GDM Request Message"))
+
+        scenario.add_next_step(
+            CCAPStep(_PKT_DIRECTOR.send_initial_complete_packet,
+                     description="DEFAULT: Write Initial Configuration Complete Message"))
+
+        scenario.add_trigger_step(
+            CCAPStep(_PKT_DIRECTOR.move_to_operational_write_packet,
+                     description="DEFAULT: Send Move To Operational Message"),
+            "ptp_notify")
+        return scenario
+
     def _service_configure(self, gpb_params):
         self._disable()
 
@@ -390,7 +414,7 @@ class CcapConfig(ServiceConfigAdapter):
                 core_addr = gpb_params.IPv4Address
             else:
                 core_addr = '0.0.0.0'
-            self.caps = RCPMasterCapabilities(
+            self.caps = CcapCoreIdentification(
                 index=4,
                 core_name="ServiceSuiteCCAPv4",
                 core_ip_addr=core_addr)
@@ -399,10 +423,13 @@ class CcapConfig(ServiceConfigAdapter):
                 core_addr = gpb_params.IPv6Address
             else:
                 core_addr = '::'
-            self.caps = RCPMasterCapabilities(
+            self.caps = CcapCoreIdentification(
                 index=6,
                 core_name="ServiceSuiteCCAPv6",
                 core_ip_addr=core_addr)
+
+        if not scenario:
+            scenario = self._generate_default_scenario()
 
         self.descr = RCPMasterDescriptor(
             capabilities=self.caps,
@@ -479,7 +506,10 @@ class ServiceSuiteManager(object):
         """Starts the manager."""
         for service in self.services:
             service._disable()
-        self.disp.loop()
+        try:
+            self.disp.loop()
+        except Exception as e:
+            self.logger.warning("Exception happened : %s", str(e))
 
     def get_dhcp_assiged_addr_list(self):
         """This API is used to get the IP Address list which is assigned by
@@ -564,6 +594,7 @@ class ServiceSuiteManager(object):
 
     def cleanup(self):
         self.it_api_server.cleanup()
+
 
 if __name__ == "__main__":
     setup_logging("MasterSim", filename="srv_suite_mgr.log")

@@ -20,7 +20,6 @@ import binascii
 
 from rpd.common import utils
 from rpd.rcp.gcp.gcp_lib import gcp_msg_def
-from rpd.rcp.gcp.gcp_lib import gcp_packet
 from rpd.gpb.RpdCapabilities_pb2 import t_RpdCapabilities
 from rpd.rcp.gcp.gcp_lib.gcp_object import GCPObject
 from rpd.rcp.rcp_lib import rcp_tlv_def
@@ -99,6 +98,42 @@ class TestRCPSpecifics(unittest.TestCase):
         self.assertEqual(seq_dec.decode(buf, offset=0, buf_data_len=len(buf)),
                          seq_dec.DECODE_DONE)
         self.assertFalse(seq._ut_compare(seq_dec))
+
+    def test_tlv_len_mismatch(self):
+        seq = "0900570a000200020b000105130001003c004701000100020004313233340300" \
+            + "10262000002b107ffe00000000000000020400010105000843434150434f524506000" \
+            + "2118b0700010108000100090001000a000200000b000100"
+
+        seq_buf = binascii.a2b_hex(seq)
+        print repr(seq_buf)
+        decoder = RCPSequence(gcp_msg_def.DataStructRSP,
+                              rcp_tlv_def.RCP_MSG_TYPE_REX,
+                              1,
+                              rcp_tlv_def.RCP_OPERATION_TYPE_WRITE_RESPONSE)
+
+        decoder.decode(seq_buf, offset=0, buf_data_len=len(seq_buf))
+        # change vendor id to 1 byte
+        decoder = RCPSequence(gcp_msg_def.DataStructRSP,
+                              rcp_tlv_def.RCP_MSG_TYPE_REX,
+                              1,
+                              rcp_tlv_def.RCP_OPERATION_TYPE_WRITE_RESPONSE)
+        seq = "0900560a000200020b000105130001003c004601000100020004313233340300102620" \
+            + "00002b107ffe00000000000000020400010105000843434150434f52450600018b070001010" \
+            + "8000100090001000a000200000b000100"
+        seq_buf = binascii.a2b_hex(seq)
+        decoder.decode(seq_buf, offset=0, buf_data_len=len(seq_buf))
+
+        # change vendor id to 3 byte
+        decoder = RCPSequence(gcp_msg_def.DataStructRSP,
+                              rcp_tlv_def.RCP_MSG_TYPE_REX,
+                              1,
+                              rcp_tlv_def.RCP_OPERATION_TYPE_WRITE_RESPONSE)
+
+        seq = "0900570a000200020b000105130001003c00470100010002000431323334030010262000002b" \
+            + "107ffe00000000000000020400010105000843434150434f524506000311118b0700010108000100" \
+            + "090001000a000200000b000100"
+        seq_buf = binascii.a2b_hex(seq)
+        decoder.decode(seq_buf, offset=0, buf_data_len=len(seq_buf))
 
     @unittest.skip('skip test for unsupport feature')
     def test_value_constraint(self):
@@ -294,7 +329,7 @@ class TestRCPSpecifics(unittest.TestCase):
         sub_tlv2.GuardTime.set_val(26)
 
         sub_tlv.UsOfdmaChannelConfig.AdminState.set_val(4)
-        sub_tlv.UsOfdmaChannelConfig.TargetRxPower.set_val(28)
+        sub_tlv.UsOfdmaChannelConfig.TargetRxPowerAdjust.set_val(28)
         sub_tlv.UsOfdmaInitialRangingIuc.NumSubcarriers.set_val(10)
         sub_tlv.UsOfdmaInitialRangingIuc.Guardband.set_val(10)
         sub_tlv.UsOfdmaFineRangingIuc.NumSubcarriers.set_val(14)
@@ -306,7 +341,7 @@ class TestRCPSpecifics(unittest.TestCase):
 
         sub_tlv2 = sub_tlv.UsOfdmaSubcarrierCfgState.add_new_repeated()
         sub_tlv2.StartingSubcarrierId.set_val(0)
-        sub_tlv2.SubarrierUsage.set_val(4)
+        sub_tlv2.SubcarrierUsage.set_val(4)
 
         sub_tlv2 = sub_tlv.SidQos.add_new_repeated()
         sub_tlv2.StartSid.set_val(100)
@@ -472,6 +507,10 @@ class TestRCPSpecifics(unittest.TestCase):
         # sub_tlv.DsRfPort.PortIndex.set_val(14)
         sub_tlv.DsRfPort.TiltMaximumFrequency.set_val(15)
 
+        sub_tlv = seq.RfPort.add_new_repeated()
+        sub_tlv.RfPortSelector.RfPortIndex.set_val(0)
+        sub_tlv.UsRfPort.BaseTargetRxPower.set_val(10)
+
         sub_tlv = seq.RfChannel.add_new_repeated()
         sub_tlv.RfChannelSelector.RfChannelIndex.set_val(0)
 
@@ -503,7 +542,7 @@ class TestRCPSpecifics(unittest.TestCase):
         sub_tlv2.GuardTime.set_val(26)
 
         sub_tlv.UsOfdmaChannelConfig.AdminState.set_val(4)
-        sub_tlv.UsOfdmaChannelConfig.TargetRxPower.set_val(28)
+        sub_tlv.UsOfdmaChannelConfig.TargetRxPowerAdjust.set_val(28)
         sub_tlv.UsOfdmaInitialRangingIuc.NumSubcarriers.set_val(10)
         sub_tlv.UsOfdmaInitialRangingIuc.Guardband.set_val(10)
         sub_tlv.UsOfdmaFineRangingIuc.NumSubcarriers.set_val(14)
@@ -515,7 +554,7 @@ class TestRCPSpecifics(unittest.TestCase):
 
         sub_tlv2 = sub_tlv.UsOfdmaSubcarrierCfgState.add_new_repeated()
         sub_tlv2.StartingSubcarrierId.set_val(0)
-        sub_tlv2.SubarrierUsage.set_val(4)
+        sub_tlv2.SubcarrierUsage.set_val(4)
         return seq
 
     @staticmethod
@@ -573,7 +612,7 @@ class TestRCPSpecifics(unittest.TestCase):
 
         resSet = seq.MultiCore.ResourceSet.add_new_repeated()
         resSet.ResourceSetIndex.set_val(1)
-        resSet.CcapCoreOwner.set_val(\
+        resSet.CcapCoreOwner.set_val(
             utils.Convert.mac_to_tuple_of_bytes("00:00:00:00:00:00"))
         resSet.DsRfPortStart.set_val(0)
         resSet.DsRfPortEnd.set_val(0)
@@ -606,6 +645,7 @@ class TestRCPSpecifics(unittest.TestCase):
         msg_dec = Message(gcp_msg_def.DataStructError)
         self.assertEqual(msg_dec.decode(buf, offset=0, buf_data_len=len(buf)),
                          msg_dec.DECODE_DONE)
+
 
 if __name__ == '__main__':
     unittest.main()

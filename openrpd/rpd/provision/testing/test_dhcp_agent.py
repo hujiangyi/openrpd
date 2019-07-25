@@ -20,7 +20,7 @@ import zmq
 import rpd.provision.proto.process_agent_pb2 as pb2
 from rpd.provision.process_agent.agent.agent import ProcessAgent
 from rpd.provision.process_agent.dhcp.dhcp_agent import DhcpAgent
-from rpd.gpb.dhcp_pb2 import t_DhcpMessage, t_DhcpData
+from rpd.gpb.dhcp_pb2 import t_DhcpMessage
 from rpd.provision.transport.transport import Transport
 from rpd.common.rpd_logging import setup_logging
 import subprocess
@@ -34,10 +34,10 @@ class TestDhcpAgent(unittest.TestCase):
         # try to find the dhcp agent
         currentPath = os.path.dirname(os.path.realpath(__file__))
         dirs = currentPath.split("/")
-        rpd_index = dirs.index("testing")-2
+        rpd_index = dirs.index("testing") - 2
         self.rootpath = "/".join(dirs[:rpd_index])
-        self.pid = subprocess.Popen("coverage run --parallel-mode --rcfile="+self.rootpath+"/.coverage.rc " 
-                                    + "/".join(dirs[:rpd_index]) +
+        self.pid = subprocess.Popen("coverage run --parallel-mode --rcfile=" + self.rootpath + "/.coverage.rc " +
+                                    "/".join(dirs[:rpd_index]) +
                                     "/rpd/provision/process_agent/dhcp/dhcp_agent.py -s",
                                     executable='bash', shell=True)
 
@@ -61,14 +61,14 @@ class TestDhcpAgent(unittest.TestCase):
         sock_api.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_DHCP]['api'])
 
         sock_pull = context.socket(zmq.PULL)
-        sock_pull.bind("ipc:///tmp/test_dhcp_agent.scok")
+        sock_pull.bind("ipc:///tmp/test_dhcp_agent.sock")
 
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
-        reg.id = "test_mgr" # use a fake ccap id
+        reg.id = "test_mgr"  # use a fake ccap id
         reg.action = pb2.msg_manager_register.REG
-        reg.path_info = "ipc:///tmp/test_dhcp_agent.scok"
+        reg.path_info = "ipc:///tmp/test_dhcp_agent.sock"
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()
 
@@ -84,7 +84,7 @@ class TestDhcpAgent(unittest.TestCase):
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_core_register()
-        reg.mgr_id = "test_mgr" # use a fake ccap id
+        reg.mgr_id = "test_mgr"  # use a fake ccap id
         reg.ccap_core_id = "test_ccap_core"
         reg.action = pb2.msg_core_register.REG
         event_request.core_reg.CopyFrom(reg)
@@ -116,7 +116,7 @@ class TestDhcpAgent(unittest.TestCase):
         # start a second core request in the same interface
         event_request = pb2.api_request()
         reg = pb2.msg_core_register()
-        reg.mgr_id = "test_mgr" # use a fake ccap id
+        reg.mgr_id = "test_mgr"  # use a fake ccap id
         reg.ccap_core_id = "test_ccap_core_2"
         reg.action = pb2.msg_core_register.REG
         event_request.core_reg.CopyFrom(reg)
@@ -152,7 +152,7 @@ class TestDhcpAgent(unittest.TestCase):
         dhcp_data = dhcp_msg.DHCPData
         dhcp_data.TimeServers.extend(['2.2.2.2', '1.1.1.1'])
         dhcp_data.LogServers.extend(['2.2.2.2', '1.1.1.1'])
-        dhcp_data.CCAPCores.extend(['2.2.2.2',])
+        dhcp_data.CCAPCores.extend(['2.2.2.2', ])
         dhcp_data.TimeOffset = 0
         self.dhcp_client_transport.sock.send(dhcp_msg.SerializeToString())
         time.sleep(5)
@@ -187,7 +187,7 @@ class TestDhcpAgent(unittest.TestCase):
         # unregister the ccapcore
         event_request = pb2.api_request()
         reg = pb2.msg_core_register()
-        reg.mgr_id = "test_mgr" # use a fake ccap id
+        reg.mgr_id = "test_mgr"  # use a fake ccap id
         reg.ccap_core_id = "test_ccap_core"
         reg.action = pb2.msg_core_register.UNREG
         event_request.core_reg.CopyFrom(reg)
@@ -205,9 +205,9 @@ class TestDhcpAgent(unittest.TestCase):
         # unregister the mgr
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
-        reg.id = "test_mgr" # use a fake ccap id
+        reg.id = "test_mgr"  # use a fake ccap id
         reg.action = pb2.msg_manager_register.UNREG
-        reg.path_info = "ipc:///tmp/test_dhcp_agent.scok"
+        reg.path_info = "ipc:///tmp/test_dhcp_agent.sock"
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()
 
@@ -233,9 +233,10 @@ class TestDhcpAgentFunc(unittest.TestCase):
             "lastChangeTime": 1,
             "transport": self.agent.process_transport,
             "initiated_by": None,
+            "initiated": False,
         }
 
-        path = "ipc:///tmp/rcp.scok"
+        path = "ipc:///tmp/rcp.sock"
         transport = Transport(
             path, Transport.PUSHSOCK, Transport.TRANSPORT_CLIENT)
 
@@ -276,7 +277,6 @@ class TestDhcpAgentFunc(unittest.TestCase):
     def test_cleanup_db(self):
         self.agent.cleanup_db('CORE-1234567890')
 
-
     def test_process_event_action(self):
         print '############test process_event_action error case#############'
         req = pb2.msg_event_request()
@@ -296,7 +296,7 @@ class TestDhcpAgentFunc(unittest.TestCase):
         self.agent.process_event_action(req.action)
 
         # start
-        self.agent.ccap_cores['CORE-1234567891'] = {"mgr": "MGR-1234567890",}
+        self.agent.ccap_cores['CORE-1234567891'] = {"mgr": "MGR-1234567890", }
         req.action.ccap_core_id = "CORE-1234567891"
         req.action.parameter = "eth0"
         req.action.action = pb2.msg_event.START
@@ -316,6 +316,36 @@ class TestDhcpAgentFunc(unittest.TestCase):
 
         # mask is self.dispatcher.EV_FD_ERR
         self.agent.dhcp_msg_cb(self.agent.process_transport.sock, self.agent.dispatcher.EV_FD_ERR)
+
+    def test_report_ipv6_duplicate_event(self):
+        interface = 'eth1'
+        msg = "[  100.395512] IPv6: eth1: IPv6 duplicate address fe80::a833:11ff:fe66:0 detected!"
+        ret, event_type = self.agent.report_ipv6_duplicate_event(interface, msg)
+        self.assertTrue(ret)
+        self.assertEquals(event_type, "Local")
+        interface = 'eth1'
+        msg = "[  100.395512] IPv6: eth1: IPv6 duplicate address 2001:558:ff00::e603 detected!"
+        ret, event_type = self.agent.report_ipv6_duplicate_event(interface, msg)
+        self.assertTrue(ret)
+        self.assertEquals(event_type, "Global")
+
+        ret, reason = self.agent.report_ipv6_duplicate_event("lo", msg)
+        self.assertFalse(ret)
+        self.assertEquals(reason, "Not match")
+
+        ret, reason = self.agent.report_ipv6_duplicate_event(interface, "")
+        self.assertFalse(ret)
+        self.assertEquals(reason, "None msg")
+
+        ret, reason = self.agent.report_ipv6_duplicate_event(interface, None)
+        self.assertFalse(ret)
+        self.assertEquals(reason, "Exception")
+
+        interface = 'vbh0'
+        msg = "[  967.535685] IPv6: vbh0: IPv6 duplicate address 2001:93:3:1::10:30d detected!"
+        ret, event_type = self.agent.report_ipv6_duplicate_event(interface, msg)
+        self.assertTrue(ret)
+        self.assertEquals(event_type, "Global")
 
 
 if __name__ == "__main__":

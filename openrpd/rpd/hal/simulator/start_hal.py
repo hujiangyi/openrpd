@@ -147,6 +147,7 @@ def start_hal(hal_cfg_file):
     process = psutil.Popen(hal_process_cmd_line.split())
     return process
 
+
 if __name__ == "__main__":
     start_redis()
     time.sleep(1)

@@ -28,10 +28,10 @@ class TestInterfaceStatusAgent(unittest.TestCase):
         # try to find the interface status agent
         currentPath = os.path.dirname(os.path.realpath(__file__))
         dirs = currentPath.split("/")
-        rpd_index = dirs.index("testing")-2
+        rpd_index = dirs.index("testing") - 2
         self.rootpath = "/".join(dirs[:rpd_index])
-        self.pid = subprocess.Popen("coverage run --parallel-mode --rcfile="+self.rootpath+"/.coverage.rc " 
-                                    + "/".join(dirs[:rpd_index]) +
+        self.pid = subprocess.Popen("coverage run --parallel-mode --rcfile=" + self.rootpath + "/.coverage.rc " +
+                                    "/".join(dirs[:rpd_index]) +
                                     "/rpd/provision/process_agent/interface_status/interface_status_agent.py",
                                     executable='bash', shell=True)
 
@@ -50,14 +50,14 @@ class TestInterfaceStatusAgent(unittest.TestCase):
         sock_api.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_INTERFACE_STATUS]['api'])
 
         sock_pull = context.socket(zmq.PULL)
-        sock_pull.bind("ipc:///tmp/test_interface_status_agent.scok")
+        sock_pull.bind("ipc:///tmp/test_interface_status_agent.sock")
 
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
-        reg.id = "test_mgr" # use a fake ccap id
+        reg.id = "test_mgr"  # use a fake ccap id
         reg.action = pb2.msg_manager_register.REG
-        reg.path_info = "ipc:///tmp/test_interface_status_agent.scok"
+        reg.path_info = "ipc:///tmp/test_interface_status_agent.sock"
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()
 
@@ -73,7 +73,7 @@ class TestInterfaceStatusAgent(unittest.TestCase):
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_core_register()
-        reg.mgr_id = "test_mgr" # use a fake ccap id
+        reg.mgr_id = "test_mgr"  # use a fake ccap id
         reg.ccap_core_id = "test_ccap_core"
         reg.action = pb2.msg_core_register.REG
         event_request.core_reg.CopyFrom(reg)
@@ -124,7 +124,7 @@ class TestInterfaceStatusAgent(unittest.TestCase):
         # unregister the ccapcore
         event_request = pb2.api_request()
         reg = pb2.msg_core_register()
-        reg.mgr_id = "test_mgr" # use a fake ccap id
+        reg.mgr_id = "test_mgr"  # use a fake ccap id
         reg.ccap_core_id = "test_ccap_core"
         reg.action = pb2.msg_core_register.UNREG
         event_request.core_reg.CopyFrom(reg)
@@ -144,7 +144,7 @@ class TestInterfaceStatusAgent(unittest.TestCase):
         reg = pb2.msg_manager_register()
         reg.id = "test_mgr"  # use a fake ccap id
         reg.action = pb2.msg_manager_register.UNREG
-        reg.path_info = "ipc:///tmp/test_interface_status_agent.scok"
+        reg.path_info = "ipc:///tmp/test_interface_status_agent.sock"
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()
 
@@ -156,6 +156,7 @@ class TestInterfaceStatusAgent(unittest.TestCase):
         print reg_rsp
 
         self.assertEqual(reg_rsp.reg_rsp.status, reg_rsp.reg_rsp.OK)
+
 
 if __name__ == "__main__":
     unittest.main()

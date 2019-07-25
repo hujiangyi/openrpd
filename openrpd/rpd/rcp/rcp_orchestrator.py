@@ -16,21 +16,20 @@
 # limitations under the License.
 #
 
-import time, os
-import json, Queue
+import time
+import json
 import errno
-from google.protobuf.message import Message as GPBMessage
-from rpd.gpb.RpdCapabilities_pb2 import t_RpdCapabilities
+import socket
 
 from rpd.rcp.rcp_msg_handling import RCPSlavePacketHandler as \
     RCPSlavePacketHandler
-from rpd.rcp.rcp_sessions import *
+from rpd.rcp.rcp_sessions import RCPSlaveSession
 from rpd.dispatcher import dispatcher
-from rpd.rcp.rcp_packet_director import *
+from rpd.rcp.rcp_packet_director import RCPSlavePacketBuildDirector
 from rpd.gpb.rcp_pb2 import t_RcpMessage
 from rpd.rcp.rcp_hal import RcpHalIpc
 from rpd.hal.src.HalConfigMsg import MsgTypeRoutePtpStatus, MsgTypeFaultManagement, MsgTypeRpdIpv6Info, \
-    MsgTypeRpdGroupInfo, MsgTypeRpdCapabilities,MsgTypeGeneralNtf, MsgTypeStaticPwStatus
+    MsgTypeRpdGroupInfo, MsgTypeGeneralNtf, MsgTypeStaticPwStatus, MsgTypeUcdRefreshNtf
 from rpd.common.rpd_logging import AddLoggerToClass
 from rpd.rcp.gcp.gcp_lib import gcp_msg_def
 from rpd.rcp.gcp.gcp_lib.gcp_packet import GCPPacket
@@ -39,8 +38,12 @@ from rpd.rcp.gcp.gcp_lib.gcp_object import GCPObject
 from rpd.dispatcher.timer import DpTimerManager
 from rpd.common import rpd_event_def
 from rpd.gpb.GeneralNotification_pb2 import t_GeneralNotification
-from rpd.gpb.StaticPwStatus_pb2 import t_StaticPwStatus
+from rpd.gpb.RfChannel_pb2 import t_RfChannel
 import rpd.provision.proto.process_agent_pb2 as protoDef
+import rpd.rcp.rcp_lib.rcp_tlv_def as rcp_tlv_def
+import rpd.rcp.gcp.gcp_sessions as gcp_sessions
+import rpd.rcp.rcp_lib.rcp as rcp
+
 
 def create_testing_notify_rsp(packet, caps):    # pragma: no cover
     # create packet with NotifyResp
@@ -320,8 +323,8 @@ class RCPOrchestrator(gcp_sessions.GCPSessionOrchestrator):
 
 
 class RCPSlaveOrchestrator(
-    RCPOrchestrator,
-    RCPSlavePacketHandler.RCPSlavePacketHandlerCallbackSet):
+        RCPOrchestrator,
+        RCPSlavePacketHandler.RCPSlavePacketHandlerCallbackSet):
     """Implements an orchestrating class for exactly one RCP slave, which
     initiates and maintains GCP sessions with GCP masters according to the
     RPD specification.
@@ -411,7 +414,7 @@ class RCPSlaveOrchestrator(
     #
     # Implementation of the CallbackSet interface
     #
-    def ccap_capabilities_update(self, session):    # pragma: no cover
+    def ccap_identification_update(self, session):    # pragma: no cover
         """This callback is called by the PacketHandler when an update of
         the CCAP's capabilities has been received.
 
@@ -424,7 +427,7 @@ class RCPSlaveOrchestrator(
         """
         # If the principal active's state has been changed,
         # then set principal to none and change the state
-        if session in self.principal and not session.ccap_capabilities.is_principal:
+        if session in self.principal and not session.ccap_identification.is_principal:
             self.principal.remove(session)
             if not len(self.principal):
                 self._set_orch_state(
@@ -445,7 +448,7 @@ class RCPSlaveOrchestrator(
 
         """
         self.logger.info("Redirect received at %s, addresses: %s" %
-                 (session.get_descriptor(), ccap_core_addres_list))
+                         (session.get_descriptor(), ccap_core_addres_list))
 
         self._redir_resp_session = session
         self._redir_addr_list = ccap_core_addres_list
@@ -611,10 +614,10 @@ class RCPSlaveOrchestrator(
             MsgTypeRpdGroupInfo: self.notification_group_info,
             MsgTypeGeneralNtf: self.notification_general_info,
             MsgTypeStaticPwStatus: self.notification_static_pw_status,
+            MsgTypeUcdRefreshNtf: self.notification_ucdrefresh_info,
         }
         self.fault_level = None
         self.fault_text_limit = 255
-        self.operational = False
         self.index_id = 1
 
         self.__orchestration_start()
@@ -631,24 +634,15 @@ class RCPSlaveOrchestrator(
 
         for uid, session in self.sessions_active.items():
             desc = session.get_descriptor()
-            if None is session.ccap_capabilities:
+            if None is session.ccap_identification:
                 continue
             if desc.addr_remote == core_ip and desc.interface_local == interface:
-                if not session.ccap_capabilities.is_active:
-                    session.ccap_capabilities.is_active = True
+                if not session.ccap_identification.is_active:
+                    session.ccap_identification.is_active = True
                     self.logger.info("set active principal core[%s] information success", core_ip)
             else:
-                if session.ccap_capabilities is not None:
-                    session.ccap_capabilities.is_active = False
-
-    def set_system_operational(self, operational=False):
-        """Will be called when system entered operational mode.
-
-        :param operational: True or False
-        :return:
-
-        """
-        self.operational = operational
+                if session.ccap_identification is not None:
+                    session.ccap_identification.is_active = False
 
     def notification_process_cb(self, notification_type, msg):
         """Notification entrance.
@@ -680,12 +674,6 @@ class RCPSlaveOrchestrator(
             else:
                 self.dispatcher.fd_modify(fd, self.dispatcher.MASK_ALL)
 
-        # notify the ccap core via fault management
-        if self.pkt_director.PTP_STATUS_TO_GCP_VAL[msg] == self.pkt_director.PTP_SYNC:
-            self.notify.info(rpd_event_def.RPD_EVENT_CONNECTIVITY_SYNC[0], "")
-        else:
-            self.notify.error(rpd_event_def.RPD_EVENT_CONNECTIVITY_LOSS_SYNC[0], "")
-
     def notification_general_info(self, msg):
         """Send general notify status to CCAP cores.
 
@@ -706,11 +694,32 @@ class RCPSlaveOrchestrator(
                 self.dispatcher.fd_modify(fd, self.dispatcher.MASK_ALL)
 
         # notify the ccap core via fault management
+        if msg_type == t_GeneralNotification.PTPRESULTNOTIFICATION:
+            if gen_ntf_msg.PtpResult == t_GeneralNotification.PTPSYNCHRONIZED:
+                self.notify.info(rpd_event_def.RPD_EVENT_CONNECTIVITY_SYNC[0], "")
+            else:
+                self.notify.error(rpd_event_def.RPD_EVENT_CONNECTIVITY_LOSS_SYNC[0], "")
 
-        if gen_ntf_msg.PtpResult == self.pkt_director.PTP_SYNC:
-            self.notify.info(rpd_event_def.RPD_EVENT_CONNECTIVITY_SYNC[0], "")
-        else:
-            self.notify.error(rpd_event_def.RPD_EVENT_CONNECTIVITY_LOSS_SYNC[0], "")
+    def notification_ucdrefresh_info(self, msg):
+        """Send general notify ucdrefresh to CCAP cores.
+
+        :param msg: RfChannel message
+        :return:
+
+        """
+        gen_ntf_msg = t_RfChannel()
+        gen_ntf_msg.ParseFromString(msg)
+        for fd, session in self.sessions_active_fd.items():
+            ntf_req = self.pkt_director.get_ucdrefresh_notify_packet(session, gen_ntf_msg)
+            session.io_ctx.add_tx_packet(ntf_req)
+
+            if session.io_ctx.is_tx_empty():
+                self.dispatcher.fd_modify(fd, self.dispatcher.MASK_RD_ERR)
+            else:
+                self.dispatcher.fd_modify(fd, self.dispatcher.MASK_ALL)
+
+        # notify the ccap core via fault management
+        self.notify.error(rpd_event_def.RPD_EVENT_CONNECTIVITY_LOSS_SYNC[0], "")
 
     def notification_ipv6_status(self, msg):
         """Send ipv6 info to CCAP cores.
@@ -770,8 +779,8 @@ class RCPSlaveOrchestrator(
         """
         try:
             for fd, session in self.sessions_active.items():
-                if not session.ccap_capabilities or \
-                        not (session.ccap_capabilities.is_active and session.ccap_capabilities.is_principal):
+                if not session.ccap_identification or \
+                        not (session.ccap_identification.is_active and session.ccap_identification.is_principal):
                     continue
                 ntf_req = self.pkt_director.get_pw_status_notify_packet(session, msg)
                 session.io_ctx.add_tx_packet(ntf_req)
@@ -779,7 +788,7 @@ class RCPSlaveOrchestrator(
                     self.dispatcher.fd_modify(session.get_socket_fd(), self.dispatcher.MASK_RD_ERR)
                 else:
                     self.dispatcher.fd_modify(session.get_socket_fd(), self.dispatcher.MASK_ALL)
-        except ValueError as e:
+        except ValueError:
             pass
 
     def notification_fault_management_cb(self, msg):
@@ -792,15 +801,15 @@ class RCPSlaveOrchestrator(
         try:
             event, text, value = json.loads(msg)
             for _, session in self.sessions_active.items():
-                if not session.ccap_capabilities or \
-                        not (session.ccap_capabilities.is_active and session.ccap_capabilities.is_principal):
+                if not session.ccap_identification or \
+                        not (session.ccap_identification.is_active and session.ccap_identification.is_principal):
                     continue
                 self.send_fault_management_message(session, event, text, value)
                 if session.io_ctx.is_tx_empty():
                     self.dispatcher.fd_modify(session.get_socket_fd(), self.dispatcher.MASK_RD_ERR)
                 else:
                     self.dispatcher.fd_modify(session.get_socket_fd(), self.dispatcher.MASK_ALL)
-        except ValueError as e:
+        except ValueError:
             pass
 
     def config_op_timeout_cb(self, pkt_req):
@@ -1127,8 +1136,8 @@ class RCPSlaveOrchestrator(
 
         self.logger.debug(
             "wr_cb hi%d, low%d, remaining hi%d, low%d"
-            %(i, j, ctx.packet_tx_low_pri_queue.qsize(),
-              ctx.packet_tx_high_pri_queue.qsize()))
+            % (i, j, ctx.packet_tx_low_pri_queue.qsize(),
+               ctx.packet_tx_high_pri_queue.qsize()))
 
         if ctx.is_tx_empty():
             if self.orch_state == self.RCP_ORCH_STATE_REDIRECT_RECEIVED:
@@ -1178,25 +1187,6 @@ class RCPSlaveOrchestrator(
                                       "connecting timeout", session.get_descriptor())
                     self.__handle_failure(session)
 
-    def ira_timeout_cb(self, session):
-
-        self.logger.info("[IRA debug]: rcp session ira timeout count is %d core_ip %s",
-                         session.ira_retry_cnt, session.get_descriptor().addr_remote)
-        if session.is_ira_recv:
-            return
-        if session.ira_retry_cnt < session.CONNECT_RETRY_COUNT:
-            session.incr_ira_retry_cnt()
-            session.ira_recv_timer = session.dispatcher.timer_register(
-                session.NO_IRA_RECV_TIMEOUT, self.ira_timeout_cb, arg=session,
-                timer_type=DpTimerManager.TIMER_ONESHOT)
-
-        # Send NotifyREQ to the master
-        ntf_req = self.pkt_director.get_notify_up_request_packet(session)
-        session.io_ctx.add_tx_packet(ntf_req)
-        fd = session.get_socket_fd()
-        self.dispatcher.fd_register(
-            fd, self.dispatcher.MASK_ALL, self.session_ev_cb)
-
     def session_timeout_cb(self, session):   # pragma: no cover
         """Called when the session is timeout due to lost GDM Messages."""
         # fixme by zhicwang, remove it when CSCva40098 is resolved
@@ -1223,19 +1213,8 @@ class RCPSlaveOrchestrator(
                          session.get_descriptor())
         if session.get_descriptor().get_uniq_id() not in self.sessions_active:
             self.logger.info("Session initiation failed: %s",
-                     session.get_descriptor())
+                             session.get_descriptor())
             return
-        if session.is_ira_recv == False:
-            try:
-                self.logger.info("[IRA debug]: IRA timeout start coreip=%s",
-                                 session.get_descriptor().addr_remote)
-                session.clear_ira_retry_cnt()
-                session.incr_ira_retry_cnt()
-                session.ira_recv_timer = session.dispatcher.timer_register(
-                    session.NO_IRA_RECV_TIMEOUT, self.ira_timeout_cb, arg=session,
-                    timer_type=DpTimerManager.TIMER_ONESHOT)
-            except Exception as e:
-                self.logger.error("start the IRA timer fail: %s" % str(e))
 
         try:
             session.timeout_timer = session.dispatcher.timer_register(
@@ -1260,6 +1239,8 @@ class RCPSlaveOrchestrator(
             fd, self.dispatcher.MASK_ALL, self.session_ev_cb)
         # add it into the sessions_active_fd
         self.sessions_active_fd[fd] = session
+
+        self.__send_mgr_session_initiated(session)
 
         session.clear_reconnect_cnt()
         self.logger.info("Session initiated: %s", session.get_descriptor())
@@ -1295,6 +1276,21 @@ class RCPSlaveOrchestrator(
         except socket.error as ex:
             self.logger.error("GCP slave session initiation failed: %s", ex)
             session.session_state = session.SESSION_STATE_FAILED
+
+    def __send_mgr_session_initiated(self, session):
+        msg = t_RcpMessage()
+        msg.RcpMessageType = msg.SESSION_INITIATED
+        desc = session.get_descriptor()
+        ccap_core_para = {'addr_remote': None, 'interface_local': None}
+        if None is not desc.addr_remote:
+            ccap_core_para['addr_remote'] = desc.addr_remote
+        if None is not desc.interface_local:
+            ccap_core_para['interface_local'] = desc.interface_local
+        msg.parameter = json.dumps(ccap_core_para)
+        self.logger.info("GCP send notification session_initiated to Rcp agent for %s", desc)
+        self.rcp_process_channel.send_ipc_msg({"session": session,
+                                               "req_packet": None,
+                                               "req_data": msg})
 
     def __handle_failure(self, session):
         """Handle a failed session."""
@@ -1380,8 +1376,8 @@ class RCPSlaveOrchestrator(
                 if session.is_initiated():
                     # TODO how to handle this case ?
                     self.logger.debug("Session %s already initiated, "
-                              "reinitiating the session",
-                              session.get_descriptor())
+                                      "reinitiating the session",
+                                      session.get_descriptor())
                     session.close()
                     session.reinit()
 
@@ -1389,7 +1385,7 @@ class RCPSlaveOrchestrator(
 
                 self.principal_candidate.initiate()
                 self.logger.debug("Next candidate for Principal active: %s",
-                          self.principal_candidate.get_descriptor())
+                                  self.principal_candidate.get_descriptor())
                 return
 
         # can't find next candidate for principal active
@@ -1444,7 +1440,7 @@ class RCPSlaveOrchestrator(
                 {"session": self._redir_resp_session,
                  "req_packet": None,
                  "req_data": redirect_msg
-                })
+                 })
 
             self._redir_addr_list = None
             self._redir_resp_session = None
@@ -1458,7 +1454,7 @@ class RCPSlaveOrchestrator(
                 if not session.is_initiated():
                     self.__handle_connect(session)
                 else:
-                    caps = session.ccap_capabilities
+                    caps = session.ccap_identification
                     if None is caps:
                         self.logger.debug(
                             "Session %s is initiated, but waiting for CCAP core capabilities.",
@@ -1504,9 +1500,9 @@ class RCPSlaveOrchestrator(
             # just create the instance and store
             # initiation will be started in the orchestrate_cb()
             session = RCPSlaveSession(desc, self.dispatcher,
-                                self.session_initiate_cb,
-                                self.session_timeout_cb,
-                                self.session_connecting_timeout_cb)
+                                      self.session_initiate_cb,
+                                      self.session_timeout_cb,
+                                      self.session_connecting_timeout_cb)
             self.sessions_active[desc.get_uniq_id()] = session
 
             # session operation

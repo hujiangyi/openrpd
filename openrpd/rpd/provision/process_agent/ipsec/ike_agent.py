@@ -30,6 +30,7 @@ import json
 import struct
 import sys
 
+
 class IkeAgent(agent.ProcessAgent):
     UP = "UP"
     DOWN = "DOWN"
@@ -39,6 +40,7 @@ class IkeAgent(agent.ProcessAgent):
     CLI_ZMQ = "/tmp/zmq-ikev2.ipc"
 
     __metaclass__ = AddLoggerToClass
+
     def __init__(self):
 
         super(IkeAgent, self).__init__(agent.ProcessAgent.AGENTTYPE_IPSEC)
@@ -73,9 +75,9 @@ class IkeAgent(agent.ProcessAgent):
             self.vici_sock.close()
             sys.exit(0)
 
-        self.dispatcher.fd_register(self.vici_sock.fileno(), \
-                    Dispatcher.EV_FD_IN | Dispatcher.EV_FD_ERR, \
-                    self.ike_event_callback)
+        self.dispatcher.fd_register(self.vici_sock.fileno(),
+                                    Dispatcher.EV_FD_IN | Dispatcher.EV_FD_ERR,
+                                    self.ike_event_callback)
 
         self.CliMsgsHandler = {
             Ikev2MsgType.ShowIkev2Session: self.show_ikev2_session,
@@ -95,7 +97,6 @@ class IkeAgent(agent.ProcessAgent):
         for ike_conn in ike_conns:
             for conn_name in ike_conn.keys():
                 self.unload_ike_conn_and_sas(conn_name)
-
 
     def ike_event_callback(self, fd, eventmask):
         """Receive an event notification from strongswan.
@@ -169,8 +170,7 @@ class IkeAgent(agent.ProcessAgent):
                     event_request_rsp.core_event.status = protoDef.msg_core_event_notification.OK
                     event_request_rsp.core_event.reason = "Status changed"
                     event_request_rsp.core_event.event_id = self.id
-                    event_request_rsp.core_event.result = \
-                    self.ike[local_ip][remote_ip]["status"]
+                    event_request_rsp.core_event.result = self.ike[local_ip][remote_ip]["status"]
                     ccap_core = self.ccap_cores[id]
                     transport = self.mgrs[ccap_core["mgr"]]['transport']
 
@@ -209,30 +209,27 @@ class IkeAgent(agent.ProcessAgent):
         local_l2tp_ts = local_ip_str + "[l2tp]"
         remote_l2tp_ts = remote_ip_str + "[l2tp]"
         proposals = "aes128-sha1-modp768"
-        esp_proposals = ['aes128-sha1-modp768','aes128-null-modp768','null-sha1-modp768']
+        esp_proposals = ['aes128-sha1-modp768', 'aes128-null-modp768', 'null-sha1-modp768']
 
         ses = {
-               conn: {'local_addrs': [local_ip], 'remote_addrs': [remote_ip], 'version': '2',
-                      'local-2': {'auth': 'pubkey', 'certs': [self.mycert]},
-                      'remote-2': {'auth': 'pubkey'},
-                      'proposals': [proposals],
-                      'children':
-                          {
-                           gcp_sa: {'mode': 'TRANSPORT', 'start_action': 'start',
-                                 'local_ts':[local_gcp_ts], 'remote_ts':[remote_gcp_ts],
-                                    'esp_proposals':esp_proposals},
-                           l2tp_sa: {'mode': 'TRANSPORT', 'start_action': 'start',
-                               'local_ts': [local_l2tp_ts], 'remote_ts': [remote_l2tp_ts]}
-                           }
-                      }
-               }
-
+            conn: {'local_addrs': [local_ip], 'remote_addrs': [remote_ip], 'version': '2',
+                   'local-2': {'auth': 'pubkey', 'certs': [self.mycert]},
+                   'remote-2': {'auth': 'pubkey'},
+                   'proposals': [proposals],
+                   'children': {gcp_sa: {'mode': 'TRANSPORT', 'start_action': 'start',
+                                         'local_ts': [local_gcp_ts], 'remote_ts': [remote_gcp_ts],
+                                         'esp_proposals': esp_proposals},
+                                l2tp_sa: {'mode': 'TRANSPORT', 'start_action': 'start',
+                                          'local_ts': [local_l2tp_ts], 'remote_ts': [remote_l2tp_ts]}
+                                }
+                   }
+        }
         rst = True
         self.unregister_vici_notification()
         try:
             self.vici_ses.load_conn(ses)
-        except Exception,e:
-            self.logger.error("Cannot load the IKE connection: %s"%e)
+        except Exception, e:
+            self.logger.error("Cannot load the IKE connection: %s" % e)
             rst = False
 
         self.register_vici_notification()
@@ -248,13 +245,13 @@ class IkeAgent(agent.ProcessAgent):
         """
 
         conn_name = {"name": conn}
-        ike_sa = {"ike":conn, "loglevel":0}
-        gcp_child = {"child":conn+"-gcp", "loglevel":0}
-        l2tp_child = {"child":conn+"-l2tp", "loglevel":0}
+        ike_sa = {"ike": conn, "loglevel": 0}
+        gcp_child = {"child": conn + "-gcp", "loglevel": 0}
+        l2tp_child = {"child": conn + "-l2tp", "loglevel": 0}
 
         # Try to terminate all SAs one by one!
         try:
-            # termnate all sas
+            # terminate all sas
             for log in self.vici_ses.terminate(gcp_child):
                 print log
         except Exception, e:
@@ -286,7 +283,7 @@ class IkeAgent(agent.ProcessAgent):
         :return: bool
 
         """
-        name = {"name": conn}
+        # name = {"name": conn}
         rst = True
 
         self.unregister_vici_notification()
@@ -304,6 +301,7 @@ class IkeAgent(agent.ProcessAgent):
 
         """
         id = action.ccap_core_id
+
         event_action = action.action
 
         self.logger.debug("Receive an event action:%s", action)
@@ -316,11 +314,11 @@ class IkeAgent(agent.ProcessAgent):
             return
 
         # Get the transport
-        ccap_core = self.ccap_cores[id]
-        transport = self.mgrs[ccap_core["mgr"]]['transport']
+        # ccap_core = self.ccap_cores[id]
+        # transport = self.mgrs[ccap_core["mgr"]]['transport']
         if not action.HasField("parameter"):
             self.logger.warn("Cannot process the event action for id %s, "
-                              "reason:Parameter is not set" % id)
+                             "reason:Parameter is not set" % id)
             # return error
             self._send_event_notification(id, protoDef.msg_core_event_notification.FAIL, "Parameter is not set")
             return
@@ -330,23 +328,22 @@ class IkeAgent(agent.ProcessAgent):
         # parameter's format is "local_ip;core_ip"
         local_ip, core_ip = parameter.split(";")
 
-        if event_action == protoDef.msg_event.START or \
-            event_action == protoDef.msg_event.CHECKSTATUS:
+        if event_action == protoDef.msg_event.START or event_action == protoDef.msg_event.CHECKSTATUS:
             # check if we are in the requester list, if yes,
             # we just send a current status to it
 
             rst = True
             if local_ip not in self.ike:
                 # this is a new IKE session
-                self.ike[local_ip] = {core_ip:{"id":id, "status": self.DOWN}}
+                self.ike[local_ip] = {core_ip: {"id": id, "status": self.DOWN}}
                 rst = self.start_ike(id, local_ip, core_ip)
             elif core_ip not in self.ike[local_ip]:
-                self.ike[local_ip][core_ip] = {"id":id, "status": self.DOWN}
+                self.ike[local_ip][core_ip] = {"id": id, "status": self.DOWN}
                 rst = self.start_ike(id, local_ip, core_ip)
 
             self.ike[local_ip][core_ip]["id"] = id
 
-            if rst == True:
+            if rst:
                 status = protoDef.msg_core_event_notification.OK
             else:
                 status = protoDef.msg_core_event_notification.FAIL
@@ -357,8 +354,7 @@ class IkeAgent(agent.ProcessAgent):
             return
 
         if event_action == protoDef.msg_event.STOP:
-            if local_ip not in self.ike or \
-                            core_ip not in self.ike[local_ip]:
+            if local_ip not in self.ike or core_ip not in self.ike[local_ip]:
                 status = protoDef.msg_core_event_notification.FAIL
                 reason = "Cannot stop event since can not find it."
             else:
@@ -368,7 +364,7 @@ class IkeAgent(agent.ProcessAgent):
                     self.ike.pop(local_ip)
                 rst = self.stop_ike(id)
 
-                if rst == True:
+                if rst:
                     status = protoDef.msg_core_event_notification.OK
                 else:
                     status = protoDef.msg_core_event_notification.FAIL
@@ -391,7 +387,7 @@ class IkeAgent(agent.ProcessAgent):
             for remote in self.ike[local]:
                 id = self.ike[local][remote]["id"]
                 status = self.ike[local][remote]["status"]
-                value = {"Core-id":id,"Local":local,"Remote":remote,"Status":status}
+                value = {"Core-id": id, "Local": local, "Remote": remote, "Status": status}
                 ike_session.append(value)
 
         return True, ike_session
@@ -471,6 +467,7 @@ class IkeAgent(agent.ProcessAgent):
             rsp_msg.CliDataResult = rsp_msg.CLI_RESULT_NONE
 
         self.send_cli_rsp(rsp_msg)
+
 
 if __name__ == "__main__":
     setup_logging("PROVISION", filename="provision_ike.log")

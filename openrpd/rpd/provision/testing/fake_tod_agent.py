@@ -18,8 +18,10 @@ from rpd.provision.process_agent.agent.fake_agent import FakeAgent
 import rpd.provision.process_agent.agent.agent as agent
 from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 
+
 class TOD(FakeAgent):
     __metaclass__ = AddLoggerToClass
+
     def __init__(self):
         super(TOD, self).__init__(agent.ProcessAgent.AGENTTYPE_TOD)
 

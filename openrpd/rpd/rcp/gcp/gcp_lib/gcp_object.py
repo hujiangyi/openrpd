@@ -442,7 +442,7 @@ class ValueFormatGPB(object):  # pragma: no cover
 
         :raises GCPInternalValueFormatError: If this method is called for
          invalid type of instance.
- 
+
        """
         if not self.is_nested_parent() and not self.is_repeated_leaf():
             self.logger.error("Unexpected type of instance")
@@ -844,15 +844,23 @@ class GCPObject(object):
     DECODE_DONE = 1
     DECODE_FAILED = 2
     DECODE_FRAGMENTED = 3
+    DECODE_UNKNOWN_FORMAT = 4
+    DECODE_INCORRECT_FORMAT = 5
+    DECODE_DATA_TOO_SHORT = 6
+    DECODE_UNKNOWN_FIELD = 7
     # Means Done, but is returned when all data of current object are
     # processed, but there's next object of the same level in the buffer
-    DECODE_NEXT = 4
+    DECODE_NEXT = 8
 
     decode_result_str = {
         DECODE_INIT: "INIT",
         DECODE_DONE: "DONE",
         DECODE_FAILED: "FAILED",
         DECODE_FRAGMENTED: "FRAGMENTED",
+        DECODE_UNKNOWN_FORMAT: "UNKNOWNFORMAT",
+        DECODE_INCORRECT_FORMAT: "INCORRECTFORMAT",
+        DECODE_DATA_TOO_SHORT: "DATATOOSHORT",
+        DECODE_UNKNOWN_FIELD: "UNKNOWNFIELD",
         DECODE_NEXT: "NEXT"
     }
 
@@ -941,7 +949,7 @@ class GCPObject(object):
 
         if self.buf_data_len <= self.offset:
             self.logger.error("Invalid offset (%u) and max_len (%u) values.",
-                      self.offset, self.buf_data_len)
+                              self.offset, self.buf_data_len)
             return False
 
         # Store the starting offset for further checks and error handling
@@ -1066,7 +1074,7 @@ class GCPObject(object):
 
         if self.buf_data_len <= self.offset:
             self.logger.error("Invalid offset (%u) and max_len (%u) values.",
-                      self.offset, self.buf_data_len)
+                              self.offset, self.buf_data_len)
             return False
 
         return True
@@ -1137,14 +1145,14 @@ class GCPObject(object):
                 struct.pack_into(fmt, self.buffer, self.offset, *val)
             else:
                 if (DataDescription.VARIABLE_LEN == fmt or
-                   DataDescription.BYTES_STRING == fmt):
+                        DataDescription.BYTES_STRING == fmt):
                     # encode as string if the length is variable
                     fmt = "!%us" % length
 
                 struct.pack_into(fmt, self.buffer, self.offset, val)
         except:
             self.logger.error("Failed to pack value with format: %s, length: %u",
-                      fmt, length)
+                              fmt, length)
             raise GCPEncodeError("Failed to pack the value")
 
         self.offset += length
@@ -1178,7 +1186,7 @@ class GCPObject(object):
         total = sum([length for (val, fmt, length) in bulk])
         if (total + self.offset) > self.buf_data_len:
             self.logger.debug("Unable to pack bulk of data of length: %u, available memory: %u",
-                      total, self.get_max_len())
+                              total, self.get_max_len())
             return False
 
         # store current offset for exception handling

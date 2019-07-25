@@ -66,7 +66,6 @@ class Debugability(object):
                         rpd_redis_server = 1
                 except psutil.NoSuchProcess:  # pragma: no cover
                     pass
-            # if dependencies software not up, check 8 seconds later
             time.sleep(3)
         while rpd_platform == 0 and not SysTools.is_vrpd():  # pragma: no cover
             if os.path.exists("/tmp/platform_ok"):
@@ -83,12 +82,12 @@ class Debugability(object):
             fl = fcntl.fcntl(fd, fcntl.F_GETFL)
             fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
         except Exception, e:
-            self.logger.info("set %s non-blocking fail, %s", \
-                    str(popen_obj['process'].name), e)
+            self.logger.info("set %s non-blocking fail, %s",
+                             str(popen_obj['process'].name), e)
         pass
 
     def debugability_traceback(self):  # pragma: no cover
-        # monitor the all process and catch all traceback when process crashed.
+        # monitor the all process and catch all traceback.
         for p in self.proc_monitor:
             try:
                 proc_stderr = None
@@ -98,7 +97,7 @@ class Debugability(object):
                     # print traceback to console
                     print proc_stderr
                     # print traceback to file
-                    trace_file = open(self.trace_filename,"a+")
+                    trace_file = open(self.trace_filename, "a+")
                     err_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S") + \
                         " - Found error for - " + str(p['process'].name) + "\n"
                     trace_file.write(err_str)

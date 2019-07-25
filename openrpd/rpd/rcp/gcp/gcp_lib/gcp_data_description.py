@@ -65,6 +65,7 @@ class UintValueConstraint(IntValueConstraint):
 class BitLengthUintConstraint(UintValueConstraint):
     """Class implements check if the value is unsigned integer number with bit
     length lower than or equal to the specified bit length."""
+
     def __init__(self, bit_length):
         """Stores the maximal bit length."""
         if bit_length <= 0:
@@ -82,6 +83,7 @@ class BitLengthUintConstraint(UintValueConstraint):
 
 class EvenConstraint(UintValueConstraint):
     """Class implements check for even values."""
+
     def __init__(self):
         pass
 
@@ -97,6 +99,7 @@ class EvenConstraint(UintValueConstraint):
 class RangeConstraint(IntValueConstraint):
     """Class implements check for values from some range specified by minimum
     and maximum, both inclusive."""
+
     def __init__(self, min_val, max_val):
         """Sets boundaries of the range."""
         self.min_val = min_val
@@ -114,6 +117,7 @@ class RangeConstraint(IntValueConstraint):
 class RangeConstraint2(ValueConstraint):
     """Class implements check for values which can come from two disjunctive
     ranges."""
+
     def __init__(self, min_val, max_val, min_val2, max_val2,):
         """Stores boundaries of all two ranges."""
         self.range1 = RangeConstraint(min_val, max_val)
@@ -132,6 +136,7 @@ class RangeConstraint2(ValueConstraint):
 class ByteSequenceConstraint(ValueConstraint):
     """Class implements check if the value is a byte sequence of specified
     length and each item is checked if it's 8bit unsigned integer number."""
+
     def __init__(self, lengths):
         """Stores number of lengths of the byte sequence.
 
@@ -166,6 +171,7 @@ class ByteSequenceConstraint(ValueConstraint):
 
 class EnumConstraint(ValueConstraint):
     """Implements check if the value is some value form allowed values."""
+
     def __init__(self, allowed_values):
         self.allowed_values = allowed_values
 
@@ -175,6 +181,7 @@ class EnumConstraint(ValueConstraint):
 
 class FlagsConstraint(ValueConstraint):
     """Implements check if the value includes only flags specified byt mask."""
+
     def __init__(self, mask):
         self.mask = mask
 
@@ -185,6 +192,7 @@ class FlagsConstraint(ValueConstraint):
 class StringLenConstraint(ValueConstraint):
     """Implements check if the length of string is lower or equal to the
     specified length."""
+
     def __init__(self, length):
         self.len = length
 
@@ -195,6 +203,7 @@ class StringLenConstraint(ValueConstraint):
 class StringLenRangeConstraint(ValueConstraint):
     """Implements check if the length of string is from range specified by
     minimum and maximum both inclusive."""
+
     def __init__(self, min_len, max_len):
         self.min = min_len
         self.max = max_len
@@ -202,6 +211,7 @@ class StringLenRangeConstraint(ValueConstraint):
     def is_value_valid(self, value_to_check):
         str_len = len(value_to_check)
         return self.min <= str_len <= self.max
+
 
 #
 # Well Known constraints
@@ -253,7 +263,7 @@ class DataDescription(object):
         "!L": 4,  # unsigned long
         "!q": 8,  # long long
         "!Q": 8,  # unsigned long long
-        "!2s":2,
+        "!2s": 2,
         VARIABLE_LEN: VARIABLE_LEN,  # "!%s" % len(value)
         BYTES_STRING: VARIABLE_LEN,
         # BYTE_SEQ_FMT: BYTE_SEQ_FMT,
@@ -300,8 +310,8 @@ class DataDescription(object):
         "!q": 0,
         "!Q": 0,
         "!2s": 'NA',
-        VARIABLE_LEN: "R_Dummy",  # read dummy
-        BYTES_STRING: "R_Dummy",  # read dummy
+        VARIABLE_LEN: "",  # read dummy
+        BYTES_STRING: "",  # read dummy
         MAC_FMT: (0, 0, 0, 0, 0, 0),
         IP_FMT: (0, 0, 0, 0),
     }
@@ -434,10 +444,13 @@ class DataDescription(object):
 class DescriptionSet(object):
     """Class represents a set of descriptions of the same level with some
     common characteristic."""
-    def __init__(self, hierarchy_name="Base"):
+
+    def __init__(self, hierarchy_name="Base", id=0):
         self.child_dict_by_name = {}
         self.child_dict_by_id = {}
         self.hierarchy_name = hierarchy_name
+        self.name = hierarchy_name # name is used within _fast_decode
+        self.id = id
 
     def insert_description(self, desc_id, desc_name, desc):
         """Inserts new data description into the dictionaries. Sanity checks

@@ -21,8 +21,10 @@ from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 
 class L2TP(FakeAgent):
     __metaclass__ = AddLoggerToClass
+
     def __init__(self):
         super(L2TP, self).__init__(agent.ProcessAgent.AGENTTYPE_L2TP)
+
 
 if __name__ == "__main__":
     setup_logging("PROVISION", filename="provision_l2tp.log")

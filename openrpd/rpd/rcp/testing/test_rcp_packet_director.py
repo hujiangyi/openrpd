@@ -26,9 +26,7 @@ from rpd.rcp.gcp.gcp_lib import gcp_msg_def
 from rpd.rcp.rcp_lib.rcp import RCPPacket, RCPSequence
 from rpd.rcp.rcp_hal import RcpHalIpc, DataObj
 from rpd.gpb.VendorSpecificExtension_pb2 import t_VendorSpecificExtension
-from rpd.gpb.RpdCapabilities_pb2 import t_RpdCapabilities
 from rpd.common.rpd_logging import setup_logging
-
 
 
 def create_test_sequence(operation=rcp_tlv_def.RCP_OPERATION_TYPE_WRITE, seq_num=0):
@@ -103,6 +101,7 @@ def create_test_sequence(operation=rcp_tlv_def.RCP_OPERATION_TYPE_WRITE, seq_num
 
     return seq
 
+
 def create_test_pkt(pkt_director, slave,
                     gcp_id=gcp_msg_def.NotifyREQ,
                     rcp_id=rcp_tlv_def.RCP_MSG_TYPE_NTF,
@@ -131,17 +130,20 @@ def create_test_pkt(pkt_director, slave,
         return None
     return pkts[0]
 
+
 def fake_cb():
     print "fake cb handled"
 
+
 class RcpPktDirectorTest(unittest.TestCase):
+
     @classmethod
     def setUpClass(cls):
         setup_logging('GCP', filename="provision_rcp.log")
         cls.dispatcher = Dispatcher()
         cls.desc = GCPSlaveDescriptor(addr_master='localhost')
         cls.session = RCPSlaveSession(cls.desc, cls.dispatcher,
-                                        fake_cb, fake_cb, fake_cb)
+                                      fake_cb, fake_cb, fake_cb)
 
     @classmethod
     def tearDownClass(cls):
@@ -190,18 +192,6 @@ class RcpPktDirectorTest(unittest.TestCase):
         except AttributeError:
             faultflag = True
         self.assertTrue(faultflag)
-
-
-    def test_handle_ipv6_nty(self):
-        ipv6_msg = t_VendorSpecificExtension()
-        sub_tlv_ipv6_addr = ipv6_msg.Ipv6Address.add()
-        sub_tlv_ipv6_addr.EnetPortIndex = 0
-        sub_tlv_ipv6_addr.IpAddress = "2001:93:3:1::0"
-        sub_tlv_ipv6_addr.AddrType = 1
-        sub_tlv_ipv6_addr.PrefixLen = 128 
-        payload = ipv6_msg.SerializeToString()
-        pkt = self.pktDirector.get_ipv6_notify_packet(self.session, payload)
-        self.assertIsInstance(pkt, RCPPacket)
 
     def test_handle_ptp_nty(self):
         pkt = self.pktDirector.get_ptp_notify_packet(self.session, "ALIGNED")
@@ -288,6 +278,40 @@ class RcpPktDirectorTest(unittest.TestCase):
         data = DataObj(seq, RcpHalIpc.RPD_DATA_OPER_AW, seq.seq_number)
         self.pktDirector.get_resulting_rsp_packets(self.session, aw_req_pkt, [data, ])
 
+    def test_get_error_read_rsp(self):
+        faultflag = False
+        try:
+            req_pkt = create_test_pkt(self.pktDirector, self.session,
+                                      gcp_id=gcp_msg_def.DataStructREQ,
+                                      rcp_operation=rcp_tlv_def.RCP_OPERATION_TYPE_READ)
+            seq_num = self.session._sequence_id
+            seq = create_test_sequence(seq_num=seq_num)
+            self.pktDirector.get_resulting_rsp_packets(self.session, req_pkt, [])
+            self.assertIsNone(seq.rcp_seq_ret_code)
+        except RCPPacketBuildError:
+            faultflag = True
+        self.assertFalse(faultflag)
+
+        req_pkt = create_test_pkt(self.pktDirector, self.session,
+                                  gcp_id=gcp_msg_def.DataStructREQ,
+                                  rcp_operation=rcp_tlv_def.RCP_OPERATION_TYPE_READ)
+        seq_num = self.session._sequence_id
+        seq = create_test_sequence(seq_num=seq_num)
+
+        data = DataObj(seq, RcpHalIpc.RPD_DATA_OPER_RD, seq.seq_number)
+        data.result = DataObj.CFG_OPER_RESULT_OK
+        self.pktDirector.get_resulting_rsp_packets(self.session, req_pkt, [data, ])
+        self.assertFalse(seq.rcp_seq_ret_code)
+
+        req_pkt = create_test_pkt(self.pktDirector, self.session,
+                                  gcp_id=gcp_msg_def.DataStructREQ,
+                                  rcp_operation=rcp_tlv_def.RCP_OPERATION_TYPE_READ)
+        seq_num = self.session._sequence_id
+        seq = create_test_sequence(seq_num=seq_num)
+        data = DataObj(seq, RcpHalIpc.RPD_DATA_OPER_RD, seq.seq_number)
+        data.result = DataObj.CFG_OPER_RESULT_GENERAL_ERROR
+        self.pktDirector.get_resulting_rsp_packets(self.session, req_pkt, [data, ])
+        self.assertFalse(seq.rcp_seq_ret_code)
 
     def test_send_eds(self):
         seq = create_test_sequence()

@@ -245,9 +245,9 @@ class TestFaultEvent(unittest.TestCase):
         EventCommonOperation.store_fault_message("66070205: test message 5", operational=True)
 
         cfg = config()
-        cfg.EventNotification.RpdEvLogIndex = 3
-        cfg.EventNotification.PendingOrLocalLog = 1
-        notify_req = cfg.EventNotification
+        notify_req = cfg.EventNotification.add()
+        notify_req.RpdEvLogIndex = 3
+        notify_req.PendingOrLocalLog = 1
         if notify_req.HasField("PendingOrLocalLog"):
             if notify_req.PendingOrLocalLog:
                 local = EventCommonOperation.BUFFERED_LOCAL
@@ -276,6 +276,23 @@ class TestFaultEvent(unittest.TestCase):
             self.assertEqual("operational" not in ntf_msg, True, msg="pop whole operational event fail")
             self.assertEqual(len(ntf_msg), 0, msg="pop  initiating process event fail")
 
+    def test_send_ptp_message(self):
+        print '*' * 80
+        print 'Send PTP SYNC/LOST SYNC/HOLDOVER Message'
+        print '*' * 80
+        # below throttle
+        RpdEventConfig.GLOBAL_CONFIG['Throttle'] = rcp_tlv_def.RPD_EVENT_THROTTLE_BELOW[0]
+        self.enable_notify_send()
+
+        # generate log
+        EventCommonOperation.store_fault_message("66070700: PTP clock synchronized to Master", operational=True)
+        EventCommonOperation.store_fault_message("66070701: PTP clock lost synchronized to Master", operational=True)
+        EventCommonOperation.store_fault_message("66070702: PTP clock ecxessive holdover to Master", operational=True)
+        dispatcher = Dispatcher()
+        dispatcher.timer_register(RpdEventConfig.GLOBAL_CONFIG["Interval"], self.schedule_fault_msg_operational,
+                                  arg=dispatcher)
+        dispatcher.loop()
+
     def test_move_all_event_to_nonoperational(self):
         print '*' * 80
         print 'test operational event log pop'
@@ -294,6 +311,37 @@ class TestFaultEvent(unittest.TestCase):
         self.assertEqual(len(ntf_msg), 4)
         ret = RpdEventOrderedBuffer.pop_operational_event(ntf_msg)
         self.assertIsNone(ret)
+
+    def test_send_self_diagnostic_message(self):
+        print '*' * 80
+        print 'Send Self Diagnostic Message'
+        print '*' * 80
+        # below throttle
+        RpdEventConfig.GLOBAL_CONFIG['Throttle'] = rcp_tlv_def.RPD_EVENT_THROTTLE_BELOW[0]
+        self.enable_notify_send()
+
+        # generate log
+        EventCommonOperation.store_fault_message("66070218: Diagnostic Self Test Failure", operational=True)
+        dispatcher = Dispatcher()
+        dispatcher.timer_register(RpdEventConfig.GLOBAL_CONFIG["Interval"], self.schedule_fault_msg_operational,
+                                  arg=dispatcher)
+        dispatcher.loop()
+
+    def test_send_local_craft_port_open_message(self):
+        print '*' * 80
+        print 'Send Enclosure Door Open Message'
+        print '*' * 80
+        # below throttle
+        RpdEventConfig.GLOBAL_CONFIG['Throttle'] = rcp_tlv_def.RPD_EVENT_THROTTLE_BELOW[0]
+        self.enable_notify_send()
+
+        # generate log
+        EventCommonOperation.store_fault_message("66070504: Enclosure Door Open", operational=True)
+        dispatcher = Dispatcher()
+        dispatcher.timer_register(RpdEventConfig.GLOBAL_CONFIG["Interval"], self.schedule_fault_msg_operational,
+                                  arg=dispatcher)
+        dispatcher.loop()
+
 
 if __name__ == "__main__":
     unittest.main()

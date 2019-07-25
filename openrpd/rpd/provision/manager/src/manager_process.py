@@ -38,11 +38,12 @@ from rpd.provision.process_agent.agent.agent import ProcessAgent
 from rpd.provision.transport.transport import Transport
 from rpd.provision.manager.src.manager_ccap_core import CCAPCore, CoreDescription
 from rpd.common.utils import SysTools, Convert
-from rpd.provision.manager.src.manager_fsm import ManagerFsm
-from rpd.provision.manager.src.manager_fsm import CCAPFsm
+from rpd.provision.manager.src.dhcpinfoDb import DhcpInfoRecord
+from rpd.provision.manager.src.manager_fsm import ManagerFsm, CCAPFsm
+from rpd.provision.manager.src.manager_hal import ProvMgrHalDriver
 from fysom import FysomError
 from rpd.common import rpd_event_def
-from rpd.common.rpd_event_def import RPD_EVENT_CONNECTIVITY_SYS_REBOOT, RPD_EVENT_CONNECTIVITY_REBOOT
+from rpd.common.rpd_event_def import RPD_EVENT_CONNECTIVITY_REBOOT
 from rpd.statistics.manager_provision_stat import ManagerProvisionStateMachineRecord
 
 
@@ -55,7 +56,8 @@ class CCAPCoreOrchestrator(object):
 
     __metaclass__ = AddLoggerToClass
 
-    __ORCHESTRATION_TIME = 20
+    __ORCHESTRATION_TIME = 60
+    # this timer is used as hold time before retry after all list candidate cores are failed
     NO_PRINCIPAL_CORE_FOUND_TIMEOUT = 60
 
     def __init__(self, mgr, fsm, dispatcher, candidate, parameters):
@@ -86,6 +88,7 @@ class CCAPCoreOrchestrator(object):
         """start orchestrator"""
         if self.orchestrator_timer:
             self.dispatcher.timer_unregister(self.orchestrator_timer)
+            self.orchestrator_timer = None
         self.orchestrator_timer = self.dispatcher.timer_register(self.__ORCHESTRATION_TIME,
                                                                  self.orchestrator_cb)
 
@@ -136,7 +139,8 @@ class CCAPCoreOrchestrator(object):
                 else:
                     self.logger.info("principal is none, but seek timer is not none")
             else:
-                self.logger.info("principal is not none: %s, retry", self.mgr.principal_core.ccap_core_network_address)
+                self.logger.info("principal core(" + str(self.mgr.principal_core) +
+                                 ") is set, try to orchestrate other cores")
                 # give failure core more chances
                 self.failed_list = []
             return
@@ -168,7 +172,8 @@ class CCAPCoreOrchestrator(object):
                                                                initiated_by=initiated,
                                                                interface=interface,
                                                                network_address=core_ip,
-                                                               added_by=ManagerProcess.CORE_INITIAL_TRIGGER[trigger])
+                                                               added_by=ManagerProcess.CORE_INITIAL_TRIGGER[trigger],
+                                                               test_flag=self.mgr.test_flag)
                     if None is not ccap_core:
                         create_flag = True
                         self.logger.info("Candidate core[%s, %s] created successfully.",
@@ -184,6 +189,7 @@ class CCAPCoreOrchestrator(object):
             if create_flag:
                 break
 
+    # TODO restructrue of this function make it readable
     def sync_delete_ccap_core(self):
         """sync delete ccap core to fail list,
         and remove the core has been deleted from candidate."""
@@ -236,7 +242,7 @@ class CCAPCoreOrchestrator(object):
                 if ccap_core.is_principal == CoreDescription.CORE_ROLE_NONE:
                     return
                 if ccap_core.is_principal == CoreDescription.CORE_ROLE_PRINCIPAL and \
-                                ccap_core.is_active == CoreDescription.CORE_MODE_ACTIVE:
+                        ccap_core.is_active == CoreDescription.CORE_MODE_ACTIVE:
                     principal_found = True
                 else:
                     ccap_core.del_ccap_core()
@@ -280,7 +286,7 @@ class CCAPCoreOrchestrator(object):
             self.seek_principal_core()
 
         elif self.fsm.is_operational():
-            self.logger.debug("System is in operational status")
+            self.logger.debug("System has principal core")
             # check CCAP core enter operational or not
             for interface, core_ip, ccap_core_id in self.active_list:
                 if ccap_core_id not in CCAPCore.ccap_core_db:
@@ -360,7 +366,6 @@ class ManagerProcess(object):
         MGR_TO_RCP_ACTION_LIGHT_LED: 'light_led',
         MGR_TO_RCP_ACTION_SET_ACTIVE_PRINCIPAL: 'set_active_principal',
     }
-
 
     OPERATION_ADD = 0
     OPERATION_DELETE = 1
@@ -449,15 +454,15 @@ class ManagerProcess(object):
                 "Handler": self._fsm_provision_interface_fail,
             },
             {
-                "Type": "event",
-                "Name": ManagerFsm.EVENT_OPERATIONAL_OK,
+                "Type": "state",
+                "Name": ManagerFsm.STATE_OPERATIONAL,
                 "TrackPoint": "on",
                 "Handler": self._fsm_provision_core_status_operational_ok,
             },
             {
-                "Type": "event",
-                "Name": ManagerFsm.EVENT_OPERATIONAL_FAIL,
-                "TrackPoint": "on",
+                "Type": "state",
+                "Name": ManagerFsm.STATE_OPERATIONAL,
+                "TrackPoint": "leave",
                 "Handler": self._fsm_provision_core_status_operational_fail,
             },
             {
@@ -496,6 +501,12 @@ class ManagerProcess(object):
                 "TrackPoint": ("on",),
                 "Handler": self._fsm_state_change,
             },
+            {
+                "Type": "state",
+                "Name": ManagerFsm.STATE_PRINCIPAL_FOUND,
+                "TrackPoint": ("on", "reenter"),
+                "Handler": self._fsm_provision_principal_core_found,
+            },
         ]
         self.fsm = ManagerFsm(callbacks=callbacks)
 
@@ -513,12 +524,18 @@ class ManagerProcess(object):
         # the global parameter settings
         self.dhcp_parameter = {}
         self.tod_parameter = ''
+        self.timeserver = ''
+        self.timeoffset = ''
+        self.createdTime = ''
+        self.logserver = ''
+        self.tod_status = ''
 
         self.interface_list = list()
 
         self.simulator_flag = simulator
 
         self.principal_core = None
+        self.startup_core = None
 
         self.principal_core_seek_timer = None
 
@@ -534,7 +551,20 @@ class ManagerProcess(object):
                                                       self.interface_core_map, self.dhcp_parameter)
         self.tod_retry = 0
 
+        self.mgr_hal = None
+        self.test_flag = test_flag
+
         if not test_flag:
+            # process the manager HAL
+            self.mgr_hal = ProvMgrHalDriver(drvName="ProvMgr_HAL_CLIENT",
+                                            drvDesc="This is provision manager hal driver",
+                                            drvVer="1.0.0",
+                                            supportedMsgType=ProvMgrHalDriver.cfgmsg_list,
+                                            supportedNotificationMsgs=ProvMgrHalDriver.ntfmsg_list,
+                                            interestedNotification=ProvMgrHalDriver.ntfmsg_list,
+                                            dispatcher=self.dispatcher,
+                                            mgr=self
+                                            )
             # register to events
             for agent_id in ProcessAgent.AgentName:
                 if not self._register_mgr_to_agent(agent_id):
@@ -543,7 +573,7 @@ class ManagerProcess(object):
             # start a timer to check the agent status, alive or dead
             self.dispatcher.timer_register(self.KA_TIMEOUT, self.check_ka_status,
                                            timer_type=DpTimerManager.TIMER_REPEATED)
-            self.fsm.Startup()
+        self.fsm.Startup()
 
     @classmethod
     def is_system_time_confirmed(cls):
@@ -632,7 +662,7 @@ class ManagerProcess(object):
                 "apiSock": api,
                 "sendSock": event_send_sock,
                 "recvSock": event_recv_sock,
-                "ka_stat": 3, # 3 retries
+                "ka_stat": 3,  # 3 retries
             }
             # wait and check the register status
             handled = False
@@ -822,6 +852,7 @@ class ManagerProcess(object):
                                                                                 timeout_cb)
             else:
                 self.dispatcher.timer_unregister(self.principal_core_seek_timer)
+                self.principal_core_seek_timer = None
                 self.principal_core_seek_timer = self.dispatcher.timer_register(self.SEEK_PRINCIPAL_CORE_TIMEOUT,
                                                                                 timeout_cb)
 
@@ -848,7 +879,7 @@ class ManagerProcess(object):
                 self.principal_core_seek_timer = None
             self.core_orchestrator.orchestrator()
         elif self.SYSTEM_TIME_CONFIRM == t_TpcMessage.FIRST_ATTEMPT_FAILED or \
-                        self.SYSTEM_TIME_CONFIRM == t_TpcMessage.INITIATED:
+                self.SYSTEM_TIME_CONFIRM == t_TpcMessage.INITIATED:
             # restart timer when tod agent still retrying
             self.start_principal_core_seek_timer(self._principal_core_seek_failure_before_tod)
         else:
@@ -861,9 +892,8 @@ class ManagerProcess(object):
         interface_up = list()
         stats = net_if_stats()
         for interface in stats.keys():
-            stat = stats[interface]
             if interface != 'lo':
-                if stat.isup:
+                if SysTools.is_if_oper_up(interface):
                     interface_up.append(interface)
         reason = "Current system up interface:{}, Cannot get any valid interfaces, reboot system".format(interface_up)
         self.notify.error(rpd_event_def.RPD_EVENT_PROVISION_NO_INTERFACE_UP[0], "")
@@ -871,6 +901,8 @@ class ManagerProcess(object):
 
     def start(self):
         """Process the manager register, timer register."""
+        if not self.test_flag:
+            self.mgr_hal.start()
         self.dispatcher.loop()
 
     def _handle_rcp_request_msg(self, action, msg):
@@ -906,7 +938,7 @@ class ManagerProcess(object):
                         ret_value += ccap_core.ccap_core_network_address
                     else:
                         ret_value += 'fail, active principal core[%s, %s]' % (ccap_core.ccap_core_network_address,
-                                                                               ccap_core.fsm.current)
+                                                                              ccap_core.fsm.current)
                     break
             else:
                 rcp_rsp.action.ccap_core_id = 'None'
@@ -928,8 +960,7 @@ class ManagerProcess(object):
                 ProcessAgent.AGENTTYPE_GCP, str(e))
 
     def _mgr_to_rcp_operational(self, ccap_core_id, action, info):
-        """Light the led when node online.
-
+        """
         :param ccap_core_id: the CCAP core's id
         :param action: operation send to rcp
         :param info: information to carry
@@ -981,7 +1012,7 @@ class ManagerProcess(object):
                     # fixme do we need any action?
                     # we need to check cores ints
                 elif interface in up_interface_lists and interface_dict['status'] == self.INTERFACE_UP:
-                        up_interface_lists.remove(interface)
+                    up_interface_lists.remove(interface)
 
             for interface in up_interface_lists:
                 self.interface_list.append(
@@ -1165,6 +1196,7 @@ class ManagerProcess(object):
         #    TimeServers ...
         #    LogServers
         #    TimeOffset
+        #    CreatedTime
         #    Interface
         #    initiated_by: core_xxxx
         # }
@@ -1184,17 +1216,28 @@ class ManagerProcess(object):
                                              ccap_core.ccap_core_network_address)
                             ccap_core.del_ccap_core()
                             if CCAPCore.is_empty():
-                                self.fsm.CORE_FAIL(interface=interface,msg='No core list received from DHCP.')
+                                self.fsm.CORE_FAIL(interface=interface, msg='No core list received from DHCP.')
                     return
-                dhcp_parameter['CCAPCores'] = dhcp_parameter['CCAPCores'][:self.DHCP_LIST_LIMIT]
+                dhcp_parameter['CCAPCores'] = \
+                    dhcp_parameter['CCAPCores'][:self.DHCP_LIST_LIMIT]
+                dhcprec = DhcpInfoRecord()
+                dhcprec.updateDhcpInfoKey(interface)
                 if interface not in self.dhcp_parameter:
                     # touch the interface firstly
-                    self.dhcp_parameter[interface] = dhcp_parameter
+                    self.dhcp_parameter[interface] = \
+                        dhcp_parameter
+                    dhcprec.updateDhcpInfoRecordData(
+                        CreatedTime=dhcp_parameter['CreatedTime'])
+                    dhcprec.write()
+                    time = dhcprec.getDhcpInfoCreatedTime()
                 else:
                     if self.is_dhcp_para_renewed(interface, dhcp_parameter):
                         self.notify.info(rpd_event_def.RPD_EVENT_DHCP_RENEW_PARA_MODIFIED[0],
                                          "{}".format(dhcp_parameter), "")
                         self.dhcp_parameter[interface] = dhcp_parameter
+                        dhcprec.updateDhcpInfoRecordData(
+                            CreatedTime=dhcp_parameter['CreatedTime'])
+                        dhcprec.write()
                         self.update_core_dhcp_parameter(interface, dhcp_parameter)
                     else:
                         return
@@ -1211,6 +1254,13 @@ class ManagerProcess(object):
                     para.parameter = ';'.join(self.dhcp_parameter[interface]['TimeServers'])
                     para.parameter += '/' + str(self.dhcp_parameter[interface]['TimeOffset'])
                     para.parameter += '|' + ';'.join(self.dhcp_parameter[interface]['LogServers'])
+                    self.timeoffset = \
+                        str(self.dhcp_parameter[interface]['TimeOffset'])
+                    self.createdtime = \
+                        str(self.dhcp_parameter[interface]['CreatedTime'])
+                    self.logserver = \
+                        ';'.join(self.dhcp_parameter[interface]['LogServers'])
+                    self.tod_parameter = para.parameter + '!' + self.tod_status
                     core_para.append(para)
                     initiated_core.update_ccap_core_parameter(core_para)
             else:
@@ -1263,35 +1313,23 @@ class ManagerProcess(object):
         data, timestamp = msg.data.split("/")
         timestamp, valid_timeserver = timestamp.split("|")
         self.logger.info("Manager receive the status(%s) from TOD", data)
-        self.tod_parameter = valid_timeserver
-        for interface in self.dhcp_parameter:
-            self.tod_parameter += '/' + str(self.dhcp_parameter[interface]['TimeOffset'])
-            self.tod_parameter += '|' + ';'.join(self.dhcp_parameter[interface]['LogServers'])
+        self.timeserver = valid_timeserver
         if data == 'success':
+            self.tod_status = 'True'
             self.notify.info(rpd_event_def.RPD_EVENT_PROVISION_TOD_DONE[0], "")
             self.set_time(int(timestamp), step=t_TpcMessage.SUCCESS)
-            self.tod_parameter += '!' + 'True'
-
-            for interface in self.dhcp_parameter:
-                if 'initiated_by' in self.dhcp_parameter[interface]:
-                    initiated_core_id = self.dhcp_parameter[interface]['initiated_by']
-                    if None is not initiated_core_id and initiated_core_id in CCAPCore.ccap_core_db:
-                        initiated_core = CCAPCore.ccap_core_db[initiated_core_id]
-                        initiated_core.del_ccap_core()
 
             # to check system is operational or not when system time established
             if None is self.operational_timer:
                 self.operational_timer = self.dispatcher.timer_register(self.RPD_OPERATIONAL_TIMEOUT,
                                                                         self._system_operational_timeout)
-            if None is not self.principal_core_seek_timer:
+            if self.principal_core_seek_timer:
                 self.dispatcher.timer_unregister(self.principal_core_seek_timer)
                 self.principal_core_seek_timer = None
             self.core_orchestrator.orchestrator_cb(None)
         elif data == "tod_first_failed":
-            self.tod_parameter += '!' + ''
             self.set_time(int(timestamp), step=t_TpcMessage.FIRST_ATTEMPT_FAILED)
         elif data == 'tod_failed':
-            self.tod_parameter += '!' + ''
             if self.tod_retry >= self.TOD_RETRY_CNT:
                 self.fsm.Error(msg="Tod Fail")
             else:
@@ -1308,6 +1346,8 @@ class ManagerProcess(object):
         else:
             self.logger.warn(
                 "Manager receive the unknown status(%s) from TOD agent", data)
+        self.tod_parameter = self.timeserver + '/' + self.timeoffset + '|' + \
+            self.logserver + '!' + self.tod_status
 
     def _handle_mgr_ipsec_event(self, msg):
         pass
@@ -1335,12 +1375,14 @@ class ManagerProcess(object):
                     if ccap_core.interface and ccap_core.interface == local_interface and \
                        ccap_core.ccap_core_network_address and \
                         Convert.is_ip_address_equal(ccap_core.ccap_core_network_address, core_ip) and \
-                        self.principal_core is ccap_core:
-                        # light led for node exit operational
-                        self._mgr_to_rcp_operational(self.principal_core.ccap_core_id,
-                                                     self.MGR_TO_RCP_ACTION_LIGHT_LED, False)
+                            self.principal_core is ccap_core:
+                        # set the node to non-operational status
+                        try:
+                            self.mgr_hal.sendOperationalStatusNtf(operational=False)
+                        except Exception as e:
+                            self.logger.warn("Exception happened when send operational status to Hal: %s", str(e))
                         ccap_core.del_ccap_core()
-                        SysTools.notify.info(RPD_EVENT_CONNECTIVITY_REBOOT[0], info, "by " + "GDM" , "")
+                        SysTools.notify.info(RPD_EVENT_CONNECTIVITY_REBOOT[0], info, "by " + "GDM", "")
                         self.dispatcher.timer_register(
                             self.WAITING_PERIOD, SysTools.external_reboot, arg=(info, "GDM"))
                         break
@@ -1375,31 +1417,13 @@ class ManagerProcess(object):
                         # delete the core when no principal core found
                         if None is self.principal_core and not ast.literal_eval(reconnect):
                             ccap_core.del_ccap_core()
-            elif action == 'gcp_flapping':
-                local_interface, core_ip = parameter.split(';')
-                recovering = data[2]
-                if local_interface == '' or core_ip == '':
-                    self.logger.warn(
-                        'GCP connect timeout: interface[%s] or core address[%s] was wrong',
-                        local_interface, core_ip)
-                    return
-                for ccap_core in CCAPCore.ccap_core_db.values():
-                    if ccap_core.interface and ccap_core.interface == local_interface and \
-                            ccap_core.ccap_core_network_address and \
-                            Convert.is_ip_address_equal(ccap_core.ccap_core_network_address, core_ip):
-                        if recovering == "recovering":
-                            if self.principal_core is ccap_core and self.fsm.is_operational():
-                                self.fsm.OPERATIONAL_FAIL()
-                        else:
-                            # kick core stop from ptp, then start it
-                            ccap_core.fsm.TRIGGER_PTP1588_FAIL()
-                            ccap_core.kick_agent(ProcessAgent.AGENTTYPE_PTP)
             elif action == "role":
                 parameter = json.loads(parameter)
                 ccap_core_network_address = parameter['ccap_core']
                 is_principal = parameter['is_principal']
                 is_active = parameter['is_active']
                 interface = parameter['interface']
+                index = parameter['index']
 
                 for ccap_core in CCAPCore.ccap_core_db.values():
                     self.logger.debug("%s", ccap_core)
@@ -1430,11 +1454,13 @@ class ManagerProcess(object):
                             if ccap_core is self.principal_core:
                                 self.principal_core = None
                                 self.logger.info("set principal core to None by mode change to standby")
+                        ccap_core.index = index
 
-                        self.logger.info("Core(%s, %s, %s, %s) role identified",
+                        self.logger.info("Core(%s, %s, %s, %s, %d) role identified",
                                          interface, ccap_core_network_address,
                                          CoreDescription.role_str(ccap_core.is_principal),
-                                         CoreDescription.mode_str(ccap_core.is_active))
+                                         CoreDescription.mode_str(ccap_core.is_active),
+                                         ccap_core.index)
                         if ccap_core.is_principal == CoreDescription.CORE_ROLE_PRINCIPAL and \
                                 ccap_core.is_active == CoreDescription.CORE_MODE_ACTIVE:
                             if self.principal_core is None:
@@ -1446,17 +1472,13 @@ class ManagerProcess(object):
                                 self.logger.info("set principal core to %s by role change", active_principal)
 
                             elif self.principal_core != ccap_core:
-                                self.notify.warn(rpd_event_def.RPD_EVENT_CONNECTIVITY_MUL_ACTIVE_PRINCIPAL[0], rpd_event_def.RpdEventTag.ccap_ip(ccap_core.ccap_core_network_address))
+                                self.notify.warn(
+                                    rpd_event_def.RPD_EVENT_CONNECTIVITY_MUL_ACTIVE_PRINCIPAL[0],
+                                    rpd_event_def.RpdEventTag.ccap_ip(ccap_core.ccap_core_network_address))
                                 ccap_core.del_ccap_core()
                         else:
-                            if self.fsm.is_recovering():
-                                self.logger.info("System is recovering...")
-                                if self.principal_core is None:
-                                    self.fsm.Error(msg="Principal Core(%s, %s) role changed to "
-                                                   "%s, %s during system recovering " %
-                                                       (ccap_core.interface, ccap_core.ccap_core_network_address,
-                                                        CoreDescription.role_str(ccap_core.is_principal),
-                                                        CoreDescription.mode_str(ccap_core.is_active)))
+                            if self.fsm.is_principal_found():
+                                self.logger.info("System is in principal found state...")
                             elif not self.fsm.is_operational():
                                 self.logger.info(
                                     "Deleting core (%s, %s)...",
@@ -1470,6 +1492,7 @@ class ManagerProcess(object):
                             else:
                                 pass
                         # to accelerate the process time
+                        self._principal_updated()
                         self.core_orchestrator.orchestrator_cb(None)
                         return
                 self.logger.warn(
@@ -1504,6 +1527,7 @@ class ManagerProcess(object):
                         continue
                     self.add_ip_to_core_map(local_interface, (core, CoreDescription.CORE_MODE_NONE,
                                                               self.GCP_REDIRECT_CORE_TRIGGER))
+                self.core_orchestrator.orchestrator_cb(None)
             elif action == 'Ha':
                 parameter = json.loads(parameter)
                 active_core = parameter['ActiveCoreIpAddress']
@@ -1562,6 +1586,8 @@ class ManagerProcess(object):
                     if not standby_flag:
                         self.add_ip_to_core_map(interface, (standby_core, CoreDescription.CORE_MODE_STANDBY,
                                                             self.HA_CORE_TRIGGER))
+                    # there maybe some new ip added, trigger the orchestrator here
+                    self.core_orchestrator.orchestrator_cb(None)
                 elif op == self.OPERATION_DELETE:
                     # delete operation only valid for standby core
                     for ccap_core in CCAPCore.ccap_core_db.values():
@@ -1651,9 +1677,7 @@ class ManagerProcess(object):
                                                  " " + standby_core_p.ccap_core_network_address)
 
                             # move recovering state to operation if the principal active core is online
-                            if self.principal_core.fsm.current in CCAPFsm.STATE_ALL_OPERATIONAL and \
-                                    not self.fsm.is_operational():
-                                self.fsm.OPERATIONAL_OK()
+                            self._principal_updated()
                             active_principal = standby_core_p.interface + ";" + standby_core_p.ccap_core_network_address
                             self._mgr_to_rcp_operational(standby_core_p.ccap_core_id,
                                                          self.MGR_TO_RCP_ACTION_SET_ACTIVE_PRINCIPAL,
@@ -1666,8 +1690,6 @@ class ManagerProcess(object):
 
                     # to delete active core
                     active_core_p.del_ccap_core()
-                    if self.is_ip_in_core_map(interface, active_core):
-                        self.remove_ip_in_core_map(interface, active_core)
 
             elif action == 'get_active_principal':
                 self._handle_rcp_request_msg(action, parameter)
@@ -1704,7 +1726,8 @@ class ManagerProcess(object):
                             if ccap_core.is_principal == CoreDescription.CORE_ROLE_PRINCIPAL and \
                                ccap_core.is_active == CoreDescription.CORE_MODE_ACTIVE:
                                 self.principal_core = None
-                                self.logger.info("set principal core to None by delete")
+                                self._principal_updated()
+                                self.logger.info("set principal core to None by config_table delete")
 
                             ccap_core.del_ccap_core()
                             if self.is_ip_in_core_map(interface, ccap_core_network_address):
@@ -1738,12 +1761,12 @@ class ManagerProcess(object):
     def _fsm_provision_user_mgmt(self, event):
         self.logger.info(
             "%s Entering state %s from state %s, triggered by event:%s." % (self.mgr_id, event.fsm.current,
-                                                                         event.src, event.event))
+                                                                            event.src, event.event))
 
     def _fsm_provision_gcp_mgmt(self, event):
         self.logger.info(
             "%s Entering state %s from state %s, triggered by event:%s." % (self.mgr_id, event.fsm.current,
-                                                                         event.src, event.event))
+                                                                            event.src, event.event))
 
     def create_original_core(self, interface):
         """create a new core on this interface."""
@@ -1758,7 +1781,7 @@ class ManagerProcess(object):
         core, reason = CCAPCore.add_ccap_core(
             self, para_set,
             initiated_by=self.CORE_INITIAL_TRIGGER[self.STARTUP_CORE_TRIGGER],
-            interface=interface)
+            interface=interface, test_flag=self.test_flag)
 
         if not core:
             self.logger.error(
@@ -1775,14 +1798,14 @@ class ManagerProcess(object):
     def _fsm_provision_interface_scan(self, event):
         self.logger.info(
             "%s Entering state %s from state %s, triggered by event:%s." % (self.mgr_id, event.fsm.current,
-                                                                         event.src, event.event))
+                                                                            event.src, event.event))
         # get the interface from event args, passed from the interface_event_notification
         self.create_original_core(event.interface)
 
     def _fsm_provision_dhcp(self, event):
         self.logger.info(
             "%s Entering state %s from state %s, triggered by event:%s." % (self.mgr_id, event.fsm.current,
-                                                                         event.src, event.event))
+                                                                            event.src, event.event))
 
     def _fsm_provision_state_retry(self, event):
         """No principal core found, try again."""
@@ -1791,7 +1814,7 @@ class ManagerProcess(object):
 
         self.logger.info(
             "%s Entering state %s from state %s, triggered by event:%s" % (self.mgr_id, event.fsm.current,
-                                                                        event.src, event.event))
+                                                                           event.src, event.event))
         if event.src == event.fsm.current:
             self.logger.debug("Reenter this state, ignore it")
             return
@@ -1809,14 +1832,15 @@ class ManagerProcess(object):
         # del all the cores in interface core map
         self.logger.info("Delete all the cores, reason: %s.", event.msg)
         for core in CCAPCore.ccap_core_db.values():
-            self.logger.info(
-                "Deleting core (%s, %s)...",
-                core.interface, core.ccap_core_network_address)
-            core.del_ccap_core()
+            if isinstance(core.fsm, CCAPFsm):
+                self.logger.info(
+                    "Deleting core (%s, %s)...",
+                    core.interface, core.ccap_core_network_address)
+                core.del_ccap_core()
 
         self.core_orchestrator.clear_list()
         if self.is_system_time_confirmed():
-            self.core_orchestrator.orchestrator()
+            self.core_orchestrator.orchestrator_cb(None)
         else:
             for interface_dict in self.interface_list:
                 interface = interface_dict['interface']
@@ -1824,6 +1848,14 @@ class ManagerProcess(object):
                     self.create_original_core(interface)
 
             self.start_principal_core_seek_timer(self._principal_core_seek_failure_before_tod)
+
+    def _fsm_provision_principal_core_found(self, event):
+        self.logger.info(
+            "%s Entering state %s from state %s, triggered by event:%s." % (self.mgr_id, event.fsm.current,
+                                                                            event.src, event.event))
+        if self.principal_core_seek_timer:
+            self.dispatcher.timer_unregister(self.principal_core_seek_timer)
+            self.principal_core_seek_timer = None
 
     def _fsm_provision_core_status_operational_ok(self, event):
         """Triggered by OPERATIONAL_OK.
@@ -1834,7 +1866,7 @@ class ManagerProcess(object):
         """
         self.logger.info(
             "%s Entering state %s from state %s, triggered by event:%s." % (self.mgr_id, event.fsm.current,
-                                                                         event.src, event.event))
+                                                                            event.src, event.event))
         if event.src == event.fsm.current:
             self.logger.debug("Reenter this state, ignore it")
             return
@@ -1846,15 +1878,18 @@ class ManagerProcess(object):
 
         self.notify.info(rpd_event_def.RPD_EVENT_PROVISION_ENTER_OPERATIONAL[0], '')
 
-        if None is not self.operational_timer:
+        if self.operational_timer:
             self.dispatcher.timer_unregister(self.operational_timer)
+            self.operational_timer = None
 
         for core in CCAPCore.ccap_core_db.values():
             if core is self.principal_core:
-                # light led for node is operational
-                self._mgr_to_rcp_operational(
-                    core.ccap_core_id, self.MGR_TO_RCP_ACTION_LIGHT_LED, True)
+                try:
+                    self.mgr_hal.sendOperationalStatusNtf(operational=True)
+                except Exception as e:
+                    self.logger.warn("Exception happened when send operational status to Hal: %s", str(e))
                 break
+        self.core_orchestrator.orchestrator_cb(None)
 
     def _fsm_provision_core_status_operational_fail(self, event):
         """Triggered by OPERATIONAL_FAIL.
@@ -1865,17 +1900,19 @@ class ManagerProcess(object):
         """
         self.logger.info(
             "%s Entering state %s from state %s, triggered by event:%s." % (self.mgr_id, event.fsm.current,
-                                                                         event.src, event.event))
+                                                                            event.src, event.event))
 
         self.notify.error(rpd_event_def.RPD_EVENT_PROVISION_EXIT_OPERATIONAL[0], '')
 
-        # light led for node exit operational
-        self._mgr_to_rcp_operational(self.principal_core.ccap_core_id, self.MGR_TO_RCP_ACTION_LIGHT_LED, False)
+        try:
+            self.mgr_hal.sendOperationalStatusNtf(operational=False)
+        except Exception as e:
+            self.logger.warn("Exception happened when send operational status to Hal: %s", str(e))
 
     def _fsm_provision_core_fail(self, event):
         self.logger.info(
             "%s Entering state %s from state %s, triggered by event:%s." % (self.mgr_id, event.fsm.current,
-                                                                         event.src, event.event))
+                                                                            event.src, event.event))
         self.logger.info("Event message: %s", event.msg)
 
         if self.fsm.current == self.fsm.STATE_INTERFACE_PROVISION:
@@ -1884,7 +1921,15 @@ class ManagerProcess(object):
         try:
             if not self.is_system_time_confirmed():
                 self.fsm.Error(msg='Tod Fail')
+                return
+
+            # for startup core, the core_ip is None
+            if not event.core_ip:
+                self.fsm.Error(msg=event.msg)
+                return
+
             if None is self.principal_core:
+                self.core_orchestrator.orchestrator_cb(None)
                 return
             elif not self.fsm.is_operational():
                 return
@@ -1900,18 +1945,23 @@ class ManagerProcess(object):
     def _fsm_provision_state_fail(self, event):
         self.logger.info(
             "%s Entering state %s from state %s, triggered by event:%s." % (self.mgr_id, event.fsm.current,
-                                                                         event.src, event.event))
+                                                                            event.src, event.event))
         self.principal_core = None
         self.logger.info("set principal core to None by provision fail")
 
         try:
             for ccap_core in CCAPCore.ccap_core_db.values():
                 ccap_core.del_ccap_core()
-            if None is not self.reboot_timer:
+            if self.reboot_timer:
                 return
-
-            # delay a few seconds then reboot
-            reboot_delay = randint(self.PC_BACKOFF_MIN, self.PC_BACKOFF_MAX)
+            if event.src in [self.fsm.STATE_PRINCIPLE_PROVISION,
+                             self.fsm.STATE_PRINCIPLE_RETRY_FIRST,
+                             self.fsm.STATE_PRINCIPLE_RETRY_SECOND,
+                             self.fsm.STATE_PRINCIPLE_RETRY_THIRD]:
+                # delay a few seconds then reboot
+                reboot_delay = randint(self.PC_BACKOFF_MIN, self.PC_BACKOFF_MAX)
+            else:
+                reboot_delay = randint(1, 10)
             self.reboot_timer = self.dispatcher.timer_register(
                 reboot_delay, SysTools.sys_failure_reboot, arg=event.msg)
             self.logger.warn(
@@ -1923,7 +1973,7 @@ class ManagerProcess(object):
     def _fsm_provision_startup_dhcp_ok(self, event):
         self.logger.info(
             "%s Entering state %s from state %s, triggered by event:%s." % (self.mgr_id, event.fsm.current,
-                                                                         event.src, event.event))
+                                                                            event.src, event.event))
         # start principal timer
         self.start_principal_core_seek_timer(
             self._principal_core_seek_failure_before_tod)
@@ -1931,7 +1981,7 @@ class ManagerProcess(object):
     def _fsm_provision_startup_core_fail(self, event):
         self.logger.info(
             "%s Entering state %s from state %s, triggered by event:%s." % (self.mgr_id, event.fsm.current,
-                                                                         event.src, event.event))
+                                                                            event.src, event.event))
         try:
             if event.interface in self.interface_candidate:
                 self.interface_candidate.remove(event.interface)
@@ -1946,17 +1996,41 @@ class ManagerProcess(object):
                     self.fsm.PROVISION_INTERFACE_FAIL(msg=event.msg)
             else:
                 self.logger.warn("%s Entering state %s from state %s, triggered by event:%s. Wrong interface: %s"
-                                 % (self.mgr_id, event.fsm.current,event.src, event.event, event.interface))
+                                 % (self.mgr_id, event.fsm.current, event.src, event.event, event.interface))
                 self.fsm.PROVISION_INTERFACE_FAIL(msg=event.msg)
         except Exception as e:
             self.logger.warn("Exception happened when process startup core fail: %s" % str(e))
             self.fsm.PROVISION_INTERFACE_FAIL(msg=event.msg)
 
+    def startup_core_exit_online(self):
+        for core in CCAPCore.ccap_core_db.values():
+            if isinstance(core.fsm, CCAPFsm):
+                core.hold_in_ipsec_state()
+                self.logger.debug("Hold %s in ipsec state for startup core exit online", str(core))
+
+    def startup_core_enter_online(self):
+        for core in CCAPCore.ccap_core_db.values():
+            if isinstance(core.fsm, CCAPFsm):
+                core.restart_hold_state()
+                self.logger.debug("Re start %s in ipsec state for startup core enter online", str(core))
 
     def _fsm_provision_interface_fail(self, event):
         self.logger.info(
             "%s Entering state %s from state %s, triggered by event:%s." % (self.mgr_id, event.fsm.current,
-                                                                         event.src, event.event))
+                                                                            event.src, event.event))
+
+    def _principal_updated(self):
+        if self.fsm.is_fail() or self.fsm.is_startup():
+            return
+        if self.principal_core:
+            self.fsm.SEEK_PRINCIPAL_OK()
+            if self.principal_core.fsm.current in CCAPFsm.STATE_ALL_OPERATIONAL:
+                self.fsm.OPERATIONAL_OK()
+            else:
+                self.fsm.OPERATIONAL_FAIL()
+        else:
+            if self.fsm.current in [ManagerFsm.STATE_OPERATIONAL, ManagerFsm.STATE_PRINCIPAL_FOUND]:
+                self.fsm.SEEK_PRINCIPAL_FAIL(msg='Principal core has been removed.')
 
     def _fsm_state_change(self, event):
         """change state callback
@@ -1970,12 +2044,15 @@ class ManagerProcess(object):
 if __name__ == "__main__":  # pragma: no cover
     import argparse
 
-    parser = argparse.ArgumentParser(description="RCP manager process")
+    parser = argparse.ArgumentParser(description="Provision manager process")
     # parse the daemon settings.
     parser.add_argument("-s", "--simulator",
                         action="store_true",
                         help="run the program with simulator mode")
+    parser.add_argument("-t", "--test_flag",
+                        action="store_true",
+                        help="run the program with test mode")
     arg = parser.parse_args()
     setup_logging("PROVISION", filename="provision_mgr_process.log")
-    starter = ManagerProcess(simulator=arg.simulator)
+    starter = ManagerProcess(simulator=arg.simulator, test_flag=arg.test_flag)
     starter.start()

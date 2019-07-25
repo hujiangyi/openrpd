@@ -22,6 +22,10 @@ from rpd.rcp.rcp_lib import rcp
 from rpd.rcp.rcp_packet_director import RCPMasterScenario
 from rpd.common.rpd_logging import AddLoggerToClass
 from rpd.rcp.rcp_lib import rcp_master
+from rpd.confdb.rpd_redis_db import RPDAllocateWriteRecord
+from rpd.gpb.CcapCoreIdentification_pb2 import t_CcapCoreIdentification
+from rpd.confdb.rpd_redis_db import RCPDB
+from rpd.common.utils import Convert
 
 
 class RCPSlaveSession(gcp_sessions.GCPSlaveSession):
@@ -42,9 +46,6 @@ class RCPSlaveSession(gcp_sessions.GCPSlaveSession):
 
     CORE_CONNECT_TIMEOUT = 5
     CORE_CONNECT_RETRY_COUNT = 3
-
-    NO_IRA_RECV_TIMEOUT = 90
-    CONNECT_RETRY_COUNT = 3
 
     RCP_STOP_SYNC = 0
     RCP_WAIT_FOR_SYNC = 1
@@ -75,8 +76,8 @@ class RCPSlaveSession(gcp_sessions.GCPSlaveSession):
         # is in the SESSION_STATE_RCP_SLAVE_INITIATED state
         self.initiated_cb = initiated_cb
         self.timeout_cb = timeout_cb
-        self.ira_retry_cnt = 0
         self.is_ira_recv = False
+        self.is_rex_recv = False
 
         # initiated may cost random time when connected to core which not exist.
         self.connecting_timer = None
@@ -84,10 +85,9 @@ class RCPSlaveSession(gcp_sessions.GCPSlaveSession):
         self.connecting_retry = 0
 
         self.initiate_retries = 0
-        self.ccap_capabilities = None
+        self.ccap_identification = None
         self.initiate_timer = None
         self.timeout_timer = None
-        self.ira_recv_timer = None
         self.keep_alive = self.RCP_STOP_SYNC
         self.reconnect_cnt = 0
 
@@ -105,16 +105,6 @@ class RCPSlaveSession(gcp_sessions.GCPSlaveSession):
     def clear_reconnect_cnt(self):
         self.logger.debug("Clear reconnect cnt")
         self.reconnect_cnt = 0
-
-    def incr_ira_retry_cnt(self):
-        self.ira_retry_cnt += 1
-
-    def get_ira_retry_cnt(self):
-        return self.ira_retry_cnt
-
-    def clear_ira_retry_cnt(self):
-        self.logger.debug("Clear ira retry cnt")
-        self.ira_retry_cnt = 0
 
     def get_next_seq_id(self):
         self._sequence_id += 1
@@ -148,19 +138,15 @@ class RCPSlaveSession(gcp_sessions.GCPSlaveSession):
             if None is not self.connecting_timer:
                 self.dispatcher.timer_unregister(self.connecting_timer)
                 self.connecting_timer = None
-            if None is not self.ira_recv_timer:
-                self.logger.debug("[IRA debug]: free the ira recv timer")
-                self.dispatcher.timer_unregister(self.ira_recv_timer)
-                self.ira_recv_timer = None
-                self.is_ira_recv = False
-                self.ira_retry_cnt = 0
+            self.is_ira_recv = False
+            self.is_rex_recv = False
 
         except Exception:
             self.logger.warning("Slave:timer already unregistered")
 
         self.keep_alive = self.RCP_STOP_SYNC
         self.initiate_retries = 0
-        self.ccap_capabilities = None
+        self.ccap_identification = None
         try:
             super(RCPSlaveSession, self).close()
         except Exception as e:
@@ -213,19 +199,19 @@ class RCPSlaveSession(gcp_sessions.GCPSlaveSession):
         return False
 
 
-class RCPMasterCapabilities(object):
+class CcapCoreIdentification(RPDAllocateWriteRecord):
 
     """Describes capabilities of the CCAP core."""
 
     __metaclass__ = AddLoggerToClass
+    MAX_INDEX = 0xF
 
-    def __init__(self, index, core_id=None, core_ip_addr=None,
-                 is_principal=True, core_name=None, vendor_id=None,
-                 is_active=True, initial_configuration_complete=True,
-                 move_to_operational=True, core_function=None,
-                 resource_set_index=None, data=None):
-        if None in (index, core_ip_addr, is_principal, is_active):
-            raise AttributeError("Some of mandatory attributes is missing!")
+    def __init__(self, index=1, core_id="NA", core_ip_addr="0.0.0.0",
+                 is_principal=True, core_name="NA", vendor_id=9,
+                 core_mode=t_CcapCoreIdentification.COREMODEACTIVE, initial_configuration_complete=False,
+                 move_to_operational=False, core_function=1,
+                 resource_set_index=2, data=None):
+        super(CcapCoreIdentification, self).__init__(self.MAX_INDEX)
 
         self.index = index
         self.core_id = core_id
@@ -233,12 +219,35 @@ class RCPMasterCapabilities(object):
         self.is_principal = is_principal
         self.core_name = core_name
         self.vendor_id = vendor_id
-        self.is_active = is_active
+        self.is_active = core_mode is t_CcapCoreIdentification.COREMODEACTIVE
         self.initial_configuration_complete = initial_configuration_complete
         self.move_to_operational = move_to_operational
         self.core_function = core_function
         self.resource_set_index = resource_set_index
+        self.core_mode = core_mode
         self.data = data
+
+    def allocateIndex(self, core_ip_addr="0.0.0.0"):
+        """
+        when allocate the index with operate allocate write type, we should search the table if
+        this ipaddress with a existing a mapping index or not.
+        if exsit, return the mapping index. Otherwise, return a new index from the pool
+        :param ip_addr:
+        :param index:
+        :return:
+        """
+        self.logger.debug("CcapCoreIdentification allocate index ip=%s ", core_ip_addr)
+        self.core_ip_addr = core_ip_addr
+        db = RCPDB()
+        for key in db.get_keys(pattern=self.poolName + ":*"):
+            self.index = key.split(':')[1]
+            self.read()
+            if self.core_ip_addr == core_ip_addr:
+                self.logger.debug("find a exist record index=%d with ip=%s",
+                                  self.index, core_ip_addr)
+                return
+        self.__init__()
+        super(CcapCoreIdentification, self).allocateIndex()
 
     def __str__(self):
         return "\n{\n  InitialConfigurationComplete: %s" \
@@ -249,8 +258,9 @@ class RCPMasterCapabilities(object):
                "\n  CoreName: %s" \
                "\n  IsPrincipal: %s" \
                "\n}" % (self.initial_configuration_complete, self.move_to_operational, self.core_function,
-               self.resource_set_index, self.core_id, self.core_name, self.is_principal)
+                        self.resource_set_index, self.core_id, self.core_name, self.is_principal)
     __repr__ = __str__
+
 
 class RCPMasterDescriptor(gcp_sessions.GCPMasterDescriptor):
     """Adds capabilities into the Master descriptor."""
@@ -273,7 +283,7 @@ class RCPMasterDescriptor(gcp_sessions.GCPMasterDescriptor):
         :raises TypeError: If some of parameters has invalid type.
 
         """
-        if not isinstance(capabilities, RCPMasterCapabilities):
+        if not isinstance(capabilities, CcapCoreIdentification):
             raise TypeError("Invalid capabilities type")
 
         if ((None is not scenario) and
@@ -380,7 +390,7 @@ class RCPMaster(gcp_sessions.GCPMaster):
                                                  scenario_steps=steps)
 
         self.logger.info("%s:: Accepted connection (%s)", self.descr,
-                 gcp_sessions.GCPSession.get_sock_string(connection))
+                         gcp_sessions.GCPSession.get_sock_string(connection))
         return connection.fileno()
 
     def close(self):

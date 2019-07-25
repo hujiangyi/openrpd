@@ -24,7 +24,6 @@ from rpd.provision.process_agent.rcp.rcp_agent import RcpOverGcp
 from rpd.provision.process_agent.dhcp.dhcp_agent import DhcpAgent
 from rpd.gpb.rcp_pb2 import t_RcpMessage
 from rpd.gpb.dhcp_pb2 import t_DhcpMessage
-from rpd.common.utils import SysTools
 
 
 @unittest.skip("skip the test temperately")
@@ -84,7 +83,7 @@ class TestProcessAgent(unittest.TestCase):
         print reg_rsp
 
     @unittest.skip("skip interface check")
-    def test_interface_status_event (self):
+    def test_interface_status_event(self):
         context = zmq.Context()
         sock1 = context.socket(zmq.PUSH)
         sock1.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_INTERFACE_STATUS]['pull'])
@@ -93,14 +92,14 @@ class TestProcessAgent(unittest.TestCase):
         sock.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_INTERFACE_STATUS]['api'])
 
         sock2 = context.socket(zmq.PULL)
-        sock2.bind("ipc:///tmp/sock4.scok")
+        sock2.bind("ipc:///tmp/sock4.sock")
 
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
         reg.id = "abcd"
         reg.action = pb2.msg_manager_register.REG
-        reg.path_info = "ipc:///tmp/sock4.scok"
+        reg.path_info = "ipc:///tmp/sock4.sock"
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()
 
@@ -151,14 +150,14 @@ class TestProcessAgent(unittest.TestCase):
         sock.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_TOD]['api'])
 
         sock2 = context.socket(zmq.PULL)
-        sock2.bind("ipc:///tmp/sock4.scok")
+        sock2.bind("ipc:///tmp/sock4.sock")
 
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
         reg.id = "abcd"
         reg.action = pb2.msg_manager_register.REG
-        # reg.path_info = "ipc:///tmp/sock4.scok"
+        # reg.path_info = "ipc:///tmp/sock4.sock"
         reg.path_info = ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_TOD]['api']
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()
@@ -231,20 +230,20 @@ class TestProcessAgent(unittest.TestCase):
         sock.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_GCP]['api'])
 
         sock2 = context.socket(zmq.PULL)
-        sock2.bind("ipc:///tmp/sock4.scok")
+        sock2.bind("ipc:///tmp/sock4.sock")
 
         rcp_sock = context.socket(zmq.PAIR)
         rcp_sock.connect(RcpOverGcp.SOCK_ADDRESS)
 
-        mgr_scok = context.socket(zmq.REP)
-        mgr_scok.bind("ipc:///tmp/rpd_provision_manager_api.sock")
+        mgr_sock = context.socket(zmq.REP)
+        mgr_sock.bind("ipc:///tmp/rpd_provision_manager_api.sock")
 
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
         reg.id = "abcd"
         reg.action = pb2.msg_manager_register.REG
-        reg.path_info = "ipc:///tmp/sock4.scok"
+        reg.path_info = "ipc:///tmp/sock4.sock"
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()
 
@@ -302,7 +301,7 @@ class TestProcessAgent(unittest.TestCase):
         rcp_msg.RedirectCCAPAddresses.extend(['1.1.1.1'])
         rcp_sock.send(rcp_msg.SerializeToString())
 
-        data = mgr_scok.recv()
+        data = mgr_sock.recv()
         red_rsp = pb2.msg_magager_api()
         red_rsp.ParseFromString(data)
         print red_rsp
@@ -325,11 +324,11 @@ class TestProcessAgent(unittest.TestCase):
             ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_DHCP]['api'])
 
         sock2 = context.socket(zmq.PULL)
-        # sock2.bind("ipc:///tmp/sock4.scok")
+        # sock2.bind("ipc:///tmp/sock4.sock")
         sock2.bind(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_DHCP]['push'])
 
-        dhcp_scok = context.socket(zmq.PUSH)
-        dhcp_scok.connect(DhcpAgent.SOCK_ADDRESS)
+        dhcp_sock = context.socket(zmq.PUSH)
+        dhcp_sock.connect(DhcpAgent.SOCK_ADDRESS)
 
         # test the successfully register
         event_request = pb2.api_request()
@@ -398,23 +397,24 @@ class TestProcessAgent(unittest.TestCase):
         dhcp_msg = t_DhcpMessage()
         dhcp_msg.InterfaceName = "eth1"
         dhcp_msg.Status = dhcp_msg.FAILED
-        # dhcp_scok.send(dhcp_msg.SerializeToString())
+        # dhcp_sock.send(dhcp_msg.SerializeToString())
 
         # send dhcp success message
         dhcp_msg.Status = dhcp_msg.UPDATED
         dhcp_data = dhcp_msg.DHCPData
-        dhcp_data.TimeServers.extend([hostip,'1.1.1.1'])
-        dhcp_data.LogServers.extend([hostip,'1.1.1.1'])
-        dhcp_data.CCAPCores.extend([hostip,])
+        dhcp_data.TimeServers.extend([hostip, '1.1.1.1'])
+        dhcp_data.LogServers.extend([hostip, '1.1.1.1'])
+        dhcp_data.CCAPCores.extend([hostip, ])
         dhcp_data.TimeOffset = 0
 
-        # dhcp_scok.send(dhcp_msg.SerializeToString())
+        # dhcp_sock.send(dhcp_msg.SerializeToString())
 
         while True:
             data = sock2.recv()
             rsp = pb2.msg_event_notification()
             rsp.ParseFromString(data)
             print rsp
+
 
 if __name__ == '__main__':
     unittest.main()

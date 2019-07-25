@@ -29,7 +29,9 @@ class L2tpv3DispatcherError(Exception):
     ParameterTypeError = "Input parameter error"
     ParameterIsNone = "parameter is None"
 
+
 class L2tpv3DispatcherStats(object):
+
     def __init__(self):
         self.exception = 0
         self.error = 0
@@ -43,6 +45,7 @@ class L2tpv3DispatcherStats(object):
         self.pkt_error = 0
         self.zmq_error = 0
         self.unexpected_else = 0
+
 
 class L2tpv3Dispatcher(object):
     """This is the program entry point and the main loop.
@@ -67,7 +70,7 @@ class L2tpv3Dispatcher(object):
         self.zmqMapping = dict()
         self.unregisterRequest = list()
         self.stats = L2tpv3DispatcherStats()
-        self.remoteAddrList=[]
+        self.remoteAddrList = []
 
         # Create a global network here
         if create_global_listen:
@@ -192,7 +195,7 @@ class L2tpv3Dispatcher(object):
                          (net_socket.addr, net_socket.connID))
 
         self.dispatcher.fd_register(
-            net_socket.fileno(), zmq.POLLIN|zmq.POLLERR, self._l2tp_event_entry_point)
+            net_socket.fileno(), zmq.POLLIN | zmq.POLLERR, self._l2tp_event_entry_point)
 
         self.socketMapping[net_socket.fileno()] = net_socket
         self.transportMapping[
@@ -362,7 +365,7 @@ class L2tpv3Dispatcher(object):
                         if not ok:
                             self.logger.warn(
                                 "Cannot find the remote connection ID, skip this packet")
-                            self.stats.pkt_error +=1
+                            self.stats.pkt_error += 1
                             return
                         if pkt.ns != 0:
                             self.logger.warn(
@@ -386,7 +389,7 @@ class L2tpv3Dispatcher(object):
                             if not recoverConn.failoverCapofCC:
                                 self.logger.warn(
                                     "Recover connection doesn't have failover capability, will not create recovery tunnel"
-                                    )
+                                )
                                 return
 
                             if recoverConn.isInRecovery:
@@ -395,7 +398,7 @@ class L2tpv3Dispatcher(object):
                                 return
                             recoverConn.isInRecovery = True
                         else:
-                            #stop old connection if a new connection for the same remote address
+                            # stop old connection if a new connection for the same remote address
                             for k in L2tpv3Connection.L2tpConnection.ConnectionDb:
                                 connection = L2tpv3Connection.L2tpConnection.ConnectionDb[k]
                                 """
@@ -413,7 +416,7 @@ class L2tpv3Dispatcher(object):
                                         self.logger.info(
                                             "L2tp already got an connection in recovery for the remote address:%s, will not accpet new connection"
                                             % connection.remoteAddr
-                                            )
+                                        )
                                         return
                         # Get current local address
                         conn = L2tpv3Connection.L2tpConnection(
@@ -481,7 +484,7 @@ class L2tpv3Dispatcher(object):
         except Exception as e:
             self.stats.exception += 1
             self.logger.warn("Exception happens in l2tp module, error:" + str(e) + ", The Trace back is:\n" +
-                              traceback.format_exc())
+                             traceback.format_exc())
 
     def receive_hal_message(self, msg):
         if isinstance(msg, L2tpv3Hal_pb2.t_l2tpSessionCircuitStatus) \
@@ -500,7 +503,7 @@ class L2tpv3Dispatcher(object):
                         else:
                             self.logger.debug(
                                 "Session has been removed: local ip %s, remote ip %s, session:%s",
-                                             local_ip, remote_ip, local_session_id)
+                                local_ip, remote_ip, local_session_id)
                     except Exception as e:
                         self.stats.exception += 1
                         self.logger.warn(

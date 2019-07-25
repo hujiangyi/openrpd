@@ -3,96 +3,242 @@ OpenRPD Build and Test
 ######################
 
 .. note:: These instructions are intended to be used for setting up a
-   Debian-based build machine (Ubuntu).
+   OpenRPD development environment on a Ubuntu 14.04 system (bare metal 
+   or VM) only, however, OpenWRT (bare metal or VM) is a testing and 
+   deployment environment for OpenRPD.
 
 ***********************************
-Software Prerequisites for Building
+Relationship of OpenRPD and OpenWRT
 ***********************************
 
-OpenWRT
-=======
+OpenWRT is a small footprint adaptable Linux operating system. It is 
+well-suited for hosting embedded applications in communications equipment.  
+OpenRPD is installed in a OpenWRT virtual machine during the Jenkins 
+continuous integration process.  This involves building OpenWRT from source 
+code, then building the OpenRPD source code and installing it as a feed_ into 
+the OpenWRT package, then making this OpenWRT package an virtual machine.  
+Conversely, the CCAP emulator is also separately built and brought into a 
+separate OpenWRT virtual machine as a feed_.
 
-(required to build the base OpenWRT)
+It is recommended that OpenRPD be enhanced and tested initially independent of 
+the OpenWRT environment.  Once working suitably, it may be build as part of 
+the OpenWRT package and tested against integration tests and CCAP core 
+emulator VM or CCAP core hardware. 
 
-.. code-block:: bash
+This section of the document will take the reader the steps necessary to 
+create having OpenRPT code in a locale development setting, and then 
+running it through its Unit Test suite.
 
-  sudo apt-get install git-core build-essential libssl-dev libncurses5-dev unzip gawk subversion mercurial daemontools
+*********************************************
+Base OpenRPD Development Environment Creation
+*********************************************
 
-OpenRPD
-=======
+Though the target deployment environment of OpenRPD is a 32-bit OpenWRT, 
+development and test of OpenRPD is done in an Ubuntu 14.04 Desktop (AMD64) 
+setting.  This can either be done on a dedicated development desktop system, 
+or in a completely dedicated virtual machine which can sit atop any of a 
+variety of host operating systems.
 
-(required to build the OpenRPD component)
+Oracle's VirtualBox is an open source well-established virtual machine 
+environment for running the guest Ubuntu 14.04 operating system on top of 
+Windows, Mac OS X, or a variety of Linux host machines.  It may be obtained 
+at:  [https://www.virtualbox.org/wiki/Downloads]
 
-.. code-block:: bash
+It is recommended that the virtual machine that will receive the Ubuntu 14.04 
+Linux OS be provisioned to have 4GB of memory and 50GB of disk storage, 
+at a minimum.
 
-  sudo apt-get install python-dev
-
-The build now requires at least version 2.6.1 of protobuf-compiler and version
-1.2.1 of protobuf-c-compiler, which must be compiled from source for Ubuntu 14.04.
-
-.. code-block:: bash
-
-  wget https://github.com/protobuf-c/protobuf-c/releases/download/v1.2.1/protobuf-c-1.2.1.tar.gz
-  wget https://github.com/google/protobuf/releases/download/v2.6.1/protobuf-2.6.1.tar.gz
-  
-  tar -xzf protobuf-c-1.2.1.tar.gz
-  tar -xzf protobuf-2.6.1.tar.gz
-  
-  cd protobuf-2.6.1/
-  ./configure
-  make
-  sudo make install
-  sudo ldconfig
-  
-  cd python
-  python setup.py build
-  sudo python setup.py install --cpp_implementation
-  
-  cd ../..
-  cd protobuf-c-1.2.1/
-  
-  ./configure
-  make
-  sudo make install
-  sudo ldconfig
-
-To verify the correct versions, run:
+The Installable live CDROM ISO file for AMD64 verion of the Ubuntu 14.04.5 
+Desktop OS can be obtained 
+at [https://www.ubuntu.com/download/alternative-downloads] or alternately:
 
 .. code-block:: bash
 
-  protoc-c --version
+   wget releases.ubuntu.com/14.04/ubuntu-14.04.5-desktop-amd64.iso 
 
-You should see::
 
-  protobuf-c 1.2.1
-  libprotoc 2.6.1
+All code examples from this place forward will be assumed to take place in the 
+Ubuntu 14.04.5 Terminal command line application.
 
-OpenRPD Unit Tests
-==================
+Installing Software Prerequisites
+=================================
 
-(required to run the OpenRPD unit tests on the development environment)
-
-.. code-block:: bash
-
-  sudo apt-get install python-pip pylint libffi-dev
-  sudo pip install fysom protobuf-to-dict glibc
-  sudo pip install pyzmq --install-option="--zmq=bundled"
-
-OpenRPD CCAP Core Emulator
-==========================
-
-(required to build the CCAP Core Emulator project)
+Git is not installed with the standard Ubuntu 14.04 environment.  It needs to be 
+installed to obtain the OpenRPD source code.
 
 .. code-block:: bash
 
-  sudo apt-get install gettext
+  sudo apt-get install git-core
 
-***********************
-RPD Check Out and Build
-***********************
 
-The RPD and the CCAP Core Emulator now build from the same branch.
-The essence of the build scripts is to add the openrpd project repo as a feed_
+OpenRPD Check Out and Build
+===========================
+
+1. Clone the current OpenRPT source repository into the Ubuntu 14.04 
+   environment
+
+You may use either SSH or HTTP method (if you want to commit and push 
+any changes back to the repository, you'll want to create 
+(instructions at 
+[https://www.howtoforge.com/linux-basics-how-to-install-ssh-keys-on-the-shell]) 
+and register a public ssh key with the CableLabs gerrit server at 
+[https://gerrit.cablelabs.com/#/settings/ssh-keys] and use the SSH method.
+
+
+  a. **HTTP**:
+     
+     .. code-block:: bash
+
+        git clone https://gerrit.cablelabs.com/openrpd
+
+  b. **SSH**:
+
+     .. code-block:: bash
+
+        git clone ssh://[username@]gerrit.cablelabs.com:29418/openrpd
+
+
+2.  Install Prerequisite Software and libraries for OpenRPD
+
+.. code-block:: bash
+
+   cd ~/openrpd
+   sudo ./.jenkinsfile/configure_node.sh
+
+
+3.  Build an augmented l2tp support form of the Python run-time interpreter 
+    and install necessary Python modules
+
+.. code-block:: bash
+
+   ./.jenkinsfile/build_python.sh
+   export PYTHONPATH=`pwd`/openrpd:`pwd`/openrpd/rpd/l2tp
+   source /tmp/openrpd/venv/bin/activate
+
+
+4.  Build OpenRPD
+
+.. code-block:: bash
+
+   cd openrpd
+   make
+   cd ..
+
+5.  Run the Unit Test Suite for OpenRPD
+
+.. code-block:: bash
+
+   cd ~/openrpd
+   time ./.jenkinsfile/run_unit_tests.sh 2>&1 | tee ~/openrpd-unittests-1.log
+
+.. note:: After a shutdown and later restart of the Ubuntu 14.04 machine or 
+   VM, should the contents of /tmp not be preserved from the earlier session, 
+   you will need to re-execute steps 3 and 4 above.
+
+
+RPD Unit Testing on the Build Machine
+=====================================
+
+.. attention:: As the build process is undergoing continuous improvements, 
+   please see the ``openrpd/.jenkinsfile/run_unit_tests.sh`` shell script for 
+   the latest build dependencies, process, and unit test procedure(s). This 
+   script is executed as part of the Continuous Integration build process in 
+   order to automatically verify new software patches to the project. The 
+   Jenkins server runs the unit test script by cloning the openrpd repo and 
+   executing ``./openrpd/.jenkinsfile/run_unit_tests.sh`` from the directory 
+   root ``./openrpd``. Please note that the repo is named `openrpd` and there 
+   is a folder in that directory called `openrpd` which contains the relevant 
+   code. This may be confusing to humans but it was done to adapt to the 
+   OpenRPD / OpenWRT build system.
+
+If you would like to run the unit tests, please use an **Ubuntu 14.04 LTS**
+machine and follow these steps:
+
+.. note:: If running unit tests from the OpenWRT build directory, the
+   `$BASE_PATH` will be the path of the OpenWRT repo plus `/package/feeds/`
+   in the examples below (``<OpenWRT>/package/feeds/``). If building from the
+   OpenRPD directory, the `$BASE_PATH` is the path of the OpenRPD repo. The
+   recommended method is to use the command:
+
+   .. code-block:: bash
+
+      BASE_PATH="<OpenWRT or OpenRPD path>"
+
+Due to the additional L2TP code, load the `l2tp_ip` kernel module into the OS.
+Check if the L2TP modules have been loaded into the kernel with
+
+   .. code-block:: bash
+
+      lsmod | grep l2tp
+
+If they are not present, load them with:
+
+   .. code-block:: bash
+
+      sudo modprobe l2tp_ip
+      sudo modprobe l2tp_ip6
+
+Run all Unit Tests
+------------------
+
+   .. note:: It is assumed that any unit tests are run after the python virtual 
+      environment is installed by "openrpd/.jenkinsfile/build_python.sh" and 
+      activated and that the PYTHONPATH environment variable is set by:
+
+      .. code-block:: bash
+      
+         source /tmp/openrpd/venv/bin/activate
+         export PYTHONPATH=`pwd`/openrpd:`pwd`/openrpd/rpd/l2tp
+
+   .. code-block:: bash
+
+      cd ~/openrpd
+      time ./.jenkinsfile/run_unit_tests.sh 2>&1 | tee ~/unittests-all.log
+
+   .. note:: The unit tests must NOT be run as root.
+
+
+Run all Unit Tests in a test module
+-----------------------------------
+
+   .. code-block:: bash
+
+      cd ~/openrpd/openrpd
+      python rpd/rcp/testing/test_rcp_process.py
+
+Or:
+
+   .. code-block:: bash
+
+      cd ~/openrpd/openrpd
+      python -m unittest -v rpd.rcp.testing.test_rcp_process
+
+
+Run all Unit Tests in a single class within a single file
+---------------------------------------------------------
+
+   .. code-block:: bash
+
+      cd ~/openrpd/openrpd
+      python -m unittest -v rpd.rcp.gcp.testing.test_VspAvps.L2tpHalDrvVspAvpTest
+
+      
+Run a specific Unit Test
+------------------------
+
+   .. code-block:: bash
+
+      cd ~/openrpd/openrpd
+      python -m unittest -v rpd.rcp.gcp.testing.test_VspAvps.L2tpHalDrvVspAvpTest.test_add_avp
+
+
+
+************************************************************
+OpenWRT Checkout and Build of OpenRPD from Repository Source
+************************************************************
+
+The RPD and the CCAP Core Emulator build from the same branch.
+The essence of the OpenWRT build scripts is to add the OpenRPD project repo as a feed_
 in the OpenWRT package management system, and to configure and install the
 RPD-specific packages from that feed_.
 
@@ -110,7 +256,7 @@ RPD-specific packages from that feed_.
 
      .. code-block:: bash
 
-        git clone -b chaos_calmer_openrpd ssh://gerrit.cablelabs.com:29418/openwrt
+        git clone -b chaos_calmer_openrpd ssh://[username@]gerrit.cablelabs.com:29418/openwrt
 
 2. Navigate into the cloned repository directory:
 
@@ -119,7 +265,7 @@ RPD-specific packages from that feed_.
 3. Execute the ``build.sh`` script with the ``vRPD`` parameter:
 
    .. note:: Running this script will clone the OpenRPD repository into the
-      correct filesystem location.
+      correct filesystem location inside of the OpenWRT directory tree.
 
    .. note:: The build script is currently pre-configured to clone
       over SSH, so if you want to clone over HTTP, you must manually modify the
@@ -138,124 +284,23 @@ RPD-specific packages from that feed_.
       builds (e.g., for the core emulator) will overwrite the file, so be sure
       to rename the .vmdk file before proceeding to build the core emulator.
 
-   .. tip:: For informational purposes, here is a :download:`successful build log <files/RPD_15.05_build_log.txt>`.
+   .. tip:: For informational purposes, here is a :download:`successful build 
+      log <files/RPD_15.05_build_log.txt>`.
 
    .. _successful build log: ./files/RPD_15.05_build_log.txt
 
-RPD Unit Testing on the Build Machine
-=====================================
-
-.. attention:: As the build process is currently rapidly changing, please see
-   the :download:`run-unit-tests.sh <../../openrpd/run-unit-tests.sh>` script in the root
-   of the openrpd project directory for
-   the latest build dependencies, process, and unit test procedure(s). This
-   script is executed as part of the Continuous Integration build process in
-   order to automatically verify new software patches to the project. The
-   Jenkins server runs the unit test script by cloning the openrpd repo and
-   executing ``./openrpd/run-unit-tests.sh`` from the directory root. Please note
-   that the repo is named `openrpd` and there is a folder in that directory
-   called `openrpd` which contains the relevant code. This may be confusing to
-   humans but it was done to adapt to the OpenWRT build system.
-
-If you would like to run the unit tests, please use an **Ubuntu 14.04 LTS**
-machine and follow these steps:
-
-.. note:: If running unit tests from the OpenWRT build directory, the
-   `$BASE_PATH` will be the path of the OpenWRT repo plus `/package/feeds/` in
-   the examples below (``<OpenWRT>/package/feeds/``). If building from the
-   OpenRPD directory, the `$BASE_PATH` is the path of the openrpd repo. The
-   recommended method is to use the command:
-
-   .. code-block:: bash
-
-      BASE_PATH="<OpenWRT or OpenRPD path>"
-
-1. First, due to the additional L2TP code, load the `l2tp_ip` kernel module
-   into the OS:
-   
-   .. code-block:: bash
-
-      sudo modprobe l2tp_ip
-      sudo modprobe l2tp_ip6
-
-2. Run all of the Unit tests:
-
-   .. code-block:: bash
-
-      cd $BASE_PATH
-      ./openrpd/run-unit-tests.sh
-
-   .. note:: You may need to execute ``sudo ./openrpd/run-unit-tests.sh`` because the
-      build machine is set up to give passwordless sudo permission for the
-      `python`, `pip`, and `apt-get` commands to the jenkins build user in
-      order to install some dependencies.
-
-.. note:: The location of the Unit Test sources is
-   ``$BASE_PATH/openrpd/rpd/testing/`` and all `testing` subfolders:
-
-   .. code-block:: bash
-
-      cd <OpenWRT>/package/feeds/openrpd/rpd/ find -name 'testing' -type d
-
-   ::
-
-      ./rcp/gcp/gcp_lib/testing
-      ./rcp/gcp/testing
-      ./rcp/rcp_lib/testing
-      ./rcp/testing
-      ./hal/testing
-      ./dispatcher/testing
-      ./confdb/testing
-      ./testing
-
-Discussion of Unit Testing
---------------------------
-
-The current `run-unit-tests.sh` script patches and compiles Python costing a
-considerable amount of time in the process. To speed up unit testing on your
-development machine, you may wish to manually patch, compile, and install
-Python once and then run the unit tests separately during development.
-
-Individual Unit Tests
-=====================
-
-Individual unit test files can also be run. For example:
-
-.. note:: Need to verify that this works (I can't get it to work)
-
-.. code-block:: bash
-
-   python rcp/rcp_lib/testing/test_rcp.py
-
-Or:
-
-.. code-block:: bash
-
-   cd <OpenWRT>/package/feeds/openrpd/
-   python -m unittest -v rpd.rcp.rcp_lib.testing.test_rcp
-
-Unit Tests for a single class within a single file can be run. For example:
-
-.. code-block:: bash
-
-   python -m unittest -v rpd.rcp.rcp_lib.testing.test_rcp.TestRCPSpecifics
-
-One specific Unit Test case can be run. For example:
-
-.. code-block:: bash
-
-   python -m unittest -v rpd.rcp.rcp_lib.testing.test_rcp.TestRCPSpecifics.test_tlv_data
-
-
-RPD VM Manual Creation
-======================
+OpenRPD VirtualBox Virtual Machine Creation
+===========================================
 
 Manually creating an RPD Virtual Machine using the built VMDK:
 
 After the OpenRPD build completes successfully, a .vmdk (virtual machine
 hard disk) file should be in the `<OpenWRT>/bin/x86/` directory
 (``openwrt-x86-generic-combined-ext4.vmdk``). This file can be used during
-the creation of a Virtual Machine.
+the creation of a Virtual Machine.  
+
+   .. NOTE:: Recommend you rename this vmdk file to indicate that it is the
+      OpenRPD payload on the OpenWRT Virtual Machine.
 
 Using VirtualBox, select the option to create a New Machine. For the `OS
 Type`, select `Linux` and for the `Version` select `Other Linux (32-bit)`.
@@ -268,9 +313,63 @@ networking interfaces:
 * eth0 - Management Interface
 * eth1 - Connection to the DHCP Server, Time Protocol Server, and CCAP Core
 
+This same process is also how the CCAP Core Emulator VirtualBox Virtual Machine
+is created.
 
-CCAP Core Emulator Build
-========================
+
+*******************************************************************
+OpenWRT Checkout and Build of OpenRPD from Local Development Source
+*******************************************************************
+
+The RPD and the CCAP Core Emulator now build from the same branch.
+The essence of this form of the OpenWRT build scripts is to add the 
+local development OpenRPD project as a linked source feed_
+in the OpenWRT package management system, and to configure and install the
+RPD-specific packages from that feed_.  This build
+
+.. _feed: https://wiki.openwrt.org/doc/devel/feeds
+
+1. Clone the OpenWRT repository using either the SSH or HTTP method:
+
+  a. **HTTP**:
+     
+     .. code-block:: bash
+
+        git clone -b chaos_calmer_openrpd https://gerrit.cablelabs.com/openwrt
+
+
+  b. **SSH**:
+
+     .. code-block:: bash
+
+        git clone -b chaos_calmer_openrpd ssh://[username@]gerrit.cablelabs.com:29418/openwrt
+
+
+2. Navigate into the cloned repository directory:
+
+   ``cd openwrt``
+
+3. Execute the OpenRPD source tree configure_build.sh script from this location
+   with parmeters set to link in the local OpenRPD.  There are two arguments to
+   this command: (a) the path to the root location of the local separate 
+   OpenRPD code tree, and (b) the location of the OpenWRT build configuration 
+   file. This example shows the process:
+
+   .. code-block:: bash
+
+      ../openrpd/.jenkinsfile/configure_build.sh /home/<myname>/openrpd ./build/x86/x86.conf
+
+4. Once the OpenRPD source files are linked into the OpenWRT build tree, build 
+   OpenWRT:
+
+   .. code-block:: bash
+
+      make
+
+
+***********************************************
+CCAP Core Emulator Build from Repository Source
+***********************************************
 
 The process for checking out and building the CCAP Core Emulator VMDK is very
 similar to the process for checking out and building the RPD.
@@ -296,7 +395,7 @@ similar to the process for checking out and building the RPD.
 
       .. code-block:: bash
 
-         git clone -b chaos_calmer_openrpd ssh://gerrit.cablelabs.com:29418/openwrt
+         git clone -b chaos_calmer_openrpd ssh://[username@]gerrit.cablelabs.com:29418/openwrt
 
 2. Navigate into the cloned repository directory:
 
@@ -310,6 +409,7 @@ similar to the process for checking out and building the RPD.
 
       ./build.sh core-sim
 
+      
 *************************
 Running Integration Tests
 *************************

@@ -1,4 +1,4 @@
-#copyright (c) 2017 Cisco and/or its affiliates, and
+# copyright (c) 2017 Cisco and/or its affiliates, and
 #                    Cable Television Laboratories, Inc. ("CableLabs")
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,14 +24,29 @@ from rpd.statistics.manager_provision_stat import ManagerProvisionStateMachineRe
 uTMgrProcess = None
 uTMgrApiDispatch = None
 
+
 def demoMgrProcess():
     global uTMgrProcess
     global uTMgrApiDispatch
     print "demoMgrProcess thread start!"
     uTMgrProcess = ManagerProcess(test_flag=True)
     uTMgrApiDispatch = uTMgrProcess.dispatcher
+    # Unregister interface_scan_timer to make the tearDown faster.
+    # When unregistered we don't need to wait for the long interface scan
+    # timeout before closing socket in tearDown.
+    uTMgrApiDispatch.timer_unregister(uTMgrProcess.interface_scan_timer)
     uTMgrProcess.start()
     print "demoMgrProcess thread done!"
+
+
+def stop_dispatcher_loop(disp):
+    disp.end_loop()
+    start_time = time.time()
+    time_elapsed = 0
+    while (not disp.loop_stopped) and time_elapsed < disp.max_timeout_sec:
+        time.sleep(0.1)
+        time_elapsed = time.time() - start_time
+
 
 class TestManagerProvisionStat(unittest.TestCase):
 
@@ -45,19 +60,17 @@ class TestManagerProvisionStat(unittest.TestCase):
         time.sleep(2)
         cls.mgr = uTMgrProcess
 
-
     @classmethod
     def tearDownClass(cls):
         global uTMgrProcess
         global uTMgrApiDispatch
+        if uTMgrApiDispatch is not None:
+            print "end loop here"
+            stop_dispatcher_loop(uTMgrApiDispatch)
         if uTMgrProcess is not None:
             uTMgrProcess.dispatcher.fd_unregister(uTMgrProcess.mgr_api.manager_api_sock.sock)
             time.sleep(1)
             uTMgrProcess.mgr_api.manager_api_sock.sock.close()
-        if uTMgrApiDispatch is not None:
-            print "end loop here"
-            uTMgrApiDispatch.end_loop()
-            time.sleep(2)
 
     def setUp(self):
         self.object_statistics = ManagerProvisionStateMachineRecord()

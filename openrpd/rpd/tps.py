@@ -36,7 +36,7 @@ class TimeServer(object):
 
     __metaclass__ = AddLoggerToClass
 
-    def __init__(self, family=socket.AF_INET,port=PORT):
+    def __init__(self, family=socket.AF_INET, port=PORT):
         self.family = family
         self.port = port
 
@@ -108,7 +108,7 @@ class TimeServerManager(object):
         """
         return 0 == call(["pgrep", '-f', self.SCRIPT_FILE_NAME])
 
-    def start_server(self, delay=0, ipv6=False,port=TimeServer.PORT):
+    def start_server(self, delay=0, ipv6=False, port=TimeServer.PORT):
         """Start time server in background.
 
         :param delay: start will be delayed specified number of seconds
@@ -120,7 +120,7 @@ class TimeServerManager(object):
         """
         port_opt = "--port " + str(port)
         cmd = "python {}/{} {} {}&".format(self.path_bin, self.SCRIPT_FILE_NAME,
-                                 "--ipv6" if ipv6 else "",port_opt)
+                                           "--ipv6" if ipv6 else "", port_opt)
         if 0 != delay:
             sleep_cmd = "sleep {} && ".format(delay)
             cmd = sleep_cmd + cmd
@@ -165,7 +165,8 @@ def main(arg_list):
     args = parser.parse_args()
     if args.ipv6:
         ip_version = socket.AF_INET6
-    TimeServer(ip_version,args.port).listen()
+    TimeServer(ip_version, args.port).listen()
+
 
 if __name__ == "__main__":
     # setup logging, will search the config files

@@ -249,5 +249,6 @@ class TestHalDatabase(unittest.TestCase):
         except Exception as e:
             self.assertIsNone(str(e))
 
+
 if __name__ == '__main__':
     unittest.main()

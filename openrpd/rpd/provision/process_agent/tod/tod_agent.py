@@ -21,14 +21,11 @@ from rpd.provision.transport.transport import Transport
 from rpd.common.utils import Convert
 from rpd.gpb.tpc_pb2 import t_TpcMessage
 from subprocess import call
-from datetime import datetime
 import zmq
-import os
 from time import time
 from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 from rpd.common.rpd_rsyslog import RSyslog
 from rpd.common import rpd_event_def
-
 
 
 class TimeOfDay(agent.ProcessAgent):
@@ -111,8 +108,7 @@ class TimeOfDay(agent.ProcessAgent):
                 format(parameter))
             return
 
-        if event_action == protoDef.msg_event.START or \
-                        event_action == protoDef.msg_event.CHECKSTATUS:
+        if event_action == protoDef.msg_event.START or event_action == protoDef.msg_event.CHECKSTATUS:
             # only one tod is valid which is for principal core
             if self.tod_done:
                 status = self.UP
@@ -128,7 +124,7 @@ class TimeOfDay(agent.ProcessAgent):
                 # create a time_server in self time_server
                 self.tod[time_server] = {
                     "status": status,
-                    "requester": [ccap_core_id,],
+                    "requester": [ccap_core_id, ],
                     "lastChangeTime": time(),
                     "time-server": time_servers,
                     "log-server": log_servers,
@@ -200,13 +196,13 @@ class TimeOfDay(agent.ProcessAgent):
             return
 
         try:
-            data = self.process_transport.sock.recv(flags=zmq.NOBLOCK) 
+            data = self.process_transport.sock.recv(flags=zmq.NOBLOCK)
             tpc_msg = t_TpcMessage()
             tpc_msg.ParseFromString(data)
             self.logger.debug("TPC status: %s",
                               tpc_msg.t_Status.Name(tpc_msg.Status))
             status_changed = False
-	    valid_timeserver = tpc_msg.Validtimeserver
+            valid_timeserver = tpc_msg.Validtimeserver
             if tpc_msg.Status == tpc_msg.SUCCESS:
                 self.logger.info("Valid timestamp received from TPC")
                 if tpc_msg.HasField('Timestamp'):
@@ -224,7 +220,7 @@ class TimeOfDay(agent.ProcessAgent):
                         event_request_rsp.mgr_event.mgr_id = idx
                         event_request_rsp.mgr_event.event_id = self.id
                         event_request_rsp.mgr_event.data = 'success/' + str(tpc_msg.Timestamp) + \
-							   '|' + valid_timeserver
+                                                           '|' + valid_timeserver
                         self.mgrs[idx]['transport'].sock.send(
                             event_request_rsp.SerializeToString(), flags=zmq.NOBLOCK)
                         self.logger.debug(
@@ -294,7 +290,7 @@ class TimeOfDay(agent.ProcessAgent):
         except Exception as e:
             self.logger.error("Cannot process the event, reason:%s" % str(e))
 
-    def configure_remote_logging(self, address): # pragma: no cover
+    def configure_remote_logging(self, address):  # pragma: no cover
         """Set address of remote log server,
 
         - For now only one log-server is supported (UDP is used, so we don't

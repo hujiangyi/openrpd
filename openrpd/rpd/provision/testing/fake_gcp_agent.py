@@ -20,8 +20,10 @@ from rpd.common.rpd_logging import setup_logging
 
 
 class GCP(FakeAgent):
+
     def __init__(self):
         super(GCP, self).__init__(agent.ProcessAgent.AGENTTYPE_GCP)
+
 
 if __name__ == "__main__":
     setup_logging("PROVISION", filename="provision_rcp.log")

@@ -28,7 +28,7 @@ omit =
     rpd/hal/simulator/start_hal.py
     rpd/provision/proto*
     rpd/rpdinfo*
-    rpd/hostresources*
+    rpd/resource/src/RpdResHalClient.py
     rpd/provision/simulator/provision_sim.py
     rpd/provision/process_agent/ipsec/ike_agent.py
     rpd/tps.py

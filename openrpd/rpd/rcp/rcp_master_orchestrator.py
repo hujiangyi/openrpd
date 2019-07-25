@@ -28,6 +28,7 @@ from rpd.rcp.gcp.gcp_lib import gcp_msg_def
 from rpd.rcp.gcp.gcp_lib.gcp_object import GCPDecodeError
 from rpd.rcp.gcp.gcp_lib.gcp_object import GCPObject
 from rpd.rcp.rcp_orchestrator import RCPOrchestrator, log_measured_values
+from rpd.gpb.GeneralNotification_pb2 import t_GeneralNotification
 
 
 class RCPMasterOrchestrator(RCPOrchestrator):
@@ -47,41 +48,42 @@ class RCPMasterOrchestrator(RCPOrchestrator):
         CCAPStep(_PKT_DIRECTOR.get_rpd_capabilities_read_packet,
                  description="DEFAULT: Read RPD Capabilities"))
     _DEFAULT_SCENARIO.add_next_step(
-        CCAPStep(_PKT_DIRECTOR.get_ccap_capabilities_write_packet,
+        CCAPStep(_PKT_DIRECTOR.get_ccap_core_ident_write_packet,
                  description="DEFAULT: Write CCAP Capabilities"))
     _DEFAULT_SCENARIO.add_next_step(
         CCAPStep(_PKT_DIRECTOR.get_gdm_packet,
                  description="DEFAULT: GDM Request Message"))
 
     _DEFAULT_SCENARIO.add_next_step(
-        CCAPStep(_PKT_DIRECTOR.test_config_done_packet,
-                 description="DEFAULT: Write Configuration Done Message"))
+        CCAPStep(_PKT_DIRECTOR.send_initial_complete_packet,
+                 description="DEFAULT: Write Initial Configuration Complete Message"))
+    _DEFAULT_SCENARIO.add_next_step(
+        CCAPStep(_PKT_DIRECTOR.send_ptp_config_packet,
+                 description="DEFAULT: Send PTP Configuration Message"))
+    _DEFAULT_SCENARIO.add_next_step(
+        CCAPStep(_PKT_DIRECTOR.send_config_done_packet,
+                 description="DEFAULT: Send Configuration Done Message"))
+    _DEFAULT_SCENARIO.add_next_step(
+        CCAPStep(_PKT_DIRECTOR.send_ds_static_l2tp_packet,
+                 description="DEFAULT: Send DS Static L2TP Message"))
+    _DEFAULT_SCENARIO.add_next_step(
+        CCAPStep(_PKT_DIRECTOR.send_us_static_l2tp_packet,
+                 description="DEFAULT: Send US Static L2TP Message"))
+    _DEFAULT_SCENARIO.add_next_step(
+        CCAPStep(_PKT_DIRECTOR.send_multiple_core_add_packet,
+                 description="DEFAULT: Send Multiple Core Add Message"))
 
-    # _DEFAULT_SCENARIO.add_next_step(
-        # CCAPStep(_PKT_DIRECTOR.test_rpd_ha_add_packet,
-                 # description="DEFAULT: HA Write Message"))
-    # _DEFAULT_SCENARIO.add_next_step(
-        # CCAPStep(_PKT_DIRECTOR.test_rpd_ha_change_packet,
-                 # description="DEFAULT: HA Change Message"))
-    # _DEFAULT_SCENARIO.add_next_step(
-        # CCAPStep(_PKT_DIRECTOR.test_rpd_ha_delete_packet,
-                 # description="DEFAULT: HA Delete Message"))
-
-    # _DEFAULT_SCENARIO.add_next_step(
-        # CCAPStep(_PKT_DIRECTOR.test_multiple_core_add_packet,
-                 # description="DEFAULT: Multiple Core Add Message"))
-    # _DEFAULT_SCENARIO.add_next_step(
-        # CCAPStep(_PKT_DIRECTOR.get_active_principal_acore_packet,
-                 # description="DEFAULT: GET Active Principal Core Message"))
-    # _DEFAULT_SCENARIO.add_next_step(
-        # CCAPStep(_PKT_DIRECTOR.test_multiple_core_del_packet,
-                 # description="DEFAULT: Multiple Core Delete Message"))
+    _DEFAULT_SCENARIO.add_trigger_step(
+        CCAPStep(_PKT_DIRECTOR.move_to_operational_write_packet,
+                 description="DEFAULT: Send Move To Operational Message"),
+        "ptp_notify")
 
     class RCPDataForSlave(object):
         """Class is used to store configuration in GPB format and store also
         GCP message ID, RCP message ID and RCP operation type which will be
         used to encapsulate the configuration which will be sent to the
         slave identified by slave descriptor."""
+
         def __init__(self, slave_descriptor, gpb_data,
                      gcp_message_id=gcp_msg_def.DataStructREQ,
                      rcp_message_id=rcp_tlv_def.RCP_MSG_TYPE_REX,
@@ -131,6 +133,7 @@ class RCPMasterOrchestrator(RCPOrchestrator):
     class RPDMeasuringData(object):
         """Stores data used for internal measurement of RTT of the REQ/RSP
         pair."""
+
         def __init__(self, gcp_packet):
             # measurement
             self.transaction_id = gcp_packet.transaction_identifier
@@ -174,7 +177,7 @@ class RCPMasterOrchestrator(RCPOrchestrator):
             raise TypeError()
         self.data_to_send.put_nowait(data)
         self.logger.info("Added data to be sent to the slave: %s",
-                 data.slave_descriptor)
+                         data.slave_descriptor)
 
     def _get_data_to_send(self):
         """Removes data from queue and returns them."""
@@ -195,7 +198,7 @@ class RCPMasterOrchestrator(RCPOrchestrator):
             raise TypeError()
         self.data_to_send_no_wait.put_nowait(data)
         self.logger.info("Added data to be sent to the slave in bulk: %s",
-                 data.slave_descriptor)
+                         data.slave_descriptor)
 
     def _get_data_to_send_no_wait(self):
         """Removes data from queue and returns them."""
@@ -273,7 +276,7 @@ class RCPMasterOrchestrator(RCPOrchestrator):
         else:
             for data in data_list:
                 if (None is data.start_time or
-                            None is data.end_time):
+                        None is data.end_time):
                     self.logger.debug("Measured delay MSGs: %s, transaction "
                                       "%u: start: %s, end: %s" %
                                       (data.gcp_messages, data.transaction_id,
@@ -287,9 +290,9 @@ class RCPMasterOrchestrator(RCPOrchestrator):
                 t_nsec = (t_usec % 1) * 1000
 
                 self.logger.debug("Measured delay MSGs: %s, transaction "
-                          "%u: %uS %umS %uuS %unS (%.6f)" %
-                          (data.gcp_messages, data.transaction_id,
-                           t_sec, t_msec, t_usec, t_nsec, t_sec))
+                                  "%u: %uS %umS %uuS %unS (%.6f)" %
+                                  (data.gcp_messages, data.transaction_id,
+                                   t_sec, t_msec, t_usec, t_nsec, t_sec))
 
     def execute_scenario_step(self, master, slave_ctx, slave_fd,
                               scenario_step):
@@ -312,10 +315,10 @@ class RCPMasterOrchestrator(RCPOrchestrator):
             return
 
         self.logger.info("Processing scenario step for master: %s, slave: %s, "
-                 "slave_fd: %s, description: %s",
-                 master.get_descriptor(),
-                 gcp_sessions.GCPSession.get_sock_string(slave_ctx.socket),
-                 slave_fd, scenario_step.description)
+                         "slave_fd: %s, description: %s",
+                         master.get_descriptor(),
+                         gcp_sessions.GCPSession.get_sock_string(slave_ctx.socket),
+                         slave_fd, scenario_step.description)
         if scenario_step.param_tuple:
             result = scenario_step.master_dir_method(
                 master,
@@ -392,8 +395,8 @@ class RCPMasterOrchestrator(RCPOrchestrator):
             # read message from the slave
             slave_ctx = master.get_fd_io_ctx(fd)
             self.logger.debug("Received message from: %s",
-                      gcp_sessions.GCPSession.get_sock_string(
-                          slave_ctx.socket))
+                              gcp_sessions.GCPSession.get_sock_string(
+                                  slave_ctx.socket))
 
             try:
                 pkt = master.read_pkt(fd)
@@ -414,7 +417,7 @@ class RCPMasterOrchestrator(RCPOrchestrator):
 
                     for msg in pkt.msgs:
                         self.logger.debug("Processing message: %s (%u)",
-                                  msg.message_name, msg.message_id)
+                                          msg.message_name, msg.message_id)
 
                         self.measure_time(pkt.transaction_identifier, fd)
                         m_data = \
@@ -427,14 +430,25 @@ class RCPMasterOrchestrator(RCPOrchestrator):
                             self.logger.info("Received NotifyREQ")
 
                             # Run the scenario step if exists
-                            # TODO Event-based scenarios ?????
-                            scenario_step = master.slave_cons[fd]. \
-                                scenario_steps.get_step_next()
+                            ptp_ok = False
+                            for rcp_msg in msg.tlv_data.rcp_msgs:
+                                for sequence in rcp_msg.sequences:
+                                    val = getattr(sequence.parent_gpb, "GeneralNotification")
+                                    if val.NotificationType is t_GeneralNotification.PTPRESULTNOTIFICATION \
+                                            and val.PtpResult is t_GeneralNotification.PTPSYNCHRONIZED:
+                                        ptp_ok = True
+
+                            if not ptp_ok:
+                                scenario_step = master.slave_cons[fd]. \
+                                    scenario_steps.get_step_next()
+                            else:
+                                scenario_step = master.slave_cons[fd]. \
+                                    scenario_steps.get_ntf_event_step("ptp_notify")
                             self.execute_scenario_step(master, slave_ctx,
                                                        fd, scenario_step)
 
                         elif (msg.message_id == gcp_msg_def.DataStructRSP):
-                            self.logger.info("Received RPD Caps")
+                            self.logger.info("Received DataStructRSP")
 
                             # Run the scenario step if exists
                             scenario_step = master.slave_cons[fd]. \
@@ -443,10 +457,10 @@ class RCPMasterOrchestrator(RCPOrchestrator):
                                                        fd, scenario_step)
 
                             # also send a gdm msg here
-                            scenario_step = master.slave_cons[fd]. \
-                                scenario_steps.get_step_next()
-                            self.execute_scenario_step(master, slave_ctx,
-                                                       fd, scenario_step)
+                            # scenario_step = master.slave_cons[fd]. \
+                            #     scenario_steps.get_step_next()
+                            # self.execute_scenario_step(master, slave_ctx,
+                            #                            fd, scenario_step)
 
                         elif (msg.message_id == gcp_msg_def.ManagementRSP):
                             self.logger.info("Received RPD device management response")
@@ -476,8 +490,8 @@ class RCPMasterOrchestrator(RCPOrchestrator):
                     master.remove_connection(fd)
                 except:
                     self.logger.error("Failed to remove connection from master, "
-                              "closing the master %s",
-                              master.get_descriptor())
+                                      "closing the master %s",
+                                      master.get_descriptor())
                     self.__handle_failure(master)
             except gcp_sessions.GCPSessionError as ex:
                 self.logger.error(
@@ -538,16 +552,16 @@ class RCPMasterOrchestrator(RCPOrchestrator):
             if master.get_socket_fd() == fd:
                 # master session has failed
                 self.logger.error("Master session %s has failed" %
-                          (master.get_descriptor()))
+                                  (master.get_descriptor()))
                 self.__handle_failure(master)
             else:
                 # master's slave connection has failed
                 ctx = master.get_fd_io_ctx(fd)
                 self.logger.error("Master's (%s) connection to slave (%s) has failed",
-                          master.get_descriptor(),
-                          (None if None is ctx else
-                           gcp_sessions.GCPSession.get_sock_string(
-                               ctx.socket)))
+                                  master.get_descriptor(),
+                                  (None if None is ctx else
+                                   gcp_sessions.GCPSession.get_sock_string(
+                                       ctx.socket)))
                 master.remove_connection(fd)
 
         except KeyError:
@@ -653,22 +667,22 @@ class RCPMasterOrchestrator(RCPOrchestrator):
             master = self._get_master(master_ip, master_port)
             if None is master:
                 self.logger.error("Failed to find Master: %s:%u",
-                          master_ip, master_port)
+                                  master_ip, master_port)
                 return
 
             slave_fd = self._get_slave_fd(master, slave_ip, slave_port)
             if None is slave_fd:
                 self.logger.error("Failed to find Master's ({}:{}) "
-                          "slave: {}:{}".format(master_ip, master_port,
-                                                slave_ip, slave_port))
+                                  "slave: {}:{}".format(master_ip, master_port,
+                                                        slave_ip, slave_port))
                 return
 
             self._send_data_from_master_to_slave(master, slave_fd, data)
 
             self.logger.debug("Data prepared to send from "
-                      "Master (%s:%u) to Slave (%s:%u)",
-                      master_ip, master_port,
-                      slave_ip, slave_port)
+                              "Master (%s:%u) to Slave (%s:%u)",
+                              master_ip, master_port,
+                              slave_ip, slave_port)
         else:
             self.logger.debug(
                 "Data without slave descriptor, will be sent to all")
@@ -690,7 +704,7 @@ class RCPMasterOrchestrator(RCPOrchestrator):
 
         self._prepare_data_to_be_sent(data)
         self.logger.info("Data for slave %s inserted into the TX queue",
-                 data.slave_descriptor)
+                         data.slave_descriptor)
 
     def _send_data_to_slave_no_wait(self):
         data = self._get_data_to_send_no_wait()
@@ -735,7 +749,7 @@ class RCPMasterOrchestrator(RCPOrchestrator):
 
             if desc.get_uniq_id() in self.sessions_active:
                 self.logger.info("RCP session: %s is already active, don't "
-                         "need to proceed.", desc)
+                                 "need to proceed.", desc)
                 continue
 
             if desc.get_uniq_id() in self.sessions_failed:
@@ -766,7 +780,6 @@ class RCPMasterOrchestrator(RCPOrchestrator):
         return self.sessions_active[desc.get_uniq_id()]
 
     def remove_sessions(self, session_descriptors):
-
         """Implements the method from the GCPSessionOrchestrator interface.
 
         Removes RCPMaster sessions identified by descriptors in the
@@ -792,11 +805,11 @@ class RCPMasterOrchestrator(RCPOrchestrator):
                     try:
                         del self.sessions_active_fd[fd]
                         self.logger.debug("Slave connection: %s of master: %s "
-                                  "has been deleted from the list of active "
-                                  "sessions FDs list.",
-                                  gcp_sessions.GCPSession
-                                  .get_sock_string(ctx.socket),
-                                  desc)
+                                          "has been deleted from the list of active "
+                                          "sessions FDs list.",
+                                          gcp_sessions.GCPSession
+                                          .get_sock_string(ctx.socket),
+                                          desc)
                     except KeyError:
                         self.logger.warning(
                             "Slave connection: %s of master: %s is "

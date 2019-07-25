@@ -16,9 +16,7 @@
 
 import unittest
 from rpd.provision.manager.src.manager_main import AgentsStarter
-import os, time
-import subprocess
-import signal
+import os
 from rpd.common.rpd_logging import setup_logging
 
 
@@ -39,7 +37,7 @@ class TestAgentsStarter(unittest.TestCase):
         os.system('rm -rf /tmp/ProcessAgent_AGENTTYPE_*')
 
     def test_starter_init(self):
-        print '#'*80
+        print '#' * 80
         print 'test main init'
         starter = AgentsStarter(simulator=False)
         agent_process = {}

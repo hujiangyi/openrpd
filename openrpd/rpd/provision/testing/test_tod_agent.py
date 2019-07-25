@@ -21,8 +21,9 @@ import rpd.provision.proto.process_agent_pb2 as pb2
 from rpd.gpb.tpc_pb2 import t_TpcMessage
 from rpd.provision.process_agent.agent.agent import ProcessAgent
 from rpd.provision.process_agent.tod.tod_agent import TimeOfDay
-from subprocess import call,Popen
+from subprocess import call, Popen
 import signal
+
 
 class TestTodAgent(unittest.TestCase):
 
@@ -30,12 +31,12 @@ class TestTodAgent(unittest.TestCase):
         # try to find the tod agent
         currentPath = os.path.split(os.path.realpath(__file__))[0]
         dirs = currentPath.split("/")
-        rpd_index = dirs.index("testing")-2
+        rpd_index = dirs.index("testing") - 2
         self.rootpath = "/".join(dirs[:rpd_index])
-        self.pid = Popen("coverage run --parallel-mode --rcfile="+self.rootpath+"/.coverage.rc " 
-                                    + "/".join(dirs[:rpd_index]) +
-                                    "/rpd/provision/process_agent/tod/tod_agent.py",
-                                    executable='bash', shell=True)
+        self.pid = Popen("coverage run --parallel-mode --rcfile=" + self.rootpath + "/.coverage.rc "
+                         + "/".join(dirs[:rpd_index]) +
+                         "/rpd/provision/process_agent/tod/tod_agent.py",
+                         executable='bash', shell=True)
 
     def tearDown(self):
         self.pid.send_signal(signal.SIGINT)
@@ -53,14 +54,14 @@ class TestTodAgent(unittest.TestCase):
         sock_api.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_TOD]['api'])
 
         sock_pull = context.socket(zmq.PULL)
-        sock_pull.bind("ipc:///tmp/test_tod_agent.scok")
+        sock_pull.bind("ipc:///tmp/test_tod_agent.sock")
 
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
         reg.id = "test_mgr"  # use a fake ccap id
         reg.action = pb2.msg_manager_register.REG
-        reg.path_info = "ipc:///tmp/test_tod_agent.scok"
+        reg.path_info = "ipc:///tmp/test_tod_agent.sock"
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()
 
@@ -107,13 +108,13 @@ class TestTodAgent(unittest.TestCase):
         rsp = pb2.msg_event_notification()
         rsp.ParseFromString(data)
 
-        #same parameter resend
+        # same parameter resend
         # event_request.action.ccap_core_id = "test_ccap_core"
         sock_push.send(event_request.SerializeToString())
         data = sock_pull.recv()
         rsp = pb2.msg_event_notification()
         rsp.ParseFromString(data)
-   
+
         # test stop
         event_request = pb2.msg_event_request()
         event_request.action.id = "test_ccap_core"
@@ -126,7 +127,7 @@ class TestTodAgent(unittest.TestCase):
         rsp = pb2.msg_event_notification()
         rsp.ParseFromString(data)
 
-        #test wrong ccap core id
+        # test wrong ccap core id
         event_request = pb2.msg_event_request()
         event_request.action.id = "test_wrong_ccap_id"
         event_request.action.event_id = ProcessAgent.AGENTTYPE_TOD
@@ -135,7 +136,7 @@ class TestTodAgent(unittest.TestCase):
         event_request.action.action = pb2.msg_event.START
         sock_push.send(event_request.SerializeToString())
 
-        #test no parameter
+        # test no parameter
         event_request = pb2.msg_event_request()
         event_request.action.id = "test_ccap_core"
         event_request.action.event_id = ProcessAgent.AGENTTYPE_TOD
@@ -146,7 +147,7 @@ class TestTodAgent(unittest.TestCase):
         rsp = pb2.msg_event_notification()
         rsp.ParseFromString(data)
 
-        #test no timeoffset and no log server
+        # test no timeoffset and no log server
         event_request.action.parameter = "10.0.0.1/|"
         sock_push.send(event_request.SerializeToString())
         data = sock_pull.recv()
@@ -154,7 +155,7 @@ class TestTodAgent(unittest.TestCase):
         rsp.ParseFromString(data)
         print(rsp)
 
-        #test illegal parameter
+        # test illegal parameter
         event_request.action.parameter = "hahaha"
         sock_push.send(event_request.SerializeToString())
         data = sock_pull.recv()
@@ -162,8 +163,8 @@ class TestTodAgent(unittest.TestCase):
         rsp.ParseFromString(data)
         print(rsp)
 
-        #test ipc_msg_call back
-        #simulate tpc send to tod_agent
+        # test ipc_msg_call back
+        # simulate tpc send to tod_agent
         kill_cmd = "kill -9 `pgrep -f tpc.py`"
         call(kill_cmd, shell=True)
         tod_sock_push = context.socket(zmq.PUSH)
@@ -217,7 +218,7 @@ class TestTodAgent(unittest.TestCase):
         reg = pb2.msg_manager_register()
         reg.id = "test_mgr"  # use a fake ccap id
         reg.action = pb2.msg_manager_register.UNREG
-        reg.path_info = "ipc:///tmp/test_tod_agent.scok"
+        reg.path_info = "ipc:///tmp/test_tod_agent.sock"
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()
 
@@ -229,6 +230,7 @@ class TestTodAgent(unittest.TestCase):
         print(reg_rsp)
 
         self.assertEqual(reg_rsp.reg_rsp.status, reg_rsp.reg_rsp.OK)
+
 
 if __name__ == "__main__":
     unittest.main()

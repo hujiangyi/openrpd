@@ -299,8 +299,10 @@ class L2tpv3ControlPacket(object):
 
         return False
 
+
 class L2tpv3ZLB(L2tpv3ControlPacket):
     """A wrapper to construct a ZLB packet."""
+
     def __init__(self, connectionID=0, Ns=0, Nr=0):
         super(L2tpv3ZLB, self).__init__(
             connectionID, Ns, Nr, avps=tuple(), avpValueStr=None)
@@ -309,6 +311,7 @@ class L2tpv3ZLB(L2tpv3ControlPacket):
 
 class l2tpV3TerminatePkt(L2tpv3ControlPacket):
     """Base class for CDN and StopCCN."""
+
     def __init__(self, msgType, connID, resultCode, errCode, errMsg):
         stopAvp = L2tpv3RFC3931AVPs.ControlMessageAVP(msgType)
         retcode = L2tpv3RFC3931AVPs.ResultCode(
@@ -319,6 +322,7 @@ class l2tpV3TerminatePkt(L2tpv3ControlPacket):
 
 class L2tpv3StopCCN(l2tpV3TerminatePkt):
     """A wrapper to construct a StopCCN packet."""
+
     def __init__(self, connection, resultCode, errCode, errMsg):
         super(
             L2tpv3StopCCN, self).__init__(L2tpv3RFC3931AVPs.ControlMessageAVP.StopCCN, connection.remoteConnID,
@@ -330,6 +334,7 @@ class L2tpv3StopCCN(l2tpV3TerminatePkt):
 
 class L2tpv3CDN(l2tpV3TerminatePkt):
     """A wrapper to construct a CDN packet."""
+
     def __init__(self, session, resultCode, errCode, errMsg):
         connection = session.connection
         super(
@@ -346,6 +351,7 @@ class L2tpv3CDN(l2tpV3TerminatePkt):
 
 class L2tpv3Hello(L2tpv3ControlPacket):
     """A wrapper to construct a HELLO packet."""
+
     def __init__(self, connID):
         helloavp = L2tpv3RFC3931AVPs.ControlMessageAVP(
             L2tpv3RFC3931AVPs.ControlMessageAVP.HELLO)
@@ -355,6 +361,7 @@ class L2tpv3Hello(L2tpv3ControlPacket):
 
 class L2tpv3ACK(L2tpv3ControlPacket):
     """A wrapper to construct a ACK packet."""
+
     def __init__(self, connID):
         ackavp = L2tpv3RFC3931AVPs.ControlMessageAVP(
             L2tpv3RFC3931AVPs.ControlMessageAVP.ACK)

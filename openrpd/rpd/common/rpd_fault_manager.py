@@ -26,11 +26,13 @@ from rpd.hal.src.transport.HalTransport import HalTransport
 from rpd.hal.lib.drivers.HalDriver0 import HalDriverClient
 from rpd.hal.src.msg import HalCommon_pb2
 from rpd.hal.src.msg.HalMessage import HalMessage
-from rpd.hal.src.HalConfigMsg import MsgTypeFaultManagement, MsgTypeRpdGlobal, MsgTypetEventNotification
-from rpd.gpb.rcp_pb2 import t_RcpMessage
+from rpd.hal.src.HalConfigMsg import MsgTypeFaultManagement, MsgTypeRpdGlobal, MsgTypetEventNotification, MsgTypeRpdCtrl
+from rpd.gpb.rcp_pb2 import t_RcpMessage, t_RpdDataMessage
 from rpd.gpb.monitor_pb2 import t_LED
 from rpd.provision.proto.MonitorMsgType import MsgTypeSetLed
 from rpd.common import rpd_event_def
+from rpd.gpb.EventNotification_pb2 import t_EventNotification
+from rpd.common import utils
 
 
 class FaultManagementClient(HalDriverClient):
@@ -38,6 +40,15 @@ class FaultManagementClient(HalDriverClient):
     refactor the class for fault management
     """
     __metaclass__ = AddLoggerToClass
+
+    RESET_LOG = {
+        "PENDING": 1,
+        "LOCAL": 2,
+    }
+
+    EVENT_VER = '0.0.1'
+    event_buffered_local_file = "/tmp/fault_local_%s.json" % EVENT_VER
+    event_buffered_pending_file = "/tmp/fault_pending_%s.json" % EVENT_VER
 
     def __init__(self, appName, appDesc, appVer, disp, supportedMsgType,
                  supportedNotificationMsgs, interestedNotification=None, send_cb=None):
@@ -55,6 +66,7 @@ class FaultManagementClient(HalDriverClient):
         self.HalConfigMsgHandlers = {
             MsgTypeRpdGlobal: self.set_global_conf,
             MsgTypetEventNotification: self.read_notification_handler,
+            MsgTypeRpdCtrl: self.reset_rpd_log,
         }
         self.HalNotificationMsgHandler = {
             MsgTypeSetLed: self.set_operational_mode,
@@ -69,6 +81,8 @@ class FaultManagementClient(HalDriverClient):
         config = config_data.RpdDataMessage.RpdData
         self.logger.debug("Recv global event configuration message, %s" % config)
         rpd_event_def.RpdEventConfig.set_config(config)
+        config_data.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
+        cfg.msg.CfgMsgPayload = config_data.SerializeToString()
         self.config_refreshed = True
 
     def read_notification_handler(self, cfg):
@@ -77,13 +91,138 @@ class FaultManagementClient(HalDriverClient):
         config_data = t_RcpMessage()
         config_data.ParseFromString(cfg.msg.CfgMsgPayload)
         config = config_data.RpdDataMessage.RpdData
-        self.logger.debug("Recv read request message, %s" % config)
-        notify_req = config.EventNotification
-        if notify_req.HasField("PendingOrLocalLog"):
-            if notify_req.PendingOrLocalLog:
-                self.poll_local_flag = True
+        self.logger.debug("Recv read request message, %s" % config_data)
+
+        # prepare the response
+        rsp_data = t_RcpMessage()
+        rsp_data.RcpMessageType = config_data.RcpMessageType
+        rsp_data.RpdDataMessage.RpdDataOperation = config_data.RpdDataMessage.RpdDataOperation
+
+        read_count = None
+        if config.HasField("ReadCount"):
+            read_count = config.ReadCount
+
+        # go through all requests and create the appropriate response
+        for notify_req in config.EventNotification:
+            # according to the spec the PendingOrLocalLog TLV must be set
+            if notify_req.HasField("PendingOrLocalLog"):
+                if notify_req.PendingOrLocalLog:
+                    buffered = rpd_event_def.EventCommonOperation.BUFFERED_LOCAL
+                else:
+                    buffered = rpd_event_def.EventCommonOperation.BUFFERED_PENDING
+
+                idx = None
+                if notify_req.HasField("RpdEvLogIndex"):
+                    idx = notify_req.RpdEvLogIndex
+                    if read_count is None:
+                        read_count = 1
+                else:
+                    idx = 0
+
+                evtNtfs = self.read_events(buffered, idx, read_count)
+
+                if evtNtfs:
+                    for evt in evtNtfs:
+                        newEvt = rsp_data.RpdDataMessage.RpdData.EventNotification.add()
+                        newEvt.CopyFrom(evt)
+                else:
+                    # no events found return an empty event notification with the
+                    # required fields set
+                    newEvt = rsp_data.RpdDataMessage.RpdData.EventNotification.add()
+                    newEvt.PendingOrLocalLog = notify_req.PendingOrLocalLog
+                    newEvt.RpdEvLogIndex = idx
             else:
-                self.poll_pending_flag = True
+                # return the request content
+                # Note: The default value for EvFirstTime and EvLastTime
+                # is automatically set to R_Dummy, which is wrong for that data
+                # type - so set 1970-1-1T00:00:00.0+0:00 as value
+                newEvt = rsp_data.RpdDataMessage.RpdData.EventNotification.add()
+                newEvt.CopyFrom(notify_req)
+                if newEvt.HasField("EvFirstTime") and newEvt.EvFirstTime == 'R_Dummy':
+                    newEvt.EvFirstTime = utils.Convert.pack_timestamp_to_string(0)
+                if newEvt.HasField("EvLastTime") and newEvt.EvLastTime == 'R_Dummy':
+                    newEvt.EvFirstTime = utils.Convert.pack_timestamp_to_string(0)
+
+        rsp_data.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
+        cfg.msg.CfgMsgPayload = rsp_data.SerializeToString()
+
+    def read_events(self, buffered, idx, rdCnt):
+        """ Read events from the pending queue or local log """
+
+        evtNtfList = []
+        evts = rpd_event_def.EventCommonOperation.read_log(buffered)
+
+        # calculate the number of elements to read;
+        # if the index is not set, then treat it as 0
+        numElements = len(evts)
+        if rdCnt is None:
+            rdCnt = numElements
+        elif rdCnt > (numElements - idx):
+            rdCnt = numElements - idx
+
+        keys = evts.keys()[idx:(idx + rdCnt)]
+        for entry in keys:
+            event, msg = evts[entry]
+            text = msg['text']
+
+            evtNtfEntry = t_EventNotification()
+            evtNtfEntry.RpdEvLogIndex = idx
+            idx += 1
+            evtNtfEntry.PendingOrLocalLog = msg['PENDING_LOCAL']
+            evtNtfEntry.EvFirstTime = utils.Convert.pack_timestamp_to_string(int(msg['FirstTime']))
+            evtNtfEntry.EvLastTime = utils.Convert.pack_timestamp_to_string(int(msg['LastTime']))
+            evtNtfEntry.EvCounts = msg['Counts']
+            evtNtfEntry.EvLevel = msg['Level']
+            evtNtfEntry.EvId = int(event)
+            evtNtfEntry.EvString = text.strip()
+            evtNtfList.append(evtNtfEntry)
+
+            evts.pop(entry)
+
+        if len(evts):
+            rpd_event_def.EventCommonOperation.write_log(evts, buffered)
+
+        return evtNtfList
+
+    def clear_rpd_log(self, reset_log):
+        if reset_log & self.RESET_LOG["PENDING"]:
+            if os.path.exists(self.event_buffered_pending_file):
+                os.remove(self.event_buffered_pending_file)
+
+        if reset_log & self.RESET_LOG["LOCAL"]:
+            if os.path.exists(self.event_buffered_local_file):
+                os.remove(self.event_buffered_local_file)
+
+    def reset_rpd_log(self, cfg):
+        """reset rpd pending and local log."""
+
+        rcp_msg = t_RcpMessage()
+        rcp_msg.ParseFromString(cfg.msg.CfgMsgPayload)
+        if rcp_msg is None:
+            return {"Status": HalCommon_pb2.FAILED,
+                    "ErrorDescription": "DeSerialize ConfigMsgPayload fail"}
+
+        recv_rcp_msg = rcp_msg.RpdDataMessage.RpdData
+        if recv_rcp_msg.HasField("RpdCtrl") and recv_rcp_msg.RpdCtrl.HasField("LogCtrl"):
+            if rcp_msg.RpdDataMessage.RpdDataOperation == t_RpdDataMessage.RPD_CFG_WRITE:
+                ctrl_log = recv_rcp_msg.RpdCtrl.LogCtrl
+                reset_log = ctrl_log.ResetLog
+                self.clear_rpd_log(reset_log)
+                rcp_msg.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
+                cfg.msg.CfgMsgPayload = rcp_msg.SerializeToString()
+                return {"Status": HalCommon_pb2.SUCCESS,
+                        "ErrorDescription": "Get Rpd Control success"}
+            elif rcp_msg.RpdDataMessage.RpdDataOperation == t_RpdDataMessage.RPD_CFG_READ:
+                return {"Status": HalCommon_pb2.SUCCESS_IGNORE_RESULT,
+                        "ErrorDescription": "Operation %d for Rpd Log Control Can Be Ignored" %
+                        rcp_msg.RpdDataMessage.RpdDataOperation}
+            else:
+                return {"Status": HalCommon_pb2.FAILED,
+                        "ErrorDescription": "Operation %d for LogCtrl is not supported"
+                        % rcp_msg.RpdDataMessage.RpdDataOperation}
+        else:
+            return {"Status": HalCommon_pb2.SUCCESS_IGNORE_RESULT,
+                    "ErrorDescription": "Rcp Msg Do Not Have RpdCtrl Field"}
 
     def set_operational_mode(self, cfg):
         """use set led msg to figure system operational status."""
@@ -274,7 +413,8 @@ class FaultManager(object):
         # create a dispatcher
         self.dispatcher = Dispatcher()
         self.fault_ipc = FaultManagementClient("FaultManager", "This is for Fault management",
-                                               "1.0.0", self.dispatcher, (MsgTypeRpdGlobal, MsgTypetEventNotification),
+                                               "1.0.0", self.dispatcher, (MsgTypeRpdGlobal, MsgTypetEventNotification,
+                                                                          MsgTypeRpdCtrl),
                                                (MsgTypeFaultManagement, ), (MsgTypeSetLed, ), self.send_fault_msg)
         self.fault_ipc.start()
         self.dispatcher.fd_register(self.fm_sock.fileno(),
@@ -352,6 +492,8 @@ class FaultManager(object):
             pass
 
         # restart the timer, this should be the only entrance except init
+        if(self.schedule_send_timer):
+            self.dispatcher.timer_unregister(self.schedule_send_timer)
         self.schedule_send_timer = self.dispatcher.timer_register(FaultManager.REPORT_CHECK_INTERVAL,
                                                                   self.schedule_fault_msg)
 
@@ -364,6 +506,8 @@ class FaultManager(object):
             pass
 
         # restart the timer
+        if(self.clear_msg_cnt_timer):
+            self.dispatcher.timer_unregister(self.clear_msg_cnt_timer)
         self.clear_msg_cnt_timer = self.dispatcher.timer_register(
             rpd_event_def.RpdEventConfig.GLOBAL_CONFIG["Interval"], self.clear_msg_cnt)
 
@@ -465,6 +609,7 @@ class FaultManager(object):
 
     def fm_run(self):
         self.dispatcher.loop()
+
 
 if __name__ == "__main__":  # pragma: no cover
     setup_logging("FaultManagement", filename="fault_management.log")

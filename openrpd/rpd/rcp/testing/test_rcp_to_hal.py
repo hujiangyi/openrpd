@@ -234,17 +234,25 @@ def create_full_cfg_sequence():
     return seq
 
 
+def fake_cb(data):
+    print "fake cb handled"
+
+
 class RcpMessageRecordTest(unittest.TestCase):
+
     def setUp(self):
         self.dispatcher = Dispatcher()
+        self.desc = GCPSlaveDescriptor(addr_master='localhost', interface_local='local')
+        self.session = RCPSlaveSession(self.desc, self.dispatcher,
+                                       fake_cb, fake_cb, fake_cb)
 
     def tearDown(self):
         self.dispatcher.end_loop()
 
     def create_data_obj_from_seq(self, seq):
         if not isinstance(seq, RCPSequence):
-                raise TypeError(
-                    "RCPSequences are expected in tuple of RCP data")
+            raise TypeError(
+                "RCPSequences are expected in tuple of RCP data")
 
         try:
             operation = RcpHalIpc.RCP_OPER_TO_RPD_DATA_OPER[seq.operation]
@@ -284,9 +292,9 @@ class RcpMessageRecordTest(unittest.TestCase):
 
     def test_create_rcp_msg_record(self):
         msg_record = RcpMessageRecord(
-            self.dispatcher, event_fire_cb=self.recv_cb, unittest = {
-                "enable":True,
-                "runtimes":1,
+            self.dispatcher, event_fire_cb=self.recv_cb, unittest={
+                "enable": True,
+                "runtimes": 1,
             })
         self.dispatcher.loop()
 
@@ -333,11 +341,22 @@ class RcpMessageRecordTest(unittest.TestCase):
         # Done the message receive part
         return seq_num
 
+    def create_test_session(self):
+        process = RcpProcess("ipc:///tmp/_test_rcp_to_hal.tmp")
+        desc = GCPSlaveDescriptor(
+            "127.0.0.1", port_master=9999, addr_local="127.0.0.1",
+            interface_local="lo",
+            addr_family=socket.AF_INET)
+        return RCPSlaveSession(desc, process.dispatcher,
+                               fake_cb,
+                               fake_cb,
+                               fake_cb)
+
     def test_add_pkt_to_internal_db(self):
 
         # construct the pkt and session
-        session = "test-session"
-        pkt = "test-pkt" # we will not touch this pkt, just return back, so we don't need to construct the pkt
+        session = self.create_test_session()
+        pkt = "test-pkt"  # we will not touch this pkt, just return back, so we don't need to construct the pkt
         gcp_msg = "gcp_msg"
         seq1 = create_cfg_sequence()
         seq2 = create_cfg_sequence()
@@ -396,8 +415,8 @@ class RcpMessageRecordTest(unittest.TestCase):
 
     def test_req_message_timeout(self):
         # construct the pkt and session
-        pkt = "test-pkt" # we will not touch this pkt, just return back, so we don't need to construct the pkt
-        session = "test-session"
+        pkt = "test-pkt"  # we will not touch this pkt, just return back, so we don't need to construct the pkt
+        session = self.create_test_session()
         gcp_msg = "gcp_msg"
         seq1 = create_cfg_sequence()
         seq2 = create_cfg_sequence()
@@ -408,9 +427,9 @@ class RcpMessageRecordTest(unittest.TestCase):
             data_objs.append(self.create_data_obj_from_seq(seq))
 
         msg_record = RcpMessageRecord(
-            self.dispatcher, event_fire_cb=self.recv_cb, unittest = {
-                "enable":True,
-                "runtimes":5,
+            self.dispatcher, event_fire_cb=self.recv_cb, unittest={
+                "enable": True,
+                "runtimes": 5,
             })
         msg_record.add_pkt_to_internal_db(session, pkt, gcp_msg, data_objs)
         self.assertIn((session, pkt, gcp_msg), msg_record.pkt_db)
@@ -431,8 +450,8 @@ class RcpMessageRecordTest(unittest.TestCase):
     def test_compose_rsp_msg(self):
 
         # construct the pkt and session
-        pkt = "test-pkt" # we will not touch this pkt, just return back, so we don't need to construct the pkt
-        session = "test-session"
+        pkt = "test-pkt"  # we will not touch this pkt, just return back, so we don't need to construct the pkt
+        session = self.create_test_session()
         gcp_msg = "gcp_msg"
         seq1 = create_cfg_sequence()
         seq2 = create_cfg_sequence()
@@ -460,7 +479,7 @@ class RcpMessageRecordTest(unittest.TestCase):
             rpd_data_msg = t_RpdDataMessage()
             rpd_data_msg.RpdDataOperation = t_RpdDataMessage.RPD_CFG_WRITE
             rcp_cfg = config()
-            sub_tlv =rcp_cfg.RfChannel.add()
+            sub_tlv = rcp_cfg.RfChannel.add()
             sub_tlv.RfChannelSelector.RfPortIndex = 10
             sub_tlv = rcp_cfg.RfPort.add()
             sub_tlv.RfPortSelector.RfPortIndex = 10
@@ -705,10 +724,10 @@ class RcpHalConfigTest(unittest.TestCase):
         while self.hal_ipc.disconnected and time.time() < timeOut:
             pass
         ipc_msg = {
-            'session':"dummy-session",
-            'req_packet':"dummy-packet",
-            'gcp_msg':"dummy-message",
-            'req_data':[create_cfg_sequence(), ],
+            'session': "dummy-session",
+            'req_packet': "dummy-packet",
+            'gcp_msg': "dummy-message",
+            'req_data': [create_cfg_sequence(), ],
         }
         self.hal_ipc.rcp_cfg_req(ipc_msg)
 
@@ -826,6 +845,7 @@ class RcpHalConfigTest(unittest.TestCase):
 
 
 class RcpHalConfigReq(unittest.TestCase):
+
     def fake_cb(self, cb):
         print "fake cb handled"
 
@@ -905,7 +925,6 @@ class RcpHalConfigReq(unittest.TestCase):
         }
         self.hal_ipc.rcp_cfg_req(ipc_msg)
 
-
         # full
         ipc_msg = {
             'session': dummy_session,
@@ -939,11 +958,19 @@ class RcpHalFuncTest(unittest.TestCase):
             "1.9.0", (1, 100, 102), process,
             "../hal/conf/ClientLogging.conf", shadowLayerConf=TMP_CFG_PATH)
 
+        currentPath = os.path.dirname(os.path.realpath(__file__))
+        dirs = currentPath.split("/")
+        rpd_index = dirs.index("testing") - 2
+        cls.rootpath = "/".join(dirs[:rpd_index])
+
     @classmethod
     def tearDownClass(cls):
         cls.hal_ipc.channel.cleanup()
         cls.hal_ipc.connection_cleanup(cls.hal_ipc.channel.dispatcher)
         cls.hal_ipc.channel.dispatcher.end_loop()
+
+        if os.path.exists(cls.rootpath + 'test_ctrl_init_prov_file.txt'):
+            os.remove(cls.rootpath + 'test_ctrl_init_prov_file.txt')
 
     def setUp(self):
         self.hal_ipc.msg_record = RcpMessageRecord(
@@ -979,7 +1006,7 @@ class RcpHalFuncTest(unittest.TestCase):
         try:
             self.hal_ipc.sendInterestedNotifications((1, 2))
         except Exception as e:
-            self.assertEqual(type(e), TypeError)
+            self.assertEqual(type(e), AttributeError)
 
     def test_sendNotificationMsg(self):
         self.hal_ipc.disconnected = False
@@ -1023,8 +1050,6 @@ class RcpHalFuncTest(unittest.TestCase):
         self.hal_ipc.send_mgr_cfg_msg(MsgTypeSetLed, led_msg)
 
     def test_sendRpdCapReq(self):
-        ret = self.hal_ipc.sendRpdCapReq()
-        self.assertFalse(ret)
         self.hal_ipc.clientID = "123"
         ret = self.hal_ipc.sendRpdCapReq()
         self.assertTrue(ret)
@@ -1136,6 +1161,7 @@ class RcpHalFuncTest(unittest.TestCase):
                          HalNotificationType=MsgTypeInvalid,
                          HalNotificationPayLoad=self.hal_ipc.LOS)
         self.hal_ipc.recvNotificationCb(ntf)
+
     def test_notification_rpd_cap(self):
         self.hal_ipc.rpd_cap = None
         rpd_cap = t_RpdCapabilities()
@@ -1148,11 +1174,15 @@ class RcpHalFuncTest(unittest.TestCase):
         self.assertIsNotNone(self.hal_ipc.rpd_cap)
         self.assertEqual(self.hal_ipc.rpd_cap.NumBdirPorts, 1)
 
-
     def test_recMsgTypeRpdCapabilitiesCb(self):
-        old_cap = self.hal_ipc.rpd_cap
+        rpd_cap = t_RpdCapabilities()
+        rpd_cap.NumBdirPorts = 1
+        self.hal_ipc.notification_rpd_cap(rpd_cap.SerializeToString())
+        self.assertIsNotNone(self.hal_ipc.rpd_cap)
+
         cfgMsgType = MsgTypeRpdCapabilities
         rcp_msg = t_RcpMessage()
+        # test RPD_CFG_READ situation
         rcp_msg.RpdDataMessage.RpdDataOperation = t_RpdDataMessage.RPD_CFG_READ
         rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
         data = config()
@@ -1171,6 +1201,66 @@ class RcpHalFuncTest(unittest.TestCase):
         record_req_elem.rsp_list = []
         ret = self.hal_ipc.recMsgTypeRpdCapabilitiesCb(msg)
         self.assertTrue(ret)
+
+        # test RPD_CFG_WRITE situation and rcp_msg does not have DeviceLocation field
+        self.hal_ipc.CTRL_RPD_INIT_PROV_INFO_PATH = self.rootpath + "test_ctrl_init_prov_file.txt"
+        self.assertFalse(os.path.exists(self.hal_ipc.CTRL_RPD_INIT_PROV_INFO_PATH))
+        data = config()
+        data.RpdCapabilities.RpdIdentification.AssetId = "test_Asset_Id"
+        data.RpdCapabilities.RpdIdentification.DeviceAlias = "test_Device_Alias"
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(data)
+        rcp_msg.RpdDataMessage.RpdDataOperation = t_RpdDataMessage.RPD_CFG_WRITE
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig", SrcClientID='1',
+                         SeqNum=self.hal_ipc.seqNum,
+                         CfgMsgType=cfgMsgType,
+                         CfgMsgPayload=payload)
+        ret = self.hal_ipc.recMsgTypeRpdCapabilitiesCb(msg)
+        self.assertTrue(ret)
+        self.assertTrue(os.path.exists(self.hal_ipc.CTRL_RPD_INIT_PROV_INFO_PATH))
+        with open(self.hal_ipc.CTRL_RPD_INIT_PROV_INFO_PATH, 'r') as fd:
+            out = fd.read()
+        self.assertTrue("test_Asset_Id" in out)
+        self.assertTrue("test_Device_Alias" in out)
+        self.assertFalse("RPD Location Description" in out)
+
+        # test RPD_CFG_WRITE situation and rcp_msg does not have RpdIdentification field
+        data = config()
+        data.RpdCapabilities.DeviceLocation.DeviceLocationDescription = "test_description"
+        data.RpdCapabilities.DeviceLocation.GeoLocationLatitude = "test_latitude"
+        data.RpdCapabilities.DeviceLocation.GeoLocationLongitude = "test_longitude"
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(data)
+        rcp_msg.RpdDataMessage.RpdDataOperation = t_RpdDataMessage.RPD_CFG_WRITE
+        payload = rcp_msg.SerializeToString()
+        os.remove(self.hal_ipc.CTRL_RPD_INIT_PROV_INFO_PATH)
+        self.assertFalse(os.path.exists(self.hal_ipc.CTRL_RPD_INIT_PROV_INFO_PATH))
+        msg = HalMessage("HalConfig", SrcClientID='1',
+                         SeqNum=self.hal_ipc.seqNum,
+                         CfgMsgType=cfgMsgType,
+                         CfgMsgPayload=payload)
+        ret = self.hal_ipc.recMsgTypeRpdCapabilitiesCb(msg)
+        self.assertTrue(ret)
+
+        with open(self.hal_ipc.CTRL_RPD_INIT_PROV_INFO_PATH, 'r') as fd:
+            out = fd.read()
+        self.assertTrue(os.path.exists(self.hal_ipc.CTRL_RPD_INIT_PROV_INFO_PATH))
+        self.assertTrue("test_description" in out)
+        self.assertTrue("test_latitude" in out)
+        self.assertTrue("test_longitude" in out)
+        self.assertFalse("Device Alias" in out)
+
+        # test wrong operation
+        data = config()
+        data.RpdCapabilities.DeviceLocation.DeviceLocationDescription = "test_description"
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(data)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 3
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig", SrcClientID='1',
+                         SeqNum=self.hal_ipc.seqNum,
+                         CfgMsgType=cfgMsgType,
+                         CfgMsgPayload=payload)
+        ret = self.hal_ipc.recMsgTypeRpdCapabilitiesCb(msg)
+        self.assertFalse(ret)
 
     def test_recMsgTypeRpdCapabilitiesRspCb(self):
 
@@ -1222,7 +1312,7 @@ class RcpHalFuncTest(unittest.TestCase):
         sub_tlv.Index = 1
         sub_tlv.CoreId = "1234567890"
 
-        sub_tlv.IsPrincipal= True
+        sub_tlv.IsPrincipal = True
         sub_tlv.CoreMode = 1
         sub_tlv.CoreId = 'CoreId'
         sub_tlv.CoreIpAddress = '1.1.1.1'

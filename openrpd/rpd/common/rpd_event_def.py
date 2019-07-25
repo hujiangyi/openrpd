@@ -44,8 +44,8 @@ RPD_EVENT_CONNECTIVITY_MUL_ACTIVE_PRINCIPAL = 66070203, (rcp_tlv_def.RPD_EVENT_L
 RPD_EVENT_CONNECTIVITY_GCP_FAILURE = 66070204, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR, "GCP Connection Failure; %s")
 RPD_EVENT_CONNECTIVITY_LOSS_SYNC = 66070205, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR, "Loss of Clock Sync %s")
 RPD_EVENT_CONNECTIVITY_SYNC = 66070206, (rcp_tlv_def.RPD_EVENT_LEVEL_NOTICE, "Clock Sync Reestablished %s")
-RPD_EVENT_CONNECTIVITY_207 = 66070207, (rcp_tlv_def.RPD_EVENT_LEVEL_WARNING, "Loss of Clock Slave %s")
-RPD_EVENT_CONNECTIVITY_208 = 66070208, (rcp_tlv_def.RPD_EVENT_LEVEL_NOTICE, "Clock Slave Reestablished %s")
+RPD_EVENT_CONNECTIVITY_LOSS_CLOCK_SLAVE = 66070207, (rcp_tlv_def.RPD_EVENT_LEVEL_WARNING, "Loss of Clock Slave %s")
+RPD_EVENT_CONNECTIVITY_CLOCK_SLAVE_REESTABLISHED = 66070208, (rcp_tlv_def.RPD_EVENT_LEVEL_NOTICE, "Clock Slave Reestablished %s")
 RPD_EVENT_CONNECTIVITY_FAILOVER_STANDBY = 66070210, (rcp_tlv_def.RPD_EVENT_LEVEL_WARNING,
                                                      "Failover to Standby Core %s")
 RPD_EVENT_CONNECTIVITY_211 = 66070211, (rcp_tlv_def.RPD_EVENT_LEVEL_WARNING, "Failback to Active Core %s")
@@ -54,7 +54,17 @@ RPD_EVENT_CONNECTIVITY_REBOOT = 66070212, (rcp_tlv_def.RPD_EVENT_LEVEL_NOTICE, "
 RPD_EVENT_CONNECTIVITY_ETH_DOWN = 66070213, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR, "Ethernet Link Down %s %s")
 RPD_EVENT_CONNECTIVITY_ETH_UP = 66070214, (rcp_tlv_def.RPD_EVENT_LEVEL_NOTICE, "Ethernet Link Up %s %s")
 RPD_EVENT_CONNECTIVITY_SYS_REBOOT = 66070217, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR, "System Failure Reboot %s %s %s")
-RPD_EVENT_CONNECTIVITY_218 = 66070218, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR, "Diagnostic Self Test Failure %s %s %s %s")
+RPD_EVENT_CONNECTIVITY_DIAGNOSTIC_SELF_TEST_FAIL = 66070218, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR,
+                                                              "Diagnostic Self Test Failure; %s, %s, %s")
+
+# PTP
+RPD_EVENT_PTP_SYNC_TO_MASTER = 66070700, (rcp_tlv_def.RPD_EVENT_LEVEL_NOTICE,
+                                          "RPD=%s PTP clock synchronized to Master=%s")
+RPD_EVENT_PTP_LOSS_SYNC = 66070701, (rcp_tlv_def.RPD_EVENT_LEVEL_WARNING,
+                                     "RPD=%s PTP clock lost synchronized to Master=%s")
+RPD_EVENT_PTP_HOLDOVER = 66070702, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR,
+                                    "RPD=%s PTP clock excessive holdover to Master=%s")
+RPD_EVENT_PTP_FAILURE_TO_MASTER = 66070703, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR, "RPD=%s PTP failure to Master=%s")
 
 # DHCP, TOD
 RPD_EVENT_DHCP_RENEW_NO_RESP = 66070300, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR, "DHCP RENEW sent - No response for %s")
@@ -80,10 +90,22 @@ RPD_EVENT_DHCP_RSP_NON_CRITICAL_INVALID_FIELD = 66070312, (rcp_tlv_def.RPD_EVENT
                                                            "DHCP FAILED - Non-critical field invalid in response")
 RPD_EVENT_DHCP_RSP_CRITICAL_INVALID_FIELD = 66070313, (rcp_tlv_def.RPD_EVENT_LEVEL_CRITICAL,
                                                        "DHCP FAILED - Critical field invalid in response")
+
+RPD_EVENT_DHCPV6_NO_RA = 66070314, (rcp_tlv_def.RPD_EVENT_LEVEL_CRITICAL, "DHCP failed - RS sent, no RA received %s")
+RPD_EVENT_DHCPV6_INVALID_RA = 66070315, (rcp_tlv_def.RPD_EVENT_LEVEL_CRITICAL, "DHCP Failed - Invalid RA %s")
+
 RPD_EVENT_DHCPV6_REQ_NO_REP = 66070316, (rcp_tlv_def.RPD_EVENT_LEVEL_CRITICAL,
                                          "DHCP failed - DHCP Solicit sent, No DHCP Advertise received %s")
 RPD_EVENT_DHCP_REQ_NO_REP = 66070317, (rcp_tlv_def.RPD_EVENT_LEVEL_CRITICAL,
                                        "DHCP failed - DHCP Request sent, No DHCP REPLY received %s")
+RPD_EVENT_DHCPV6_NO_SECONDARY = 66070318, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR,
+                                           "Primary address acquired, secondary failed %s")
+RPD_EVENT_DHCPV6_NO_PRIMARY = 66070319, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR,
+                                         "Primary address failed, secondary active %s")
+RPD_EVENT_DHCPV6_DAD_LOCAL = 66070320, (rcp_tlv_def.RPD_EVENT_LEVEL_CRITICAL,
+                                        "Link-Local address failed DAD %s")
+RPD_EVENT_DHCPV6_DAD_LEASE = 66070321, (rcp_tlv_def.RPD_EVENT_LEVEL_CRITICAL,
+                                        "DHCP lease address failed DAD %s")
 
 RPD_EVENT_TOD_NO_RESPONSE = 66070322, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR, "ToD request sent - No Response received %s")
 RPD_EVENT_TOD_INVALID_FMT = 66070323, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR,
@@ -102,6 +124,16 @@ RPD_EVENT_SSD_DOWNLOAD_FAIL_SERVER_NOT_PRESENT = 66070403, (rcp_tlv_def.RPD_EVEN
 RPD_EVENT_SSD_DOWNLOAD_FAIL_FILE_NOT_PRESENT = 66070404, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR,
                                                           "SW upgrade Failed before download - File not Present: "
                                                           "SW file:%s - SW server:%s %s")
+RPD_EVENT_SSD_DOWNLOAD_FAIL_TFTP_MAX_RETRY = 66070405, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR,
+                                                        "SW upgrade Failed before download - TFTP Max Retry Exceeded: SW file:%s - SW server:%s %s")
+RPD_EVENT_SSD_INCOMPATIBLE_SW_FILE = 66070406, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR,
+                                                "SW upgrade Failed after download - Incompatible SW file: SW file:%s - SW server:%s %s")
+RPD_EVENT_SSD_SW_FILE_CORRUPTION = 66070407, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR,
+                                              "SW upgrade Failed after download - SW File corruption: SW file:%s - SW server:%s %s")
+RPD_EVENT_SSD_INTERRUPT_BY_POWER_FAILURE = 66070408, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR,
+                                                      "SW upgrade Failed during download - Power Failure: SW file:%s - SW server:%s %s")
+RPD_EVENT_SSD_INTERRUPT_BY_RF_REMOVED = 66070409, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR,
+                                                   "SW upgrade Failed during download -  RF removed: SW file:%s - SW server:%s %s")
 RPD_EVENT_SSD_DOWNLOAD_SUCCESSFUL_RPD = 66070410, (rcp_tlv_def.RPD_EVENT_LEVEL_NOTICE,
                                                    "SW download Successful - Via RPD CLI: SW file:%s - SW server:%s %s")
 RPD_EVENT_SSD_DOWNLOAD_SUCCESSFUL_GCP = 66070411, (rcp_tlv_def.RPD_EVENT_LEVEL_NOTICE,
@@ -129,7 +161,12 @@ RPD_EVENT_L2TP_SESSION_DOWN = 66070215, (rcp_tlv_def.RPD_EVENT_LEVEL_ERROR, "Pse
 RPD_EVENT_L2TP_SESSION_UP = 66070216, (rcp_tlv_def.RPD_EVENT_LEVEL_NOTICE, "Pseudowire Connection Up: %s %s;%s")
 
 # Physical and Environmental
-RPD_EVENT_PHYSICAL_ENV_507 = 66070507, (rcp_tlv_def.RPD_EVENT_LEVEL_WARNING, "%s %s %s")
+RPD_EVENT_PHYSICAL_ENCLOSURE_DOOR_OPEN = 66070504, (rcp_tlv_def.RPD_EVENT_LEVEL_WARNING, "Enclosure door opened %s")
+RPD_EVENT_HUMIDITY_EXCEED_HIGH_THRESHOLD = 66070505, (rcp_tlv_def.RPD_EVENT_LEVEL_WARNING,
+                                                      "Sensor unit=%s - High Humidity Threshold Exceeded %s %s %s")
+RPD_EVENT_HUMIDITY_EXCEED_NORMAL = 66070506, (rcp_tlv_def.RPD_EVENT_LEVEL_WARNING,
+                                              "Sensor unit=%s - Normal Operating Humidity Exceeded:%s %s %s")
+RPD_EVENT_ACCESS_LOCAL_PORT = 66070507, (rcp_tlv_def.RPD_EVENT_LEVEL_WARNING, "Local craft port accessed %s")
 
 # emd event
 RPD_EVENT_EMD_TEMP_ERR = 66070500, (rcp_tlv_def.RPD_EVENT_LEVEL_WARNING, "Rpd temperature abnormal %s")
@@ -204,8 +241,8 @@ RPD_EVENT_ALL = (
     RPD_EVENT_CONNECTIVITY_GCP_FAILURE,
     RPD_EVENT_CONNECTIVITY_LOSS_SYNC,
     RPD_EVENT_CONNECTIVITY_SYNC,
-    RPD_EVENT_CONNECTIVITY_207,
-    RPD_EVENT_CONNECTIVITY_208,
+    RPD_EVENT_CONNECTIVITY_LOSS_CLOCK_SLAVE,
+    RPD_EVENT_CONNECTIVITY_CLOCK_SLAVE_REESTABLISHED,
     RPD_EVENT_L2TP_CONN_ERR,
     RPD_EVENT_CONNECTIVITY_FAILOVER_STANDBY,
     RPD_EVENT_CONNECTIVITY_211,
@@ -213,9 +250,14 @@ RPD_EVENT_ALL = (
     RPD_EVENT_CONNECTIVITY_ETH_DOWN,
     RPD_EVENT_CONNECTIVITY_ETH_UP,
     RPD_EVENT_CONNECTIVITY_SYS_REBOOT,
+    RPD_EVENT_CONNECTIVITY_DIAGNOSTIC_SELF_TEST_FAIL,
     RPD_EVENT_L2TP_SESSION_DOWN,
     RPD_EVENT_L2TP_SESSION_UP,
-    RPD_EVENT_CONNECTIVITY_218,
+
+    RPD_EVENT_PTP_SYNC_TO_MASTER,
+    RPD_EVENT_PTP_LOSS_SYNC,
+    RPD_EVENT_PTP_HOLDOVER,
+    RPD_EVENT_PTP_FAILURE_TO_MASTER,
 
     RPD_EVENT_DHCP_RENEW_NO_RESP,
     RPD_EVENT_DHCP_REBIND_NO_RESP,
@@ -227,8 +269,14 @@ RPD_EVENT_ALL = (
     RPD_EVENT_DHCP_CORE_LIST_MISSING,
     RPD_EVENT_DHCP_DISCOVER_NO_OFFER,
     RPD_EVENT_DHCP_REQ_NO_RSP,
+    RPD_EVENT_DHCPV6_NO_RA,
+    RPD_EVENT_DHCPV6_INVALID_RA,
     RPD_EVENT_DHCPV6_REQ_NO_REP,
     RPD_EVENT_DHCP_REQ_NO_REP,
+    RPD_EVENT_DHCPV6_NO_SECONDARY,
+    RPD_EVENT_DHCPV6_NO_PRIMARY,
+    RPD_EVENT_DHCPV6_DAD_LOCAL,
+    RPD_EVENT_DHCPV6_DAD_LEASE,
     RPD_EVENT_DHCP_RSP_NON_CRITICAL_INVALID_FIELD,
     RPD_EVENT_DHCP_RSP_CRITICAL_INVALID_FIELD,
     RPD_EVENT_TOD_NO_RESPONSE,
@@ -239,6 +287,11 @@ RPD_EVENT_ALL = (
     RPD_EVENT_SSD_DOWNLOAD_FAILED_AFTER_RETRY,
     RPD_EVENT_SSD_DOWNLOAD_FAIL_SERVER_NOT_PRESENT,
     RPD_EVENT_SSD_DOWNLOAD_FAIL_FILE_NOT_PRESENT,
+    RPD_EVENT_SSD_DOWNLOAD_FAIL_TFTP_MAX_RETRY,
+    RPD_EVENT_SSD_INCOMPATIBLE_SW_FILE,
+    RPD_EVENT_SSD_SW_FILE_CORRUPTION,
+    RPD_EVENT_SSD_INTERRUPT_BY_POWER_FAILURE,
+    RPD_EVENT_SSD_INTERRUPT_BY_RF_REMOVED,
     RPD_EVENT_SSD_DOWNLOAD_SUCCESSFUL_RPD,
     RPD_EVENT_SSD_DOWNLOAD_SUCCESSFUL_GCP,
     RPD_EVENT_SSD_IMPROPER_CODEFILE,
@@ -249,7 +302,10 @@ RPD_EVENT_ALL = (
     RPD_EVENT_SSD_IMPROPER_GCP_CVC_FORMAT,
     RPD_EVENT_SSD_GCP_CVC_VALIDATION_FAIL,
 
-    RPD_EVENT_PHYSICAL_ENV_507,
+    RPD_EVENT_PHYSICAL_ENCLOSURE_DOOR_OPEN,
+    RPD_EVENT_HUMIDITY_EXCEED_HIGH_THRESHOLD,
+    RPD_EVENT_HUMIDITY_EXCEED_NORMAL,
+    RPD_EVENT_ACCESS_LOCAL_PORT,
     # emd event
     RPD_EVENT_EMD_TEMP_ERR,
     RPD_EVENT_EMD_TEMP_WARN,

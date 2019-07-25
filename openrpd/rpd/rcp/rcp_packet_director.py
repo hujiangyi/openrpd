@@ -16,7 +16,6 @@
 # limitations under the License.
 #
 
-import os
 from rpd.rcp.rcp_lib import rcp_tlv_def
 from rpd.rcp.gcp.gcp_lib import gcp_msg_def
 from rpd.rcp.rcp_lib.rcp import RCPPacketBuilder
@@ -31,6 +30,7 @@ from rpd.gpb.GeneralNotification_pb2 import t_GeneralNotification
 from rpd.gpb.StaticPwStatus_pb2 import t_StaticPwStatus
 import random
 from rpd.gpb.RpdCapabilities_pb2 import t_RpdCapabilities
+from rpd.rcp.rcp_hal import DataObj
 
 
 class RCPSlavePacketBuildDirector(object):
@@ -44,8 +44,8 @@ class RCPSlavePacketBuildDirector(object):
     PTP_SYNC = 1
     PTP_LOS = 2
     PTP_STATUS_TO_GCP_VAL = {
-        "ALIGNED":          PTP_SYNC,
-        "LOSS OF SYNC":     PTP_LOS,
+        "ALIGNED": PTP_SYNC,
+        "LOSS OF SYNC": PTP_LOS,
     }
 
     CISCO_VENDOR_ID = 9
@@ -58,7 +58,7 @@ class RCPSlavePacketBuildDirector(object):
     def _set_ipv6_info(self, seq, msg):
         """set VendorSpecificExtension Ipv6Address from msg."""
 
-        self.logger.debug("send a RpdIpv6Info notification message to Hal %s",msg)
+        self.logger.debug("send a RpdIpv6Info notification message to Hal %s", msg)
         ipv6_msg = t_VendorSpecificExtension()
         ipv6_msg.ParseFromString(msg)
         seq.VendorSpecificExtension.VendorId.set_val(self.CISCO_VENDOR_ID)
@@ -125,7 +125,7 @@ class RCPSlavePacketBuildDirector(object):
         seq.RpdCapabilities.RpdIdentification.ModelNumber.set_val("123456")
         mac = utils.SysTools.get_sys_mac_address()
 
-        #for vRPD we can get the mac from interface in case the system mac is not set
+        # for vRPD we can get the mac from interface in case the system mac is not set
         if mac == "00:00:00:00:00:00" and utils.SysTools.is_vrpd():
             try:
                 if None is not interface_local:
@@ -146,7 +146,7 @@ class RCPSlavePacketBuildDirector(object):
         seq.RpdCapabilities.RpdIdentification.RpdRcpProtocolVersion.\
             set_val("1.0")
         seq.RpdCapabilities.RpdIdentification.RpdRcpSchemaVersion.\
-            set_val("1.0.0")
+            set_val("1.0.8")
 
     def _set_devicelocation(self, seq, cap=None):
         if isinstance(cap, t_RpdCapabilities):
@@ -156,6 +156,15 @@ class RCPSlavePacketBuildDirector(object):
         seq.RpdCapabilities.DeviceLocation.GeoLocationLatitude.set_val("+000000.0")
         seq.RpdCapabilities.DeviceLocation.GeoLocationLongitude.set_val("+0000000.0")
         self.logger.debug("Set DeviceLocation to default NA")
+
+    def _set_rpd_ucdrefresh(self, seq, rfchannel):
+        sub_tlv = seq.RfChannel.add_new_repeated()
+        sub_tlv.RfChannelSelector.RfPortIndex.set_val(rfchannel.RfChannelSelector.RfPortIndex)
+        sub_tlv.RfChannelSelector.RfChannelIndex.set_val(rfchannel.RfChannelSelector.RfChannelIndex)
+        sub_tlv.RfChannelSelector.RfChannelType.set_val(rfchannel.RfChannelSelector.RfChannelType)
+        sub_tlv.UsOfdmaChannelPerf.UcdRefreshStatusOfdma.UcdRefreshRequestOfdma.set_val(True)
+        sub_tlv.UsOfdmaChannelPerf.UcdRefreshStatusOfdma.UcdRefreshReasonOfdma.set_val(rfchannel.UsOfdmaChannelPerf.UcdRefreshStatusOfdma.UcdRefreshReasonOfdma)
+        self.logger.debug("Set ucdrefresh")
 
     def get_fault_management_notify_packet(self, slave, event, text, msg):
         if None is slave or None is msg:
@@ -173,21 +182,22 @@ class RCPSlavePacketBuildDirector(object):
                                  gpb_config=None)
 
         # Fill GCP message fields
-        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0xc0)
         self.builder.last_gcp_msg.msg_fields.Status.set_val(0)
         self.builder.last_gcp_msg.msg_fields.EventCode.set_val(1)
 
         # Fill some hardcoded data now
         seq = self.builder.last_rcp_sequence
 
-        # seq.EventNotification.Index.set_val(index)
-        seq.EventNotification.PendingOrLocalLog.set_val(msg['PENDING_LOCAL'])
-        seq.EventNotification.EvFirstTime.set_val(utils.Convert.pack_timestamp_to_string(int(msg['FirstTime'])))
-        seq.EventNotification.EvLastTime.set_val(utils.Convert.pack_timestamp_to_string(int(msg['LastTime'])))
-        seq.EventNotification.EvCounts.set_val(msg['Counts'])
-        seq.EventNotification.EvLevel.set_val(msg['Level'])
-        seq.EventNotification.EvId.set_val(event)
-        seq.EventNotification.EvString.set_val(text.strip())
+        evt_ntf = seq.EventNotification.add_new_repeated()
+        # evt_ntf.Index.set_val(index)
+        evt_ntf.PendingOrLocalLog.set_val(msg['PENDING_LOCAL'])
+        evt_ntf.EvFirstTime.set_val(utils.Convert.pack_timestamp_to_string(int(msg['FirstTime'])))
+        evt_ntf.EvLastTime.set_val(utils.Convert.pack_timestamp_to_string(int(msg['LastTime'])))
+        evt_ntf.EvCounts.set_val(msg['Counts'])
+        evt_ntf.EvLevel.set_val(msg['Level'])
+        evt_ntf.EvId.set_val(event)
+        evt_ntf.EvString.set_val(text.strip())
 
         pkts = self.builder.get_packets()
         if len(pkts) != 1:
@@ -211,10 +221,10 @@ class RCPSlavePacketBuildDirector(object):
         self.builder.add_rcp_msg(rcp_tlv_def.RCP_MSG_TYPE_NTF)
         self.builder.add_rcp_seq(rcp_sequence_id,
                                  rcp_tlv_def.RCP_OPERATION_TYPE_WRITE,
-                                 gpb_config=None)  
+                                 gpb_config=None)
 
         # Fill GCP message fields
-        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0xc0)
         self.builder.last_gcp_msg.msg_fields.Status.set_val(0)
         self.builder.last_gcp_msg.msg_fields.EventCode.set_val(1)
 
@@ -247,7 +257,7 @@ class RCPSlavePacketBuildDirector(object):
                                  gpb_config=None)
 
         # Fill GCP message fields
-        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0xc0)
         self.builder.last_gcp_msg.msg_fields.Status.set_val(0)
         self.builder.last_gcp_msg.msg_fields.EventCode.set_val(1)
 
@@ -311,7 +321,7 @@ class RCPSlavePacketBuildDirector(object):
                                  gpb_config=None)  # TODO get the GPB from DB
 
         # Fill GCP message fields
-        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0x0)
+        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0xc0)
         self.builder.last_gcp_msg.msg_fields.Status.set_val(0)
         self.builder.last_gcp_msg.msg_fields.EventCode.set_val(1)
 
@@ -345,7 +355,7 @@ class RCPSlavePacketBuildDirector(object):
                                  gpb_config=None)  # TODO get the GPB from DB
 
         # Fill GCP message fields
-        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0x0)
+        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0xc0)
         self.builder.last_gcp_msg.msg_fields.Status.set_val(0)
         self.builder.last_gcp_msg.msg_fields.EventCode.set_val(1)
 
@@ -363,19 +373,8 @@ class RCPSlavePacketBuildDirector(object):
         self.logger.info("Send GeneralNtf packets to ccap core:%s", pkts[0])
         return pkts[0]
 
-    def get_notify_up_request_packet(self, slave):
-
-        """Builds and returns GCP packet including GCP NTFUPReq message with NTF UP
-        RCP message
-
-        :param slave: The RCP Slave session.
-        :returns RCP packet with all data set.
-        :raises AttributeError: If the slave session is not passed.
-        :raises RCPPacketBuildError : If some error occurred during the build
-        of the packet.
-
-        """
-        if None is slave:
+    def get_ucdrefresh_notify_packet(self, slave, rfchannel):
+        if None is slave or None is rfchannel:
             raise AttributeError()
 
         self.builder.clear()
@@ -391,22 +390,25 @@ class RCPSlavePacketBuildDirector(object):
 
         # Fill GCP message fields
         self.builder.last_gcp_msg.msg_fields.Mode.set_val(0xc0)
-        self.builder.last_gcp_msg.msg_fields.Status.set_val(1)
+        self.builder.last_gcp_msg.msg_fields.Status.set_val(0)
         self.builder.last_gcp_msg.msg_fields.EventCode.set_val(1)
 
         # TODO get the GPB from DB and use it in the add_rcp_seq() above
         # Fill some hardcoded data now
         seq = self.builder.last_rcp_sequence
-        self._set_general_ntf_info(seq, t_GeneralNotification.STARTUPNOTIFICATION)
+        self._set_general_ntf_info(seq, t_GeneralNotification.CHANNELUCDREFRESHREQUEST)
+        self._set_rpd_ucdrefresh(seq, rfchannel)
+
+        # can we guarantee the first packet is the one we just created?
         pkts = self.builder.get_packets()
         if len(pkts) != 1:
             raise RCPPacketBuildError(
-                "Unexpected resulting number of packets: {}, "
+                "Unexpected GeneralNtf resulting number of packets: {}, "
                 "expected: 1".format(len(pkts)))
+        self.logger.info("Send GeneralNtf packets to ccap core:%s", pkts[0])
         return pkts[0]
 
     def get_notify_request_packet(self, slave, cap=None):
-
         """Builds and returns GCP packet including GCP NTFReq message with NTF
         RCP message and RCPSequence with RPD Identification data.
 
@@ -483,7 +485,7 @@ class RCPSlavePacketBuildDirector(object):
         seq.msg_id = gcp_msg.message_id
         seq.msg_name = gcp_msg.message_name
         seq.reinit()
-        #seq.clear_read()
+        # seq.clear_read()
         if seq.operation == rcp_tlv_def.RCP_OPERATION_TYPE_READ:
             seq.operation =\
                 rcp_tlv_def.RCP_OPERATION_TYPE_READ_RESPONSE
@@ -623,13 +625,14 @@ class RCPSlavePacketBuildDirector(object):
 
                     # get rsp_data
                     rsp_data = None
+                    rsp_code = 0
                     for data in rsp_data_list:
                         self.logger.debug("the rsp date operation_id: %d, seq number: %d",
                                           data.operation_id, seq.seq_number)
                         if data.operation_id == seq.seq_number:
                             rsp_data = data
                             rsp_data_list.remove(rsp_data)
-                            break
+                            rsp_code |= (rsp_data.result == DataObj.CFG_OPER_RESULT_GENERAL_ERROR)
 
                     try:
                         ret_seq = RCPSequence(
@@ -640,7 +643,13 @@ class RCPSlavePacketBuildDirector(object):
                             parent_gpb=rsp_data.rsp_data if rsp_data is not None else None,
                             skip_create_tlv_data=True
                         )
-                        self._set_seq_ok(ret_seq)
+                        if rsp_code:
+                            self._set_seq_failed(ret_seq)
+                            self.logger.debug("Response general error for rcp message "
+                                              "seq_number=%d rsp_data=%s",
+                                              seq.seq_number, rsp_data)
+                        else:
+                            self._set_seq_ok(ret_seq)
                         rcp_msg.sequences.append(ret_seq)
                     except Exception as ex:
                         self.logger.error("Failed to re-init RCP SEQ with result data: %s", ex)
@@ -768,6 +777,9 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
         seq.RpdCapabilities.RpdIdentification.RpdRcpProtocolVersion.set_is_used()
         seq.RpdCapabilities.RpdIdentification.RpdRcpSchemaVersion.set_is_used()
         seq.RpdCapabilities.RpdIdentification.HwRevision.set_is_used()
+        seq.RpdCapabilities.RpdIdentification.CurrentSwImageLastUpdate.set_is_used()
+        seq.RpdCapabilities.RpdIdentification.CurrentSwImageName.set_is_used()
+        seq.RpdCapabilities.RpdIdentification.CurrentSwImageServer.set_is_used()
 
         # for rcp rpd capabilities 50.20
         sub_tlv = \
@@ -799,7 +811,6 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
         sub_tlv.Deprecated.set_is_used()
         sub_tlv.AllocatedNdfChannels.set_is_used()
 
-
         # for rcp rpd capabilities 50.23
         sub_tlv = seq.RpdCapabilities.AllocUsChanResources.add_new_repeated()
         sub_tlv.UsPortIndex.set_val(1)
@@ -808,7 +819,6 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
         sub_tlv.AllocatedUsOob55d1Channels.set_is_used()
         sub_tlv.Deprecated.set_is_used()
         sub_tlv.AllocatedNdrChannels.set_is_used()
-
 
         # for rcp rpd capabilities 50.24
         sub_tlv = seq.RpdCapabilities.DeviceLocation
@@ -823,6 +833,11 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
         seq.RpdCapabilities.SupportsFrequencyTilt.set_is_used()
         seq.RpdCapabilities.TiltRange.set_is_used()
 
+        # for rcp rpd capabilities 50.54
+        sub_tlv = seq.RpdCapabilities.OfdmConfigurationCapabilities
+        sub_tlv.set_is_used()
+        sub_tlv.RequiresOfdmaImDurationConfig.set_is_used()
+
         pkts = self.builder.get_packets()
         if len(pkts) != 1:
             raise RCPPacketBuildError(
@@ -830,7 +845,7 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
                 "expected: 1".format(len(pkts)))
         return pkts[0]
 
-    def get_ccap_capabilities_write_packet(self, master, slave_fd):
+    def get_ccap_core_ident_write_packet(self, master, slave_fd):
         """Creates a packet including EDSReq message with REX message with the
         sequence including write operation for CCAP Capabilities.
 
@@ -868,16 +883,24 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
 
         ccap_ident = seq.CcapCoreIdentification.add_new_repeated()
         ccap_ident.Index.set_val(caps.index)
-        ccap_ident.CoreId.set_val("{}".format(master_addr[1]))
-        ccap_ident.CoreIpAddress.set_val(
-            utils.Convert.ipaddr_to_tuple_of_bytes(master.descr.addr_local))
+        ccap_ident.CoreId.set_val(bytes(caps.core_id))
+        ccap_ident.CoreIpAddress.set_val(utils.Convert.ipaddr_to_tuple_of_bytes(caps.core_ip_addr))
+#            utils.Convert.ipaddr_to_tuple_of_bytes(master.descr.addr_local))
         ccap_ident.IsPrincipal.set_val(1 if caps.is_principal else 0)
         if None is caps.core_name:
             ccap_ident.CoreName.set_val(
                 "Testing_core_{}".format(master_addr[0]))
         else:
             ccap_ident.CoreName.set_val(caps.core_name)
-        ccap_ident.VendorId.set_val(0)
+        ccap_ident.VendorId.set_val(caps.vendor_id)
+        core_mode = 1
+        if not caps.is_active:
+            core_mode = 2
+        ccap_ident.CoreMode.set_val(core_mode)
+        ccap_ident.InitialConfigurationComplete.set_val(False)
+        ccap_ident.MoveToOperational.set_val(False)
+        ccap_ident.CoreFunction.set_val(caps.core_function)
+        ccap_ident.ResourceSetIndex.set_val(caps.resource_set_index)
 
         pkts = self.builder.get_packets()
         if len(pkts) != 1:
@@ -917,7 +940,7 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
                 "expected: 1".format(len(pkts)))
         return pkts[0]
 
-    def test_config_done_packet(self, master, slave_fd):
+    def send_initial_complete_packet(self, master, slave_fd):
         """Creates a packet including EDSReq message with REX message with the
         sequence including write operation for HA feature.
 
@@ -926,6 +949,104 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
         :param slave_fd: The file descriptor of the slave's connection.
 
         """
+        if None is master:
+            raise AttributeError()
+
+        self.builder.clear()
+        transaction_id = master.slave_cons[slave_fd].get_next_trans_id()
+        rcp_sequence_id = master.slave_cons[slave_fd].get_next_seq_id()
+
+        self.builder.add_packet(transaction_id=transaction_id)
+        self.builder.add_gcp_msg(gcp_msg_def.DataStructREQ, transaction_id)
+        self.builder.add_rcp_msg(rcp_tlv_def.RCP_MSG_TYPE_REX)
+        self.builder.add_rcp_seq(rcp_sequence_id,
+                                 rcp_tlv_def.RCP_OPERATION_TYPE_WRITE,
+                                 gpb_config=None, unittest=True)
+
+        # Fill GCP message fields
+        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Port.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Channel.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.VendorID.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.VendorIndex.set_val(0)
+
+        # Set RCP sequence
+        seq = self.builder.last_rcp_sequence
+
+        caps = master.get_descriptor().capabilities
+        ccap_ident = seq.CcapCoreIdentification.add_new_repeated()
+        ccap_ident.InitialConfigurationComplete.set_val(True)
+        ccap_ident.Index.set_val(caps.index)
+        ccap_ident.CoreId.set_val(bytes(caps.core_id))
+        ccap_ident.CoreIpAddress.set_val(utils.Convert.ipaddr_to_tuple_of_bytes(caps.core_ip_addr))
+        ccap_ident.CoreName.set_val(caps.core_name)
+        ccap_ident.IsPrincipal.set_val(caps.is_principal)
+        ccap_ident.CoreMode.set_val(1)
+        ccap_ident.MoveToOperational.set_val(False)
+        pkts = self.builder.get_packets()
+        if len(pkts) != 1:
+            raise RCPPacketBuildError(
+                "Unexpected resulting number of packets: {}, "
+                "expected: 1".format(len(pkts)))
+        return pkts[0]
+
+    def send_ptp_config_packet(self, master, slave_fd):
+        if None is master:
+            raise AttributeError()
+
+        self.builder.clear()
+        transaction_id = master.slave_cons[slave_fd].get_next_trans_id()
+        rcp_sequence_id = master.slave_cons[slave_fd].get_next_seq_id()
+
+        self.builder.add_packet(transaction_id=transaction_id)
+        self.builder.add_gcp_msg(gcp_msg_def.DataStructREQ, transaction_id)
+        self.builder.add_rcp_msg(rcp_tlv_def.RCP_MSG_TYPE_REX)
+        self.builder.add_rcp_seq(rcp_sequence_id,
+                                 rcp_tlv_def.RCP_OPERATION_TYPE_WRITE,
+                                 gpb_config=None, unittest=True)
+
+        # Fill GCP message fields
+        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Port.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Channel.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.VendorID.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.VendorIndex.set_val(0)
+
+        # Set RCP sequence
+        seq = self.builder.last_rcp_sequence
+        rdti = seq.RdtiConfig
+        dict_rdti = master.get_descriptor().capabilities.data["rdti"]
+        rdti.RpdRdtiMode.set_val(dict_rdti["RpdRdtiMode"])
+        rdti.RpdPtpDefDsDomainNumber.set_val(dict_rdti["RpdPtpDefDsDomainNumber"])
+        rdti.RpdPtpDefDsPriority1.set_val(dict_rdti["RpdPtpDefDsPriority1"])
+        rdti.RpdPtpDefDsPriority2.set_val(dict_rdti["RpdPtpDefDsPriority2"])
+        rdti.RpdPtpDefDsLocalPriority.set_val(dict_rdti["RpdPtpDefDsLocalPriority"])
+        rdti.RpdPtpProfileVersion.set_val(str(dict_rdti["RpdPtpProfileVersion"]))
+        portcfg = rdti.RpdPtpPortConfig.add_new_repeated()
+        dict_portcfg = dict_rdti["RpdPtpPortConfig"]
+        portcfg.RpdEnetPortIndex.set_val(dict_portcfg["RpdEnetPortIndex"])
+        portcfg.RpdPtpPortIndex.set_val(dict_portcfg["RpdPtpPortIndex"])
+        portcfg.RpdPtpPortAdminState.set_val(dict_portcfg["RpdPtpPortAdminState"])
+        portcfg.RpdPtpPortClockSource.set_val(utils.Convert.ipaddr_to_tuple_of_bytes(dict_portcfg["RpdPtpPortClockSource"]))
+        portcfg.RpdPtpPortClockSelectAlternateSourceFirst.set_val(dict_portcfg["RpdPtpPortClockSelectAlternateSourceFirst"])
+        portcfg.RpdPtpPortTransportType.set_val(dict_portcfg["RpdPtpPortTransportType"])
+        portcfg.RpdPtpPortTransportCos.set_val(dict_portcfg["RpdPtpPortTransportCos"])
+        portcfg.RpdPtpPortTransportDscp.set_val(dict_portcfg["RpdPtpPortTransportDscp"])
+        portcfg.RpdPtpPortDsLocalPriority.set_val(dict_portcfg["RpdPtpPortDsLocalPriority"])
+        portcfg.RpdPtpPortDsLogSyncInterval.set_val(dict_portcfg["RpdPtpPortDsLogSyncInterval"])
+        portcfg.RpdPtpPortDsLogAnnounceInterval.set_val(dict_portcfg["RpdPtpPortDsLogAnnounceInterval"])
+        portcfg.RpdPtpPortDsLogDelayReqInterval.set_val(dict_portcfg["RpdPtpPortDsLogDelayReqInterval"])
+        portcfg.RpdPtpPortDsAnnounceReceiptTimeout.set_val(dict_portcfg["RpdPtpPortDsAnnounceReceiptTimeout"])
+        portcfg.RpdPtpPortUnicastContractDuration.set_val(dict_portcfg["RpdPtpPortUnicastContractDuration"])
+        portcfg.RpdPtpPortClockGW.set_val(utils.Convert.ipaddr_to_tuple_of_bytes(dict_portcfg["RpdPtpPortClockGW"]))
+        pkts = self.builder.get_packets()
+        if len(pkts) != 1:
+            raise RCPPacketBuildError(
+                "Unexpected resulting number of packets: {}, "
+                "expected: 1".format(len(pkts)))
+        return pkts[0]
+
+    def send_config_done_packet(self, master, slave_fd):
         if None is master:
             raise AttributeError()
 
@@ -950,7 +1071,6 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
         # Set RCP sequence
         seq = self.builder.last_rcp_sequence
         seq.RpdConfigurationDone.set_val(1)
-
         pkts = self.builder.get_packets()
         if len(pkts) != 1:
             raise RCPPacketBuildError(
@@ -958,15 +1078,117 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
                 "expected: 1".format(len(pkts)))
         return pkts[0]
 
-    def test_rpd_ha_add_packet(self, master, slave_fd):
-        """Creates a packet including EDSReq message with REX message with the
-        sequence including write operation for HA feature.
+    def send_ds_static_l2tp_packet(self, master, slave_fd):
+        if None is master:
+            raise AttributeError()
+        self.builder.clear()
+        transaction_id = master.slave_cons[slave_fd].get_next_trans_id()
+        rcp_sequence_id = master.slave_cons[slave_fd].get_next_seq_id()
+        self.builder.add_packet(transaction_id=transaction_id)
+        self.builder.add_gcp_msg(gcp_msg_def.DataStructREQ, transaction_id)
+        self.builder.add_rcp_msg(rcp_tlv_def.RCP_MSG_TYPE_REX)
+        self.builder.add_rcp_seq(rcp_sequence_id,
+                                 rcp_tlv_def.RCP_OPERATION_TYPE_WRITE,
+                                 gpb_config=None, unittest=True)
+        # Fill GCP message fields
+        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Port.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Channel.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.VendorID.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.VendorIndex.set_val(0)
+        # Set RCP sequence
+        seq = self.builder.last_rcp_sequence
+        ds = master.get_descriptor().capabilities.data["staticl2tp"]["DS"]
 
-        :param master: The master session.
-        :return RCPPacket
-        :param slave_fd: The file descriptor of the slave's connection.
+        staticPW = seq.StaticPwConfig
+        fwd = staticPW.FwdStaticPwConfig
+        dict_fwd = ds["FwdStaticPwConfig"]
+        fwd.Index.set_val(dict_fwd["Index"])
+        fwd.GroupAddress.set_val(utils.Convert.ipaddr_to_tuple_of_bytes(dict_fwd["GroupAddress"]))
+        fwd.SourceAddress.set_val(utils.Convert.ipaddr_to_tuple_of_bytes(dict_fwd["SourceAddress"]))
+        fwd.CcapCoreOwner.set_val(utils.Convert.mac_to_tuple_of_bytes(dict_fwd["CcapCoreOwner"]))
+        common = staticPW.CommonStaticPwConfig
+        dict_common = ds["CommonStaticPwConfig"]
+        common.Direction.set_val(dict_common["Direction"])
+        common.Index.set_val(dict_common["Index"])
+        common.PwType.set_val(dict_common["PwType"])
+        common.DepiPwSubtype.set_val(dict_common["DepiPwSubtype"])
+        common.L2SublayerType.set_val(dict_common["L2SublayerType"])
+        common.DepiL2SublayerSubtype.set_val(dict_common["DepiL2SublayerSubtype"])
+        common.SessionId.set_val(random.randint(1, 0xFFF))
+        common.CircuitStatus.set_val(dict_common["CircuitStatus"])
+        common.RpdEnetPortIndex.set_val(dict_common["RpdEnetPortIndex"])
+        common.EnableStatusNotification.set_val(dict_common["EnableStatusNotification"])
+        pwa = common.PwAssociation.add_new_repeated()
+        pwa_dict = dict_common["PwAssociation"]
+        pwa.Index.set_val(pwa_dict["Index"])
+        chs = pwa.ChannelSelector
+        chs.RfPortIndex.set_val(pwa_dict["ChannelSelector"]["RfPortIndex"])
+        chs.ChannelType.set_val(pwa_dict["ChannelSelector"]["ChannelType"])
+        chs.ChannelIndex.set_val(pwa_dict["ChannelSelector"]["ChannelIndex"])
+        pkts = self.builder.get_packets()
+        if len(pkts) != 1:
+            raise RCPPacketBuildError(
+                "Unexpected resulting number of packets: {}, "
+                "expected: 1".format(len(pkts)))
+        return pkts[0]
 
-        """
+    def send_us_static_l2tp_packet(self, master, slave_fd):
+        if None is master:
+            raise AttributeError()
+        self.builder.clear()
+        transaction_id = master.slave_cons[slave_fd].get_next_trans_id()
+        rcp_sequence_id = master.slave_cons[slave_fd].get_next_seq_id()
+        self.builder.add_packet(transaction_id=transaction_id)
+        self.builder.add_gcp_msg(gcp_msg_def.DataStructREQ, transaction_id)
+        self.builder.add_rcp_msg(rcp_tlv_def.RCP_MSG_TYPE_REX)
+        self.builder.add_rcp_seq(rcp_sequence_id,
+                                 rcp_tlv_def.RCP_OPERATION_TYPE_WRITE,
+                                 gpb_config=None, unittest=True)
+        # Fill GCP message fields
+        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Port.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Channel.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.VendorID.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.VendorIndex.set_val(0)
+        # Set RCP sequence
+        seq = self.builder.last_rcp_sequence
+        ds = master.get_descriptor().capabilities.data["staticl2tp"]["US"]
+        staticPW = seq.StaticPwConfig
+        ret = staticPW.RetStaticPwConfig
+        dict_ret = ds["RetStaticPwConfig"]
+        ret.Index.set_val(dict_ret["Index"])
+        ret.DestAddress.set_val(utils.Convert.ipaddr_to_tuple_of_bytes(dict_ret["DestAddress"]))
+        ret.CcapCoreOwner.set_val(utils.Convert.mac_to_tuple_of_bytes(dict_ret["CcapCoreOwner"]))
+        ret.MtuSize.set_val(dict_ret["MtuSize"])
+        ret.UsPhbId.set_val(dict_ret["UsPhbId"])
+        common = staticPW.CommonStaticPwConfig
+        dict_common = ds["CommonStaticPwConfig"]
+        common.Direction.set_val(dict_common["Direction"])
+        common.Index.set_val(dict_common["Index"])
+        common.PwType.set_val(dict_common["PwType"])
+        common.DepiPwSubtype.set_val(dict_common["DepiPwSubtype"])
+        common.L2SublayerType.set_val(dict_common["L2SublayerType"])
+        common.DepiL2SublayerSubtype.set_val(dict_common["DepiL2SublayerSubtype"])
+        common.SessionId.set_val(random.randint(1, 0xFFF))
+        common.CircuitStatus.set_val(dict_common["CircuitStatus"])
+        common.RpdEnetPortIndex.set_val(dict_common["RpdEnetPortIndex"])
+        common.EnableStatusNotification.set_val(dict_common["EnableStatusNotification"])
+        pwa = common.PwAssociation.add_new_repeated()
+        dict_pwa = dict_common["PwAssociation"]
+        pwa.Index.set_val(dict_pwa["Index"])
+        chs = pwa.ChannelSelector
+        chs.RfPortIndex.set_val(dict_pwa["ChannelSelector"]["RfPortIndex"])
+        chs.ChannelType.set_val(dict_pwa["ChannelSelector"]["ChannelType"])
+        chs.ChannelIndex.set_val(dict_pwa["ChannelSelector"]["ChannelIndex"])
+        pkts = self.builder.get_packets()
+        if len(pkts) != 1:
+            raise RCPPacketBuildError(
+                "Unexpected resulting number of packets: {}, "
+                "expected: 1".format(len(pkts)))
+        return pkts[0]
+
+    def send_multiple_core_add_packet(self, master, slave_fd):
         if None is master:
             raise AttributeError()
 
@@ -990,15 +1212,54 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
 
         # Set RCP sequence
         seq = self.builder.last_rcp_sequence
-        ha_info = seq.RedundantCoreIpAddress.add_new_repeated()
-        # (utils.Convert.ipaddr_to_tuple_of_bytes(master.descr.addr_local))
-        ha_info.ActiveCoreIpAddress.set_val(
-            utils.Convert.ipaddr_to_tuple_of_bytes(master.descr.addr_local))
-        ha_info.StandbyCoreIpAddress.set_val(
-            utils.Convert.ipaddr_to_tuple_of_bytes("10.0.2.15"))
-        #ha_info.CoreHaRole.set_val(1)  # 0: active, 1: standby
-        ha_info.Operation.set_val(0)  # 0: add, 1: del, 2: change
+        corelist = master.get_descriptor().capabilities.data["corelist"]
+        mc = seq.MultiCore
+        for ip in corelist:
+            ct = mc.ConfiguredCoreTable.add_new_repeated()
+            ct.Index.set_val(corelist.index(ip))
+            ct.ConfiguredCoreIp.set_val(utils.Convert.ipaddr_to_tuple_of_bytes(ip))
 
+        pkts = self.builder.get_packets()
+        if len(pkts) != 1:
+            raise RCPPacketBuildError(
+                "Unexpected resulting number of packets: {}, "
+                "expected: 1".format(len(pkts)))
+        return pkts[0]
+
+    def move_to_operational_write_packet(self, master, slave_fd):
+        if None is master:
+            raise AttributeError()
+
+        self.builder.clear()
+        transaction_id = master.slave_cons[slave_fd].get_next_trans_id()
+        rcp_sequence_id = master.slave_cons[slave_fd].get_next_seq_id()
+
+        self.builder.add_packet(transaction_id=transaction_id)
+        self.builder.add_gcp_msg(gcp_msg_def.DataStructREQ, transaction_id)
+        self.builder.add_rcp_msg(rcp_tlv_def.RCP_MSG_TYPE_REX)
+        self.builder.add_rcp_seq(rcp_sequence_id,
+                                 rcp_tlv_def.RCP_OPERATION_TYPE_WRITE,
+                                 gpb_config=None, unittest=True)
+
+        # Fill GCP message fields
+        self.builder.last_gcp_msg.msg_fields.Mode.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Port.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.Channel.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.VendorID.set_val(0)
+        self.builder.last_gcp_msg.msg_fields.VendorIndex.set_val(0)
+
+        # Set RCP sequence
+        seq = self.builder.last_rcp_sequence
+        caps = master.get_descriptor().capabilities
+        ccap_ident = seq.CcapCoreIdentification.add_new_repeated()
+        ccap_ident.InitialConfigurationComplete.set_val(True)
+        ccap_ident.Index.set_val(caps.index)
+        ccap_ident.CoreId.set_val(bytes(caps.core_id))
+        ccap_ident.CoreIpAddress.set_val(utils.Convert.ipaddr_to_tuple_of_bytes(caps.core_ip_addr))
+        ccap_ident.CoreName.set_val(caps.core_name)
+        ccap_ident.IsPrincipal.set_val(caps.is_principal)
+        ccap_ident.CoreMode.set_val(1)
+        ccap_ident.MoveToOperational.set_val(True)
         pkts = self.builder.get_packets()
         if len(pkts) != 1:
             raise RCPPacketBuildError(
@@ -1043,7 +1304,7 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
         ha_info.ActiveCoreIpAddress.set_val(
             utils.Convert.ipaddr_to_tuple_of_bytes(master.descr.addr_local))
         ha_info.StandbyCoreIpAddress.set_val(utils.Convert.ipaddr_to_tuple_of_bytes("10.0.2.15"))
-        #ha_info.CoreHaRole.set_val(0)  # 0: active, 1: standby
+        # ha_info.CoreHaRole.set_val(0)  # 0: active, 1: standby
         ha_info.Operation.set_val(2)  # 0: add, 1: del, 2: change
 
         pkts = self.builder.get_packets()
@@ -1089,7 +1350,7 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
         ha_info.ActiveCoreIpAddress.set_val(
             utils.Convert.ipaddr_to_tuple_of_bytes(master.descr.addr_local))
         ha_info.StandbyCoreIpAddress.set_val(utils.Convert.ipaddr_to_tuple_of_bytes("10.0.2.15"))
-        #ha_info.CoreHaRole.set_val(1)  # 0: active, 1: standby
+        # ha_info.CoreHaRole.set_val(1)  # 0: active, 1: standby
         ha_info.Operation.set_val(1)  # 0: add, 1: del, 2: change
 
         pkts = self.builder.get_packets()
@@ -1173,7 +1434,7 @@ class RCPMasterPacketBuildDirector(object):  # pragma: no cover
         self.builder.last_gcp_msg.msg_fields.VendorIndex.set_val(0)
 
         # Set RCP sequence
-        seq = self.builder.last_rcp_sequence
+        # seq = self.builder.last_rcp_sequence
 
         self.builder.last_rcp_sequence.ActivePrincipalCore.set_is_used()
         pkts = self.builder.get_packets()
@@ -1382,10 +1643,19 @@ class CCAPStepSet(object):  # pragma: no cover
     def __init__(self):
         self.index = 0
         self.steps = []
+        self.event_steps = {}
 
     def reset(self):
         """Sets index pointing to the current step at the first step."""
         self.index = 0
+
+    def add_ntf_event_step(self, event, step):
+        if not isinstance(step, CCAPStep):
+            raise TypeError("Invalid step type")
+        self.event_steps.update({event: step})
+
+    def get_ntf_event_step(self, event):
+        return self.event_steps[event]
 
     def get_step_next(self):
         """Returns current step and moves index.
@@ -1399,6 +1669,9 @@ class CCAPStepSet(object):  # pragma: no cover
             return None
         self.index += 1
         return step
+
+    def get_last_step(self):
+        return self.steps[-1]
 
     def clear_steps(self):
         """Clears steps and sets index to zero."""
@@ -1433,6 +1706,7 @@ class CCAPStepSet(object):  # pragma: no cover
         # make a shallow copy of steps
         copy.steps = list(self.steps)
         copy.index = self.index
+        copy.event_steps = self.event_steps
         return copy
 
 
@@ -1451,6 +1725,7 @@ class RCPMasterScenario(object):  # pragma: no cover
 
     def __init__(self):
         self.slave_step_set = {}
+        self.event_trigger_step_set = {}
 
     def add_next_step(self, step, slave_id=None):
         """Creates new list of steps if it doesn't already exist and adds
@@ -1478,6 +1753,18 @@ class RCPMasterScenario(object):  # pragma: no cover
             self.slave_step_set[slave_id] = CCAPStepSet()
 
         self.slave_step_set[slave_id].add_step(step)
+
+    def add_trigger_step(self, step, event, slave_id=None):
+        if not isinstance(step, CCAPStep):
+            raise TypeError("Invalid step type")
+
+        if None is slave_id:
+            slave_id = self._DEFAULT_SLAVE_ID
+
+        if slave_id not in self.slave_step_set:
+            self.slave_step_set[slave_id] = CCAPStepSet()
+
+        self.slave_step_set[slave_id].add_ntf_event_step(event, step)
 
     def get_steps(self, slave_id):
         """Returns all steps for the slave identified by the slave_id.

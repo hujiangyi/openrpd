@@ -80,5 +80,6 @@ class TestTimer(unittest.TestCase):
             self.assertIsInstance(res[k][0], object)
             self.assertIsNone(res[k][1])
 
+
 if __name__ == '__main__':
     unittest.main()

@@ -23,6 +23,7 @@ from rpd.common.rpd_logging import setup_logging
 
 
 class TestSsdVerify(unittest.TestCase):
+
     def setUp(self):
         currentPath = os.path.dirname(os.path.realpath(__file__))
         dirs = currentPath.split("/")
@@ -105,10 +106,10 @@ class TestSsdVerify(unittest.TestCase):
         print initcode
 
         # Get the image
-        ret = test.get_image('/tmp/testsvae')
+        ret = test.get_image('/tmp/testsvae', self.codefile)
         self.assertTrue(ret)
 
-        ret = test.get_image('/tmp/')
+        ret = test.get_image('/tmp/', self.codefile)
         self.assertFalse(ret)
 
     def test_verify_mfr_name_mismatch(self):
@@ -613,8 +614,7 @@ class TestSsdVerify(unittest.TestCase):
         initcode = test.get_initcode()
         print initcode
 
-
-        rst = test.verify_file(self.codefile+"abcd")
+        rst = test.verify_file(self.codefile + "abcd")
         print "codefile verification result: " + str(rst[0]) + ", " + RST.ssdErrorMessage[rst[1]]
 
         if rst[0] == False:
@@ -717,7 +717,6 @@ class TestSsdVerify(unittest.TestCase):
                                   "cvcAccessStart": "20160311122430Z"}}
 
         test = CFV(initcode, self.rootca)
-
 
         # Verify MFR CVC at first
         rst = test.verify_cvc(self.mfr_cvc, True)
@@ -895,7 +894,6 @@ class TestSsdVerify(unittest.TestCase):
         if rst[0] == False:
             return
 
-
         # Test codefile
         rst = test.verify_file(self.nokey_codefile)
         print "codefile verification result: " + str(rst[0]) + ", " + RST.ssdErrorMessage[rst[1]]
@@ -983,7 +981,6 @@ class TestSsdVerify(unittest.TestCase):
 
         rst = test.verify_file('000000000000000000000000000000')
         print "codefile verification result: " + str(rst[0]) + ", " + RST.ssdErrorMessage[rst[1]]
-
 
 
 if __name__ == '__main__':

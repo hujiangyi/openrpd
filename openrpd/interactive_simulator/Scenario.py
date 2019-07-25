@@ -136,4 +136,3 @@ class Scenario(object):
             if arg not in p_args:
                 missing_attrs.append(arg)
         return missing_attrs
-

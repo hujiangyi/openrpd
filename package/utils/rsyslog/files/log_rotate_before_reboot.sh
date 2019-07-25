@@ -8,8 +8,8 @@ rotate_before_reboot()
 
    lognum=`ls -l /rpd/log|grep "tar.gz"|wc -l`
    logname=`date '+%F-%T'` 
-   if [[ ${lognum} -gt 10 ]]; then
-        echo "Log rotate: log file save more than 10 files"
+   if [[ ${lognum} -gt 100 ]]; then
+        echo "Log rotate: log file save more than 100 files"
         echo "Log rotate: remove oldest one and rotate again"
         remove_oldest_log=`ls -rt /rpd/log/rpd_reboot_provision_*|head -n 1|xargs rm -rf`
    else

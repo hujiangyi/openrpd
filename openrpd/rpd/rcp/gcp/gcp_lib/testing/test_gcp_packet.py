@@ -486,5 +486,6 @@ class TestGCPMessage(unittest.TestCase):
             msg.tlv_data.TestUsOfdmaSubcarrierCfgState. \
                 TestNotDefined.set_val("not defined")
 
+
 if __name__ == '__main__':
     unittest.main()

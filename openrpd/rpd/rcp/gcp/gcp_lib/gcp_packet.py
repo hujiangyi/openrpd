@@ -882,7 +882,7 @@ class Message(gcp_object.GCPObject):
         """
         # store current offset for exception handling
         old_offset = self.offset
-        self.offset += self.MSGIDLen +self.MSGLengthLen
+        self.offset += self.MSGIDLen + self.MSGLengthLen
 
         # encode message fields
         fields_len = 0
@@ -936,7 +936,7 @@ class Message(gcp_object.GCPObject):
                 "Failed to encode message ID and length")
 
         # Done
-        self.offset = old_offset+ encoded_len + self.MSGIDLen + self.MSGLengthLen
+        self.offset = old_offset + encoded_len + self.MSGIDLen + self.MSGLengthLen
         return True
 
     def _decode_process(self):
@@ -1223,7 +1223,7 @@ class GCPPacket(gcp_object.GCPObject):
     def compute_buffer_len(self):
         """Implements the method from GCPObject class."""
         length = self.PKT_TID_LEN + self.PKT_PID_LEN + \
-                 self.PKT_LEN_LEN + self.PKT_UID_LEN
+            self.PKT_LEN_LEN + self.PKT_UID_LEN
 
         for msg in self.msgs:
             length += msg.compute_buffer_len()

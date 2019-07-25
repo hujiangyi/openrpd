@@ -92,7 +92,7 @@ class TestHalDatabase(unittest.TestCase):
                              Rsp={"Status": 1, "ErrorDescription": []})
             rsp = HalMessage("HalClientInterestNotificationCfgRsp",
                              ClientID="123",
-                             Rsp={"Status": 1, "ErrorDescription": [1,2,3]})
+                             Rsp={"Status": 1, "ErrorDescription": [1, 2, 3]})
         except AttributeError:
             pass
 
@@ -153,6 +153,7 @@ class TestHalDatabase(unittest.TestCase):
         except Exception as e:
             self.assertEqual(
                 str(e).startswith("Cannot parse the message since the msgType"), True)
+
 
 if __name__ == '__main__':
     unittest.main()

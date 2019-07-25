@@ -17,19 +17,21 @@
 #
 import zmq
 from zmq.utils.monitor import recv_monitor_message
-
 import rpd.provision.process_agent.agent.agent as agent
 import rpd.provision.proto.process_agent_pb2 as protoDef
 from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
+from rpd.gpb.rcp_pb2 import t_RcpMessage
 from rpd.hal.lib.clients.HalClient0 import HalClient, HalClientError
-from rpd.hal.src.HalConfigMsg import *
+from rpd.hal.src.HalConfigMsg import MsgTypeGeneralNtf, MsgTypeRoutePtpStatus, \
+    MsgTypePtpClockStatus, MsgTypeRpdState, MsgTypePtpStatusGet
 from rpd.hal.src.msg import HalCommon_pb2
 from rpd.hal.src.msg.HalMessage import HalMessage
 from rpd.hal.src.transport.HalTransport import HalTransport
-from rpd.common import utils
 from rpd.gpb.GeneralNotification_pb2 import t_GeneralNotification
 
+
 class HalPtpClientError(HalClientError):
+
     def __init__(self, msg, expr=None):
         super(HalPtpClientError, self).__init__(msg)
         self.msg = "HalPtpClientError: " + msg
@@ -42,13 +44,18 @@ class HalPtpClient(HalClient):
 
     __metaclass__ = AddLoggerToClass
 
-    def __init__(self, appName, appDesc, appVer, supportedNotificationMsgs, interestedNotification, dispatcher,
-                 notifyCb,logConfigurePath=None):
-        super(HalPtpClient, self).__init__(appName, appDesc, appVer, interestedNotification,logConfigurePath)
+    def __init__(self, appName, appDesc, appVer, supportedNotification, supportedMsgsTypes, dispatcher,
+                 notifyCb, logConfigurePath=None):
 
-        if not isinstance(supportedNotificationMsgs, tuple) and not isinstance(supportedNotificationMsgs, list):
+        # sanity check the input args
+        super(HalPtpClient, self).__init__(appName, appDesc, appVer,
+                                           supportedNotification,
+                                           logConfigurePath,
+                                           supportedMsgsTypes)
+
+        if not isinstance(supportedNotification, tuple) and not isinstance(supportedNotification, list):
             raise HalClientError(
-                "supportedNotificationMsgs should be a tuple or list")
+                "supportedMsgsTypes should be a tuple or list")
 
         self.HalMsgsHandler = {
             "HalClientRegisterRsp": self.recvRegisterMsgCb,
@@ -57,11 +64,14 @@ class HalPtpClient(HalClient):
             "HalConfigRsp": self.recvCfgMsgRspCb,
             "HalClientInterestNotificationCfgRsp": self.sendInterestedNotificationsRspCb,
             "HalNotification": self.recvNotificationCb,
+            "HalConfig": self.recvCfgMsgCb,
         }
+
         self.notifyHandler = notifyCb
         self.dispatcher = dispatcher
-        self.supportedNotificationMsgs = list(supportedNotificationMsgs)
+        self.supportedNotificationMsgs = list(supportedNotification)
         self.dispatcher.timer_register(1, self.checkPtpStatus, timer_type=1)
+        self.ptp_result = t_GeneralNotification.PTPACQUIRE
 
     def checkPtpStatus(self, fd):
         self.sendCfgMsg(MsgTypePtpStatusGet, "GetPtpStatus")
@@ -72,41 +82,13 @@ class HalPtpClient(HalClient):
         self.connectionSetup(self.dispatcher)
         self.register(self.clientID)
 
-    def register(self, clientID):
-        """Send a register message to Hal and get the client ID from the Hal.
-
-        :return:
-
-        """
-        if clientID is None:
-            registerMsg = HalMessage("HalClientRegister",
-                                     ClientName=self.appName,
-                                     ClientDescription=self.appDesc,
-                                     ClientVersion=self.appVer,
-                                     ClientSupportedNotificationMessages=self.supportedNotificationMsgs)
-        else:
-            registerMsg = HalMessage("HalClientRegister",
-                                     ClientName=self.appName,
-                                     ClientDescription=self.appDesc,
-                                     ClientVersion=self.appVer,
-                                     ClientID=clientID,
-                                     ClientSupportedNotificationMessages=self.supportedNotificationMsgs)
-
-        if self.mgrConnection is None:
-            errMsg = "Cannot send the register since the mgr connection is not setup"
-            self.logger.error(errMsg)
-            raise HalClientError(errMsg)
-        self.logger.debug("Send the register msg to Hal...")
-        self.mgrConnection.send(registerMsg.Serialize())
-
     def connectionSetup(self, disp=None):
         """Create the connection to the mgr and setup the poller."""
         self.logger.debug("Create the connection to the mgr....")
         # Create a connection to Hal driver mgr
         self.mgrConnection = HalTransport(HalTransport.HalTransportClientMgr,
                                           HalTransport.HalClientMode,
-                                          disconnectHandlerCb=
-                                          self.connectionDisconnectCb)
+                                          disconnectHandlerCb=self.connectionDisconnectCb)
         # register the mgr socket
         disp.fd_register(self.mgrConnection.socket,
                          zmq.POLLIN, self.ptp_hal_cb)
@@ -194,6 +176,27 @@ class HalPtpClient(HalClient):
 
         return
 
+    def recvCfgMsgCb(self, cfgMsg):
+        """Receive a configuration message from the Hal, processing it.
+
+        :param cfgMsg:
+        :return:
+
+        """
+        try:
+            msgType = cfgMsg.msg.CfgMsgType
+            if msgType == MsgTypeRpdState:
+                self.getRpdPtpState(cfgMsg)
+        except Exception as e:  # pragma: no cover
+            self.logger.error("Got an error:%s, the cfg msg:%s",
+                              str(e), cfgMsg)
+            rsp = {
+                "Status": HalCommon_pb2.FAILED,
+                "ErrorDescription": "Process configuration failed, reason:%s"
+                                    % str(e)
+            }
+            self.sendCfgRspMsg(cfgMsg, rsp)
+
     def recvCfgMsgRspCb(self, cfg):
         """Receive a configuration response message from the Hal, processing it.
 
@@ -217,8 +220,7 @@ class HalPtpClient(HalClient):
         if self.pullSock is not None and sock == self.pullSock.monitor:
             self.pullSock.monitorHandler(recv_monitor_message(sock))
             return
-        if self.mgrConnection is not None and \
-                        sock == self.mgrConnection.monitor:
+        if self.mgrConnection is not None and sock == self.mgrConnection.monitor:
             self.mgrConnection.monitorHandler(recv_monitor_message(sock))
             return
 
@@ -253,6 +255,31 @@ class HalPtpClient(HalClient):
                 self.notifyHandler(msg.msg.HalNotificationPayLoad)
                 print "send %s notification to provision" % msg.msg.HalNotificationPayLoad
 
+    def getRpdPtpState(self, cfg):
+        rsp = t_RcpMessage()
+        rsp.ParseFromString(cfg.msg.CfgMsgPayload)
+        config = rsp.RpdDataMessage.RpdData
+        try:
+            config.RpdState.LocalPtpSyncStatus = \
+                True if self.ptp_result == t_GeneralNotification.PTPSYNCHRONIZED else False
+            cfg.CfgMsgPayload = config.SerializeToString()
+            rsp.RpdDataMessage.RpdData.CopyFrom(config)
+            rsp.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
+            payload = rsp.SerializeToString()
+            self.logger.info("Send rpd state LocalPtpSyncStatus response, %s" % rsp)
+            msg = HalMessage(
+                "HalConfigRsp", SrcClientID=cfg.msg.SrcClientID, SeqNum=cfg.msg.SeqNum,
+                Rsp={
+                    "Status": HalCommon_pb2.SUCCESS,
+                    "ErrorDescription": "PTP LOCALPTPSYNCSTATUS query success"
+                },
+                CfgMsgType=cfg.msg.CfgMsgType,
+                CfgMsgPayload=payload)
+            self.pushSock.send(msg.Serialize())
+        except Exception as e:
+            self.logger.error("excpetipn:%s", str(e))
+        return
+
 
 class PtpAgent(agent.ProcessAgent):
     SYNC = "ALIGNED"
@@ -271,8 +298,9 @@ class PtpAgent(agent.ProcessAgent):
         self.ptp_status = self.LOS
         self.PtpClient = HalPtpClient(
             "PTPClient", "This is a PTP application", "1.9.0",
-            (MsgTypeRoutePtpStatus, MsgTypeGeneralNtf,), (MsgTypePtpClockStatus,), self.dispatcher,
-            self.PtpNotifyHandler,logConfigurePath="../../../hal/conf/ClientLogging.conf")
+            [MsgTypeRoutePtpStatus, MsgTypeGeneralNtf, ],
+            [MsgTypeRpdState, MsgTypePtpClockStatus, ], self.dispatcher,
+            self.PtpNotifyHandler, logConfigurePath="../../../hal/conf/ClientLogging.conf")
         self.PtpClient.start()
 
     def process_event_action(self, action):
@@ -296,8 +324,7 @@ class PtpAgent(agent.ProcessAgent):
         ccap_core = self.ccap_cores[id]
         transport = self.mgrs[ccap_core["mgr"]]['transport']
 
-        if event_action == protoDef.msg_event.START or \
-                        event_action == protoDef.msg_event.CHECKSTATUS:
+        if event_action == protoDef.msg_event.START or event_action == protoDef.msg_event.CHECKSTATUS:
             # check if we are in the requester list, if yes,
             # we just send a current status to it
             if id not in self.ptp_requester:
@@ -318,10 +345,7 @@ class PtpAgent(agent.ProcessAgent):
                 MsgTypeRoutePtpStatus, self.ptp_status)
             gen_ntf_msg = t_GeneralNotification()
             gen_ntf_msg.NotificationType = t_GeneralNotification.PTPRESULTNOTIFICATION
-            if self.ptp_status == self.SYNC:
-                gen_ntf_msg.PtpResult = t_GeneralNotification.PTPSYNCHRONIZED
-            else:
-                gen_ntf_msg.PtpResult = t_GeneralNotification.PTPACQUIRE
+            gen_ntf_msg.PtpResult = self.PtpClient.ptp_result
             self.PtpClient.sendNotificationMsg(
                 MsgTypeGeneralNtf, gen_ntf_msg.SerializeToString())
             self.logger.info(
@@ -358,16 +382,17 @@ class PtpAgent(agent.ProcessAgent):
                 "The new status:%s, old status:%s" % (new_status, self.ptp_status))
         if self.ptp_status != new_status:
             self.ptp_status = new_status
+            if self.ptp_status == self.SYNC:
+                self.PtpClient.ptp_result = t_GeneralNotification.PTPSYNCHRONIZED
+            else:
+                self.PtpClient.ptp_result = t_GeneralNotification.PTPACQUIRE
 
             if len(self.ptp_requester):
                 self.PtpClient.sendNotificationMsg(
                     MsgTypeRoutePtpStatus, self.ptp_status)
                 gen_ntf_msg = t_GeneralNotification()
                 gen_ntf_msg.NotificationType = t_GeneralNotification.PTPRESULTNOTIFICATION
-                if self.ptp_status == self.SYNC:
-                    gen_ntf_msg.PtpResult = t_GeneralNotification.PTPSYNCHRONIZED
-                else:
-                    gen_ntf_msg.PtpResult = t_GeneralNotification.PTPACQUIRE
+                gen_ntf_msg.PtpResult = self.PtpClient.ptp_result
                 self.PtpClient.sendNotificationMsg(
                     MsgTypeGeneralNtf, gen_ntf_msg.SerializeToString())
             else:
@@ -397,10 +422,7 @@ class PtpAgent(agent.ProcessAgent):
                 except zmq.Again as e:
                     pass
                 except Exception as e:
-
                     self.logger.error("Cannot send the event, reason:%s" % str(e))
-
-
 
 
 if __name__ == "__main__":

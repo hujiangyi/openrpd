@@ -118,6 +118,7 @@ class Simulator(object):
         else:
             return {"response": "Unknown command"}
 
+
 if __name__ == "__main__":
     sim = None
     try:

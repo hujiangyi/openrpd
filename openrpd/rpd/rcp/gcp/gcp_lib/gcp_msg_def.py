@@ -39,6 +39,7 @@ class GCP_RC(_GCP_RC):
         GCP_Return_Codes[rc] = self
         return self
 
+
 # GCP Return codes - Section 6.4 of GCP Specification
 GCP_RC_SUCCESS = GCP_RC(0, "Message Successful")
 GCP_RC_UNSUPPORTED = GCP_RC(1, "Unsupported Message")
@@ -70,6 +71,7 @@ class GDM_CMD(_GDM_CMD):
         GDM_CMD_SET[cmd] = self
         return self
 
+
 # GDM commands - Section B.2.3 of GCP Specification
 GDM_NULL = GDM_CMD(0, 'Null')
 GDM_COLD_RESET = GDM_CMD(1, 'Cold Reset')
@@ -82,9 +84,11 @@ GDM_POWER_UP = GDM_CMD(6, 'Power Up')
 
 class GCP_MSG_DescriptionSet(DescriptionSet):
     """Holds definitions of all supported GCP messages."""
+
     def __init__(self):
         super(GCP_MSG_DescriptionSet, self).__init__(
             hierarchy_name="GCP_MSG_Base")
+
 
 # global reference to the set of descriptions of supported GCP messages
 GCP_MSG_SET = GCP_MSG_DescriptionSet()
@@ -125,6 +129,7 @@ class MSGFieldsSet(object):
 
 class MSGFieldDesc(DataDescription):
     """Implements description of the data format of the message fields."""
+
     def __init__(self, name, format_str, val_constraints=None):
         if None is name:
             raise AttributeError("Unspecified message field's name")

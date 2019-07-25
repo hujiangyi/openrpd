@@ -351,5 +351,6 @@ class TestHalAgentDriver(unittest.TestCase):
         agentDriver.disconnectHandler(None)
         self.assertTrue(agentDriver.disconnectProcessed)
 
+
 if __name__ == '__main__':
     unittest.main()

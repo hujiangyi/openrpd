@@ -76,7 +76,7 @@ proto_dhcpv6_setup() {
 		append opts "-r$opt"
 	done
 
-	append opts "-t${soltimeout:-120}"
+	append opts "-t${soltimeout:-5}"
 
 	[ -n "$ip6prefix" ] && proto_export "USERPREFIX=$ip6prefix"
 	[ -n "$iface_dslite" ] && proto_export "IFACE_DSLITE=$iface_dslite"

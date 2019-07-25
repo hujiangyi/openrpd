@@ -64,4 +64,3 @@ if __name__ == "__main__":
         args["file"] = load_attrs_from_file(args["file"])
     client = Client()
     print client.ask(args)
-

@@ -463,7 +463,28 @@
  			dhcpv6_send(type, trid, elapsed / 10);
  			rc++;
  		}
-@@ -941,6 +1243,7 @@ static int dhcpv6_handle_reply(enum dhcp
+@@ -640,6 +942,20 @@ int dhcpv6_request(enum dhcpv6_msg type)
+ 			len = retx->handler_finish();
+ 	} while (len < 0 && ((timeout == UINT32_MAX) || (elapsed / 1000 < timeout)) && 
+ 			(!retx->max_rc || rc < retx->max_rc));
++        // checkout the timeout event case
++        if ((elapsed / 1000 >= timeout) || (!retx->max_rc || rc >= retx->max_rc)) {
++            if (type == DHCPV6_MSG_RENEW) {
++                syslog(LOG_ERR, "66070300:DHCP RENEW sent - No response for IPv6");
++            }
++            else if (type == DHCPV6_MSG_REBIND) {
++                syslog(LOG_ERR, "66070301:DHCP REBIND sent - No response for IPv6");
++            } else if (type == DHCPV6_MSG_SOLICIT) {
++                syslog(LOG_CRIT, "66070316:DHCP failed - DHCP Solicit sent, No DHCP Advertise received");
++	    } else if (type == DHCPV6_MSG_REQUEST) {
++                syslog(LOG_CRIT, "66070317:DHCP failed - DHCP Request sent, No DHCP REPLY received");
++            }
++        }
++
+ 	return len;
+ }
+ 
+@@ -941,6 +1257,7 @@ static int dhcpv6_handle_reply(enum dhcp
  		odhcp6c_clear_state(STATE_S46_LW);
  		odhcp6c_clear_state(STATE_PASSTHRU);
  		odhcp6c_clear_state(STATE_CUSTOM_OPTS);
@@ -471,7 +492,7 @@
  
  		// Parse and find all matching IAs
  		dhcpv6_for_each_option(opt, end, otype, olen, odata) {
-@@ -1064,6 +1367,22 @@ static int dhcpv6_handle_reply(enum dhcp
+@@ -1064,6 +1381,22 @@ static int dhcpv6_handle_reply(enum dhcp
  			} else if (otype == DHCPV6_OPT_S46_CONT_MAPT) {
  				odhcp6c_add_state(STATE_S46_MAPT, odata, olen);
  				passthru = false;
@@ -494,7 +515,7 @@
  			} else if (otype == DHCPV6_OPT_S46_CONT_MAPE) {
  				size_t mape_len;
  				odhcp6c_get_state(STATE_S46_MAPE, &mape_len);
-@@ -1234,7 +1553,7 @@ static int dhcpv6_parse_ia(void *opt, void *end)
+@@ -1234,7 +1567,7 @@ static int dhcpv6_parse_ia(void *opt, vo
  			if (entry.t1 > entry.t2)
  				entry.t1 = entry.t2;
  
@@ -659,13 +680,11 @@
  
  		switch (mode) {
  		case DHCPV6_STATELESS:
-@@ -414,8 +478,17 @@ int main(_unused int argc, char* const a
+@@ -414,8 +478,15 @@ int main(_unused int argc, char* const a
  		odhcp6c_clear_state(STATE_IA_PD);
  	}
  
-+	// Notify parent about exiting
-+	syslog(LOG_ERR, "66070316:DHCP failed - DHCP Solicit sent, No DHCP Advertise received");
-+
++	check_and_report_event();
 +	if (NULL == sock) {
 +		syslog(LOG_NOTICE, "Socket to parent not ready, skipping sending info");
 +	} else {
@@ -678,7 +697,7 @@
  }
  
  
-@@ -443,6 +516,8 @@ static int usage(void)
+@@ -443,6 +514,8 @@ static int usage(void)
  	"\nInvocation options:\n"
  	"	-p <pidfile>	Set pidfile (/var/run/odhcp6c.pid)\n"
  	"	-d		Daemonize\n"
@@ -833,3 +852,36 @@
 +	}
 +
  }
+--- a/src/ra.c
++++ b/src/ra.c
+@@ -320,8 +320,10 @@ bool ra_process(void)
+ 					ch->cmsg_type == IPV6_HOPLIMIT)
+ 				memcpy(&hlim, CMSG_DATA(ch), sizeof(hlim));
+ 
+-		if (!ra_icmpv6_valid(&from, hlim, buf, len))
++		if (!ra_icmpv6_valid(&from, hlim, buf, len)) {
++			syslog(LOG_CRIT, "66070315:DHCP Failed - Invalid RA");
+ 			continue;
++		}
+ 
+ 		// Stop sending solicits
+ 		if (rs_attempt > 0) {
+@@ -457,3 +459,11 @@ bool ra_process(void)
+ 
+ 	return found && changed;
+ }
++
++void check_and_report_event(void)
++{
++    if (rs_attempt > 0)
++    {
++        syslog(LOG_CRIT, "66070314:DHCP failed - RS sent, no RA received");
++    }
++}
+--- a/src/ra.h
++++ b/src/ra.h
+@@ -37,3 +37,4 @@ struct icmpv6_opt {
+ int ra_init(const char *ifname, const struct in6_addr *ifid);
+ bool ra_link_up(void);
+ bool ra_process(void);
++void check_and_report_event(void);

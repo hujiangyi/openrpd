@@ -17,6 +17,7 @@
 import zmq
 from rpd.common.rpd_logging import AddLoggerToClass
 
+
 class Transport(object):
     PULLSOCK = zmq.PULL
     PUSHSOCK = zmq.PUSH
@@ -47,7 +48,7 @@ class Transport(object):
             else:
                 self.sock.connect(path)
             self.logger.info("transport socket bind/connect end")
-        except Exception as e:
+        except Exception:  # as e:
             self.logger.error("transport socket bind/connect fail")
             self.sock.close()
             self.logger.info("transport socket close")
@@ -55,6 +56,7 @@ class Transport(object):
 
         self.fileno = self.sock.get(zmq.FD)
         return
+
 
 if __name__ == "__main__":
     trans = Transport("ipc:///tmp/test1", zmq.PUSH)

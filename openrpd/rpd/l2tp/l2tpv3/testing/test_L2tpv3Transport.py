@@ -28,7 +28,7 @@ from rpd.common.rpd_logging import AddLoggerToClass, setup_logging
 
 
 class Test\
-            (unittest.TestCase):
+        (unittest.TestCase):
     # open the logger
     __metaclass__ = AddLoggerToClass
 
@@ -163,7 +163,7 @@ class Test\
         orig_receiveWindow = self.transport.receiveWindow
         orig_receiveWindowSize = self.transport.receiveWindowSize
         avps = []
-        pkt = L2tpv3ControlPacket(self.connection.remoteConnID, 1,2,avps=avps)
+        pkt = L2tpv3ControlPacket(self.connection.remoteConnID, 1, 2, avps=avps)
         pkt.isZlb = True
         self.transport.ReceivePacket(pkt, None)
         pass
@@ -176,7 +176,6 @@ class Test\
         self.transport.receiveWindow = orig_receiveWindow
         self.transport.receiveWindowSize = orig_receiveWindowSize
         pass
-
 
     def testRegisterTransport(self):
         self.logger.info("start testing...")
@@ -432,7 +431,9 @@ class Test\
         self.transport.wrapCount = orig_wrapCount
         self.assertEqual(ret, 0x2001e)
 
+
 class TestL2tpv3Network(unittest.TestCase):
+
     def test_L2tpv3Network(self):
         network = L2tpv3Network(localAddr="127.0.0.1", connID=123134)
         self.assertIsInstance(network, L2tpv3Network)
@@ -442,6 +443,7 @@ class TestL2tpv3Network(unittest.TestCase):
         network = L2tpv3Network(localAddr="::1", connID=123134)
         self.assertIsInstance(network, L2tpv3Network)
         network.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -23,22 +23,22 @@ import rpd.python_path_resolver
 import L2tpv3Connection
 import L2tpv3Session
 import L2tpv3GlobalSettings
-import L2tpv3GcppConnection
+from L2tpv3GcppConnection import StaticL2tpSession
 import L2tpv3ControlPacket
 import re
 import datetime
 import L2tpv3_pb2 as l2tpMsg
 from rpd.common.rpd_logging import AddLoggerToClass
 from rpd.common.utils import IPCClient
-from L2tpv3Hal import  L2tpHalClient
+from L2tpv3Hal import L2tpHalClient
 from rpd.mcast.src.mcast import Mcast
 import L2tpv3Fsm
+
 
 class L2tpv3APIClient(IPCClient):
 
     def __init__(self):
         super(L2tpv3APIClient, self).__init__(L2tpv3GlobalSettings.L2tpv3GlobalSettings.APITransportPath)
-
 
     def requestSystemInfo(self, timeout=2500):
         msg = l2tpMsg.L2tpCommandReq()
@@ -50,8 +50,7 @@ class L2tpv3APIClient(IPCClient):
         rsp.ParseFromString(bin)
         return rsp
 
-
-    def requestSessInfo(self, conn,sess, timeout = 2500):
+    def requestSessInfo(self, conn, sess, timeout=2500):
         msg = l2tpMsg.L2tpCommandReq()
         msg.cmd = l2tpMsg.SESSION_INFO
         msg.sess.conn.remoteAddr = conn.remoteAddr
@@ -64,6 +63,7 @@ class L2tpv3APIClient(IPCClient):
         rsp = l2tpMsg.L2tpCommandRsp()
         rsp.ParseFromString(bin)
         return rsp
+
 
 class L2tpv3APITransport(object):
     __metaclass__ = AddLoggerToClass
@@ -217,14 +217,10 @@ class L2tpv3API(object):
         connID = conn.connectionID
         localSessionId = sess.localSessionID
         if connID == 0:
-            staticPseudowireDb = L2tpv3GcppConnection.L2tpv3GcppProvider.staticPseudowireDB
-            if staticPseudowireDb is None:
-                self.logger.debug("Gcpp session table staticPseudowireDb is empty ")
-                retMsg.rsp = l2tpMsg.FAILURE
-                retMsg.retMsg = "Cannot find the connection in local Gcpp DB"
-                return retMsg
-            for key, staticL2tpSession in staticPseudowireDb.items():
-                if staticL2tpSession.direction == L2tpv3GcppConnection.StaticL2tpSession.DIRECTION_RETURN:
+            for key in StaticL2tpSession.get_keys():
+                staticL2tpSession = StaticL2tpSession(key)
+                staticL2tpSession.read()
+                if staticL2tpSession.direction == StaticL2tpSession.DIRECTION_RETURN:
                     if localSessionId == staticL2tpSession.sessionId \
                             and staticL2tpSession.localAddress == localAddr \
                             and staticL2tpSession.destAddress == remoteAddr:
@@ -371,12 +367,13 @@ class L2tpv3API(object):
 
         # Try to find the session
         systemResult = l2tpMsg.SystemQueryResult()
-        staticPseudowireDb = L2tpv3GcppConnection.L2tpv3GcppProvider.staticPseudowireDB
         num = 0
         staticSessionDic = {}
         dstAddr = ""
-        for key, staticL2tpSession in staticPseudowireDb.items():
-            if staticL2tpSession.direction == L2tpv3GcppConnection.StaticL2tpSession.DIRECTION_FORWARD:
+        for key in StaticL2tpSession.get_keys():
+            staticL2tpSession = StaticL2tpSession(key)
+            staticL2tpSession.read()
+            if staticL2tpSession.direction == StaticL2tpSession.DIRECTION_FORWARD:
                 dstAddr = staticL2tpSession.sourceAddress
             else:
                 dstAddr = staticL2tpSession.destAddress
@@ -564,7 +561,7 @@ class L2tpv3API(object):
                 mcastInfo.grp = mcast.grp_ip
                 mcastInfo.src = mcast.src_ip
                 mcastInfo.local_ip = mcast.local_ip
-                mcastInfo.status = "JOINED" if mcast.status==Mcast.JOINED else "LEAVED"
+                mcastInfo.status = "JOINED" if mcast.status == Mcast.JOINED else "LEAVED"
                 mcastInfo.interface = mcast.interface
                 mcastInfo.lastchange = datetime.datetime.fromtimestamp(mcast.lastchange).strftime("%H:%M:%S %Y-%m-%d")
                 for session in mcast.sessionList:

@@ -148,10 +148,13 @@ class GCPSession(object):
 
         def is_tx_low_pri_queue_at_high_watermark(self):
             return self.packet_tx_low_pri_queue.qsize() >= \
-                   GCPSession.TX_LOW_PRI_QUEUE_HIGH_WATERMARK
+                GCPSession.TX_LOW_PRI_QUEUE_HIGH_WATERMARK
 
         def is_tx_empty(self):
-            return self.packet_tx_high_pri_queue.empty() and self.packet_tx_low_pri_queue.empty()
+	    try:
+                return self.packet_tx_high_pri_queue.empty() and self.packet_tx_low_pri_queue.empty()
+	    except AttributeError:
+		return False
 
         def add_rx_packet(self, gcp_packet, high_priority=False):
             if None is self.packet_rx_high_pri_queue or None is self.packet_rx_low_pri_queue:
@@ -428,7 +431,7 @@ class GCPSession(object):
                                                 GCPPacket.MIN_PACKET_LEN)
             except socket.error as ex:
                 if (ex.args[0] == errno.EAGAIN or
-                            ex.args[0] == errno.EWOULDBLOCK):
+                        ex.args[0] == errno.EWOULDBLOCK):
                     self.stats.RxNoData += 1
                     # no any data to read
                     return None
@@ -441,10 +444,10 @@ class GCPSession(object):
             if 0 == received:
                 self.stats.RxSessionClose += 1
                 self.logger.info("Session closed by opposite side: %s",
-                                  self.get_descriptor())
+                                 self.get_descriptor())
                 raise GCPSessionClosed("Session closed by opposite "
                                        "side: {}".format(
-                    self.get_descriptor()))
+                                           self.get_descriptor()))
 
             packet = self.PacketClass(ctx.buffer_rx, buf_data_len=received)
 
@@ -745,7 +748,7 @@ class GCPSlaveSession(GCPSession):
 
     def is_initiated(self):
         return (True if self.session_state ==
-                        GCPSlaveSession.SESSION_STATE_GCP_SLAVE_INITIATED
+                GCPSlaveSession.SESSION_STATE_GCP_SLAVE_INITIATED
                 else False)
 
 
@@ -787,7 +790,7 @@ class GCPSessionDescriptor(object):
         """
         # Only IPv4 and IPv6 address families are supported
         if (addr_family != socket.AF_INET and
-                    addr_family != socket.AF_INET6):
+                addr_family != socket.AF_INET6):
             raise GCPSessionError("Invalid address family passed")
 
         # It's not supported to specify only addr_remote or only port_remote

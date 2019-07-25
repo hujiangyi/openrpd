@@ -17,11 +17,12 @@
 
 import unittest
 import os
-
 from rpd.common.utils import Convert, Print, SysTools
+from rpd.common.rpdinfo_utils import RpdInfoUtils
 from rpd.common.ipc_gpb_utils import PathConverter, PathBuilder, PathDirector
 from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 from rpd.gpb.rcp_pb2 import t_Path
+from rpd.gpb.rcp_pb2 import t_RcpMessage
 
 
 class TestUtils(unittest.TestCase):
@@ -192,6 +193,40 @@ class TestUtils(unittest.TestCase):
         self.assertIsNone(ret)
         ret = SysTools.if_nametoindex("dafsd")
         self.assertIsNone(ret)
+        ret = SysTools.is_if_oper_up('eth0')
+        self.assertTrue(ret)
+
+    def test_compip(self):
+        ret = Convert.compare_ip("10.79.41.31", "10.79.41.31")
+        self.assertEquals(ret, 0)
+        ret = Convert.compare_ip("10.79.41.30", "10.79.41.31")
+        self.assertEquals(ret, -1)
+        ret = Convert.compare_ip("10.79.41.30", "10.25.41.31")
+        self.assertEquals(ret, 1)
+        ret = Convert.compare_ip("fe80::6a5b:35ff:feb2:8dcf", "fe80::6a5b:35ff:feb2:8d6f")
+        self.assertEquals(ret, 1)
+
+    def test_rpdinfo_utils(self):
+        ipaddr = {
+            'addrtype': RpdInfoUtils.INETADDRESSTYPE_IPV4,
+            'ip': '60.10.10.3',
+            'mask': 64,
+            'status': RpdInfoUtils.IPADDR_STATUS_1_PREFERRED,
+            'origin': RpdInfoUtils.IPADDR_ORIGIN_4_DHCP,
+        }
+        rsp = t_RcpMessage()
+        ipaddr_info = rsp.RpdDataMessage.RpdData.RpdInfo.IpAddress.add()
+        RpdInfoUtils.set_ipaddr_info(ipaddr, ipaddr_info)
+        self.assertEqual(RpdInfoUtils.ip_exchange_mask('255.0.0.0'), 8)
+        self.assertEqual(RpdInfoUtils.ip_exchange_mask('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'), 128)
+        self.assertEqual(RpdInfoUtils.convert_ipv6('fe80::204:9fff:fe31:231%vbh0'), 'fe80::204:9fff:fe31:231')
+        self.assertEqual(RpdInfoUtils.get_ipv6_arp_retransmit_time('vbh0'), 1000)
+        self.assertEqual(RpdInfoUtils.get_ipv6_arp_retransmit_time('eth0'), 1000)
+        self.assertEqual(RpdInfoUtils.get_ipv6_arp_reachable_time('vbh0'), 30000)
+        self.assertEqual(RpdInfoUtils.get_ipv6_arp_reachable_time('eth0'), 30000)
+        print(RpdInfoUtils.get_ipaddr_info())
+        self.assertEqual(RpdInfoUtils.read_ipv6_scope('vbh0', 'ip'), 11)
+
 
 class TestIPC_GPB_Utils(unittest.TestCase):
 
@@ -287,7 +322,7 @@ class TestRpdLog(unittest.TestCase):
 
     def test_rSysLog(self):
         # rsyslog = RSyslog()
-        #config no remote syslog server
+        # config no remote syslog server
         # rsyslog.config_rsyslog('10.79.41.148')
         # log_level = {'error':3}
         # rsyslog.config_rsyslog_loglevel(3)
@@ -312,6 +347,7 @@ class TestRpdLog(unittest.TestCase):
         except Exception:
             ret = False
         self.assertTrue(ret)
+
 
 if __name__ == "__main__":
     unittest.main()

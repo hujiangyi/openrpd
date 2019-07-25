@@ -21,7 +21,7 @@ for d, _, fl in os.walk(rootDir):
             if ext[0] in whitelist:
                 print "{} skipt since in whitelist".format(d + '/' + fn)
                 continue
-#print "The file name is ", fn
+# print "The file name is ", fn
 #            print "Processing the file", fn
             content = None
             with open(d + "/" + fn) as f:
@@ -42,10 +42,10 @@ for d, _, fl in os.walk(rootDir):
             content = "\n".join(contentLines)
 
             if content.find("Copyright") >= 0 and \
-                 content.find("Cisco and/or its affiliates") >= 0 and \
-                 content.find("CableLabs") >= 0  and \
-                 content.find("http://www.apache.org/licenses/LICENSE-2.0") >= 0:
-                 continue
+                    content.find("Cisco and/or its affiliates") >= 0 and \
+                    content.find("CableLabs") >= 0 and \
+                    content.find("http://www.apache.org/licenses/LICENSE-2.0") >= 0:
+                continue
             elif content.find("http://www.apache.org/licenses/LICENSE-2.0") >= 0:
                 print "{} only has appache license".format(d + '/' + fn)
             elif content.find("Copyright") >= 0:

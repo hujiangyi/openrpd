@@ -69,7 +69,7 @@ class RPDCLI():
         signal.signal(signal.SIGTSTP, self.ignore_signal)
         signal.signal(signal.SIGTERM, self.ignore_signal)
         signal.signal(signal.SIGABRT, self.ignore_signal)
-        signal.signal(signal.SIGINT,self.ignore_signal)
+        signal.signal(signal.SIGINT, self.ignore_signal)
         pass
 
     def init_termios(self):

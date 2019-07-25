@@ -22,6 +22,7 @@ message t_DhcpData {
 	repeated string TimeServers = 2;
 	repeated string LogServers = 3;
 	required int32  TimeOffset = 4 [default = 0];
+	optional int32 Slaac = 5 [default = 0];
 }
 
 message t_DhcpMessage {

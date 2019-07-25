@@ -21,7 +21,7 @@ import subprocess
 from unittest import TestCase
 import time
 import unittest
-from rpd.confdb.rpd_redis_db import RCPDB, RCPDBRecord, RPDAllocateWriteRecord
+from rpd.confdb.rpd_redis_db import RCPDB, DBRecord, RPDAllocateWriteRecord
 
 
 CONF_FILE = '/tmp/rcp_db.conf'
@@ -62,7 +62,19 @@ def stop_redis():
     time.sleep(2)
 
 
-class SubRCPDBRecord(RCPDBRecord):
+def setup_test_redis():
+    create_db_conf()
+    start_redis()
+    RCPDB.DB_CFG_FILE = CONF_FILE
+    assert RCPDB().redis_db is not None
+
+
+def stop_test_redis():
+    stop_redis()
+    os.remove(CONF_FILE)
+
+
+class SubRCPDBRecord(DBRecord):
 
     def __init__(self):
         self.index = 0
@@ -163,8 +175,8 @@ class TestRCPDBRecord(TestCase):
         self.awRecord.delete()
         self.awRecord1.delete()
         self.awRecord2.delete()
-        self.awRecord.index = 333
-        self.awRecord.delete()
+        self.awRecord2.index = 333
+        self.awRecord2.delete()
         self.assertEqual(len(self.awRecord2.getIndexPool()),
                          Sub2RCPAllocaWriteRecord.MAX_INDEX)
 

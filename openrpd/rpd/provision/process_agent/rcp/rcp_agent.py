@@ -21,14 +21,14 @@ import zmq
 from time import time
 import json
 from rpd.rcp.rcp_process import RcpHalProcess
+from rpd.rcp.rcp_sessions import CcapCoreIdentification
 from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 from rpd.gpb.rcp_pb2 import t_RcpMessage
 from rpd.dispatcher.timer import DpTimerManager
-from rpd.gpb.monitor_pb2 import t_LED
-from rpd.provision.proto.MonitorMsgType import MsgTypeSetLed
 from rpd.provision.manager.src.manager_process import ManagerProcess
 from rpd.common.utils import Convert
 from rpd.gpb.CcapCoreIdentification_pb2 import t_CcapCoreIdentification
+
 
 class RcpOverGcp(agent.ProcessAgent):
     UP = "UP"
@@ -38,7 +38,6 @@ class RcpOverGcp(agent.ProcessAgent):
 
     __metaclass__ = AddLoggerToClass
     MSG_TIMEOUT = 5
-    GCP_FLAP_RECOVERING_TIMEOUT = 20
 
     def __init__(self):
         super(RcpOverGcp, self).__init__(agent.ProcessAgent.AGENTTYPE_GCP)
@@ -52,7 +51,6 @@ class RcpOverGcp(agent.ProcessAgent):
             None,
             timer_type=DpTimerManager.TIMER_REPEATED)
 
-        self.gcp_flapping_list = dict()
         # for principal core
         self.principal_core = None
         self.principal_core_interface = None
@@ -92,7 +90,7 @@ class RcpOverGcp(agent.ProcessAgent):
             seq_num, core_ip = seq_value.split(',')
             seq_num = int(seq_num)
 
-            if not self.rcp_req_group.has_key((seq_num, core_ip)):
+            if (seq_num, core_ip) not in self.rcp_req_group.keys():
                 self.logger.error("Rcp request message sequence number %s error for core %s", seq_num, core_ip)
                 return
 
@@ -121,20 +119,7 @@ class RcpOverGcp(agent.ProcessAgent):
             ret_value = json.loads(msg.parameter)
             self.logger.debug("MGR write request: %s", ret_value)
             action, value = ret_value.split("/")
-            if action == 'light_led':
-                led_msg = t_LED()
-                led_msg.setLed.ledType = led_msg.LED_TYPE_STATUS
-                led_msg.setLed.color = led_msg.LED_COLOR_GREEN
-                if value == "True":
-                    led_msg.setLed.action = led_msg.LED_ACTION_LIT
-                    self.process.orchestrator.set_system_operational(operational=True)
-                else:
-                    led_msg.setLed.action = led_msg.LED_ACTION_DARK
-                    self.process.orchestrator.set_system_operational()
-
-                self.logger.info("Set led request message: %s", led_msg)
-                self.process.hal_ipc.send_mgr_cfg_msg(MsgTypeSetLed, led_msg)
-            elif action == 'set_active_principal':
+            if action == 'set_active_principal':
                 self.principal_core_interface, self.principal_core = value.split(";")
         except Exception as e:
             self.logger.error("Unexpected failure: %s", str(e))
@@ -202,7 +187,7 @@ class RcpOverGcp(agent.ProcessAgent):
             else:
                 self.rcp[(interface, ccap_core)] = {
                     "status": self.DOWN,
-                    "requester": [ccap_core_id,],
+                    "requester": [ccap_core_id, ],
                     "lastChangeTime": time(),
                 }
 
@@ -244,10 +229,12 @@ class RcpOverGcp(agent.ProcessAgent):
 
         :param seq: data format t_RcpMessage defined in rcp.proto or
          rcp sequence
+        :param args: RCP message arguments
 
         """
         status_changed = False
         specific = None
+        core_msg_str = None
         if None is seq:
             self.logger.error("Parameters error, can not be NoneType")
             return
@@ -255,15 +242,15 @@ class RcpOverGcp(agent.ProcessAgent):
             rcp_msg = seq
         else:
             rcp_msg = seq.ipc_msg
-
+        self.logger.info("rcp_msg_cb: %s args, %s", str(rcp_msg), str(args))
         interface_local = ''
-        if None is not args:
+        if args:
             session, transaction_identifier, trans_id = args
             interface_local = session.get_descriptor().interface_local
         self.logger.info("RCP message type: %s",
                          rcp_msg.t_RcpMessageType.Name(rcp_msg.RcpMessageType))
 
-        if rcp_msg.RcpMessageType == rcp_msg.RPD_REBOOT:
+        if rcp_msg.RcpMessageType == t_RcpMessage.RPD_REBOOT:
             self.logger.debug("Received RPD Reboot from RCP")
             core_ip = ''
             info = ''
@@ -283,7 +270,7 @@ class RcpOverGcp(agent.ProcessAgent):
                 self.logger.debug("Send event notification to id %s, msg:%s" %
                                   (idx, event_request_rsp))
 
-        elif rcp_msg.RcpMessageType == rcp_msg.REDIRECT_NOTIFICATION:
+        elif rcp_msg.RcpMessageType == t_RcpMessage.REDIRECT_NOTIFICATION:
             self.logger.debug("Received RPD Redirect message from RCP")
             #  need to send message to manager to handle this
             core_ip = ''
@@ -297,7 +284,7 @@ class RcpOverGcp(agent.ProcessAgent):
                 event_request_rsp.mgr_event.event_id = self.id
                 event_request_rsp.mgr_event.data = json.dumps(
                     "redirect/" +
-                    ";".join([core for core in rcp_msg.RedirectCCAPAddresses])
+                    ";".join([Convert.format_ip(core) for core in rcp_msg.RedirectCCAPAddresses])
                     + '/' + interface_local + ';' + core_ip)
                 self.mgrs[idx]['transport'].sock.send(
                     event_request_rsp.SerializeToString(), flags=zmq.NOBLOCK)
@@ -314,7 +301,7 @@ class RcpOverGcp(agent.ProcessAgent):
                         specific = (interface_local, core_ip)
                         self.rcp[(interface_local, core_ip)]['status'] = self.DOWN
 
-        elif rcp_msg.RcpMessageType == rcp_msg.RPD_CONFIGURATION:
+        elif rcp_msg.RcpMessageType == t_RcpMessage.RPD_CONFIGURATION:
             self.logger.debug(
                 "Received RPD Ccap Core configuration message from RCP")
             cfg_data = rcp_msg.RpdDataMessage.RpdData
@@ -325,11 +312,34 @@ class RcpOverGcp(agent.ProcessAgent):
                 if descr.name == 'CcapCoreIdentification':
                     #  need to send message to manager to handle this
                     for cap_info in value:
+                        coreIpAddress = "0.0.0.0"
+                        identRecord = CcapCoreIdentification()
+                        index = -1
+                        is_principal = False
+                        if cap_info.HasField("Index"):
+                            index = cap_info.Index
+                            identRecord.index = index
+                            identRecord.read()
+                            coreIpAddress = identRecord.core_ip_addr
+                            is_principal = identRecord.is_principal
+                            is_active = identRecord.is_active
+                            if cap_info.HasField("CoreIpAddress"):
+                                coreIpAddress = cap_info.CoreIpAddress
+                            if cap_info.HasField("IsPrincipal"):
+                                is_principal = cap_info.IsPrincipal
+                            if cap_info.HasField("CoreMode"):
+                                is_active = cap_info.CoreMode is t_CcapCoreIdentification.COREMODEACTIVE \
+                                    if cap_info.HasField("CoreMode") else True
+                            self.logger.debug("CcapCoreIdentification index =%d coreIpAddress is %s is_principal=%d is_active=%d",
+                                              index, coreIpAddress, is_principal, is_active)
+                        else:
+                            continue
                         caps = {
-                            "is_active": cap_info.CoreMode is t_CcapCoreIdentification.COREMODEACTIVE if cap_info.HasField(
-                                "CoreMode") else True,
-                                "ccap_core": Convert.format_ip(cap_info.CoreIpAddress),
-                                'interface': interface_local, "is_principal": cap_info.IsPrincipal}
+                            "index": index,
+                            "is_active": is_active,
+                            "ccap_core": Convert.format_ip(coreIpAddress),
+                            "interface": interface_local,
+                            "is_principal": is_principal}
                         for idx in self.mgrs:
                             event_request_rsp = protoDef.msg_event_notification()
                             event_request_rsp.mgr_event.mgr_id = idx
@@ -344,7 +354,7 @@ class RcpOverGcp(agent.ProcessAgent):
                         # changed the status, then send to corresponding requester, just for CLI test
                         for interface, core_ip in self.rcp:
                             if interface != interface_local or \
-                                    not Convert.is_ip_address_equal(core_ip, cap_info.CoreIpAddress):
+                                    not Convert.is_ip_address_equal(core_ip, coreIpAddress):
                                 continue
                             ccap_core = self.rcp[(interface, core_ip)]
                             # send the Core Identification
@@ -352,12 +362,12 @@ class RcpOverGcp(agent.ProcessAgent):
                                 info_update = protoDef.msg_event_notification()
                                 info_update.agent_info_update.ccap_core_id = core_id
 
-                                # The ugly code is casued by the proto file is different place
+                                # The ugly code is caused by the proto file is different place
                                 if cap_info.HasField("CoreId"):
                                     info_update.agent_info_update.ccap_core_identification.CoreId = cap_info.CoreId
                                 if cap_info.HasField("CoreIpAddress"):
                                     info_update.agent_info_update.ccap_core_identification.CoreIpAddress = \
-                                                                             Convert.format_ip(cap_info.CoreIpAddress)
+                                        Convert.format_ip(coreIpAddress)
                                 if cap_info.HasField("IsPrincipal"):
                                     info_update.agent_info_update.ccap_core_identification.IsPrincipal = cap_info.IsPrincipal
                                 if cap_info.HasField("CoreName"):
@@ -366,12 +376,13 @@ class RcpOverGcp(agent.ProcessAgent):
                                     info_update.agent_info_update.ccap_core_identification.VendorId = cap_info.VendorId
                                 if cap_info.HasField("CoreMode"):
                                     info_update.agent_info_update.ccap_core_identification.CoreMode = cap_info.CoreMode
-                                if cap_info.HasField("CoreFunction"): 
+                                if cap_info.HasField("CoreFunction"):
                                     info_update.agent_info_update.ccap_core_identification.CoreFunction = cap_info.CoreFunction
                                 if cap_info.HasField("InitialConfigurationComplete"):
                                     info_update.agent_info_update.ccap_core_identification.InitialConfigurationComplete = cap_info.InitialConfigurationComplete
-                                    if (cap_info.InitialConfigurationComplete):
+                                    if cap_info.InitialConfigurationComplete:
                                         status_changed, specific = self.handle_init_conf_completed(args)
+                                        core_msg_str = "GCP_CFG_CPL"
                                 if cap_info.HasField("MoveToOperational"):
                                     if cap_info.MoveToOperational:
                                         self._send_event_notification(core_id, protoDef.msg_core_event_notification.OK,
@@ -379,8 +390,9 @@ class RcpOverGcp(agent.ProcessAgent):
 
                                 if cap_info.HasField("ResourceSetIndex"):
                                     info_update.agent_info_update.ccap_core_identification.ResourceSetIndex = cap_info.ResourceSetIndex
+                                if cap_info.HasField("Index"):
+                                    info_update.agent_info_update.ccap_core_identification.Index = cap_info.Index
 
-                                info_update.agent_info_update.ccap_core_identification.Index = 0
                                 ccap_core_instance = self.ccap_cores[core_id]
                                 transport = self.mgrs[ccap_core_instance["mgr"]]['transport']
                                 transport.sock.send(
@@ -414,17 +426,17 @@ class RcpOverGcp(agent.ProcessAgent):
                             for _, s in self.process.orchestrator.sessions_active.items():
                                 addr = s.get_descriptor().addr_remote
                                 if addr == caps["ActiveCoreIpAddress"]:
-                                    if (hasattr(s.ccap_capabilities, "is_active") and
-                                            s.ccap_capabilities.is_active):
+                                    if (hasattr(s.ccap_identification, "is_active") and
+                                            s.ccap_identification.is_active):
                                         active_session = s
-                                        active_session.ccap_capabilities.is_active = False
+                                        active_session.ccap_identification.is_active = False
                                         self.logger.info("HA CHANGE: set session[%s] to standby" %
                                                          caps["StandbyCoreIpAddress"])
                                 elif addr == caps["StandbyCoreIpAddress"]:
-                                    if (hasattr(s.ccap_capabilities, "is_active") and
-                                            not s.ccap_capabilities.is_active):
+                                    if (hasattr(s.ccap_identification, "is_active") and
+                                            not s.ccap_identification.is_active):
                                         standby_session = s
-                                        standby_session.ccap_capabilities.is_active = True
+                                        standby_session.ccap_identification.is_active = True
                                         self.logger.info("HA CHANGE: set session[%s] to active" %
                                                          caps["StandbyCoreIpAddress"])
 
@@ -432,13 +444,13 @@ class RcpOverGcp(agent.ProcessAgent):
                             for _, s in self.process.orchestrator.sessions_active.items():
                                 addr = s.get_descriptor().addr_remote
                                 if addr == caps["ActiveCoreIpAddress"]:
-                                    if (hasattr(s.ccap_capabilities, "is_active") and
-                                            not s.ccap_capabilities.is_active):
+                                    if (hasattr(s.ccap_identification, "is_active") and
+                                            not s.ccap_identification.is_active):
                                         self.logger.warn("HA ADD: session[%s] is not active now" %
                                                          caps["ActiveCoreIpAddress"])
                                 elif addr == caps["StandbyCoreIpAddress"]:
-                                    if (hasattr(s.ccap_capabilities, "is_active") and
-                                            s.ccap_capabilities.is_active):
+                                    if (hasattr(s.ccap_identification, "is_active") and
+                                            s.ccap_identification.is_active):
                                         self.logger.warn("HA ADD: session[%s] is not inactive now" %
                                                          caps["StandbyCoreIpAddress"])
 
@@ -504,60 +516,48 @@ class RcpOverGcp(agent.ProcessAgent):
                         "Recv {} message {}".format(descr.name, value))
                     return
 
-        elif rcp_msg.RcpMessageType == rcp_msg.RPD_CONFIGURATION_DONE:
+        elif rcp_msg.RcpMessageType == t_RcpMessage.RPD_CONFIGURATION_DONE:
             self.logger.debug("Got configuration done message...")
             # changed the status, then send to corresponding requester
             status_changed, specific = self.handle_init_conf_completed(args)
+            core_msg_str = "GCP_CFG_CPL"
 
-        elif rcp_msg.RcpMessageType == rcp_msg.CONNECT_CLOSE_NOTIFICATION:
-            # changed the status, then send to corresponding requester
-            if rcp_msg.HasField('parameter'):
-                core_para = json.loads(rcp_msg.parameter)
-                ccap_core_ip = core_para['addr_remote'] if None is not core_para['addr_remote'] else ''
-                interface_local = core_para['interface_local'] if None is not core_para['interface_local'] else ''
-                reconnect = core_para['reconnect']
-
-                # store flap gcp
-                if reconnect and (interface_local, ccap_core_ip) not in self.gcp_flapping_list:
-                    flap_timer = self.dispatcher.timer_register(
-                        self.GCP_FLAP_RECOVERING_TIMEOUT, self.gcp_flap_timeout, arg=(interface_local, ccap_core_ip))
-                    self.gcp_flapping_list[(interface_local, ccap_core_ip)] = flap_timer
-                    # send recovering to manager.
-                    for idx in self.mgrs:
-                        event_request_rsp = protoDef.msg_event_notification()
-                        event_request_rsp.mgr_event.mgr_id = idx
-                        event_request_rsp.mgr_event.event_id = self.id
-                        event_request_rsp.mgr_event.data = json.dumps("gcp_flapping/" +
-                                                                      interface_local + ";" + ccap_core_ip +
-                                                                      "/recovering")
-                        self.mgrs[idx]['transport'].sock.send(
-                            event_request_rsp.SerializeToString(), flags=zmq.NOBLOCK)
-                        self.logger.debug("Send event notification to id %s, msg:%s" %
-                                          (idx, event_request_rsp))
-                elif not reconnect:
-                    if (interface_local, ccap_core_ip) in self.gcp_flapping_list:
-                        flap_timer = self.gcp_flapping_list.pop((interface_local, ccap_core_ip))
-                        self.dispatcher.timer_unregister(flap_timer)
-
-                    if (interface_local, ccap_core_ip) in self.rcp:
-                        if self.rcp[(interface_local, ccap_core_ip)]['status'] != self.DOWN:
-                            status_changed = True
-                            specific = (interface_local, ccap_core_ip)
-                            self.rcp[(interface_local, ccap_core_ip)]['status'] = self.DOWN
-                    # notify mgr about connection info, mgr will log this,
-                    # and send notify message to CCAP Core finally.
-                    for idx in self.mgrs:
-                        event_request_rsp = protoDef.msg_event_notification()
-                        event_request_rsp.mgr_event.mgr_id = idx
-                        event_request_rsp.mgr_event.event_id = self.id
-                        event_request_rsp.mgr_event.data = json.dumps("connect_closed/" +
-                                                                      interface_local + ";" + ccap_core_ip +
-                                                                      ";" + str(reconnect))
-                        self.mgrs[idx]['transport'].sock.send(
-                            event_request_rsp.SerializeToString(), flags=zmq.NOBLOCK)
-                        self.logger.debug("Send event notification to id %s, msg:%s" %
-                                          (idx, event_request_rsp))
-
+        elif rcp_msg.RcpMessageType == t_RcpMessage.CONNECT_CLOSE_NOTIFICATION:
+            specific = self._get_specific_core_para(rcp_msg, args)
+            core_msg_str = "TCP_FAIL"
+            status_changed = True
+            if specific:
+                reconnect = False
+                if specific in self.rcp:
+                    if self.rcp[specific]['status'] != self.DOWN:
+                        self.rcp[specific]['status'] = self.DOWN
+                        # notify mgr about connection info, mgr will log this,
+                        # and send notify message to CCAP Core finally.
+                        # TODO remove these code later
+                        for idx in self.mgrs:
+                            event_request_rsp = protoDef.msg_event_notification()
+                            event_request_rsp.mgr_event.mgr_id = idx
+                            event_request_rsp.mgr_event.event_id = self.id
+                            event_request_rsp.mgr_event.data = json.dumps("connect_closed/" +
+                                                                          specific[0] + ";" +
+                                                                          specific[1] + ";" +
+                                                                          str(reconnect))
+                            self.mgrs[idx]['transport'].sock.send(
+                                event_request_rsp.SerializeToString(), flags=zmq.NOBLOCK)
+                            self.logger.debug("Send event notification to id %s, msg:%s" %
+                                              (idx, event_request_rsp))
+        elif rcp_msg.RcpMessageType == t_RcpMessage.SESSION_INITIATED:
+            specific = self._get_specific_core_para(rcp_msg, args)
+            core_msg_str = "TCP_OK"
+            status_changed = True
+        elif rcp_msg.RcpMessageType == t_RcpMessage.IRA_RECEIVED:
+            specific = self._get_specific_core_para(rcp_msg, args)
+            core_msg_str = "GCP_IRA"
+            status_changed = True
+        elif rcp_msg.RcpMessageType == t_RcpMessage.REX_RECEIVED:
+            specific = self._get_specific_core_para(rcp_msg, args)
+            core_msg_str = "GCP_CFG"
+            status_changed = True
         else:
             self.logger.error("Unexpected IPC message received from "
                               "RCP: type: %s(%u)",
@@ -572,6 +572,7 @@ class RcpOverGcp(agent.ProcessAgent):
 
         popup_list = list()
         if None is not specific and specific in self.rcp:
+            self.rcp[specific]['lastChangeTime'] = time()
             for id in self.rcp[specific]["requester"]:
                 if id not in self.ccap_cores:
                     popup_list.append(id)
@@ -582,13 +583,13 @@ class RcpOverGcp(agent.ProcessAgent):
                 event_request_rsp.core_event.status = protoDef.msg_core_event_notification.OK
                 event_request_rsp.core_event.reason = "Status changed"
                 event_request_rsp.core_event.event_id = self.id
-                event_request_rsp.core_event.result = self.rcp[specific]["status"]
+                event_request_rsp.core_event.result = core_msg_str if core_msg_str else self.rcp[specific]['status']
                 ccap_core = self.ccap_cores[id]
                 transport = self.mgrs[ccap_core["mgr"]]['transport']
                 transport.sock.send(
                     event_request_rsp.SerializeToString(), flags=zmq.NOBLOCK)
-                self.logger.debug("Send status change to id %s, msg:%s" %
-                                  (id, event_request_rsp))
+                self.logger.info("Send status change to id %s, msg:%s" %
+                                 (id, event_request_rsp))
             for idx in popup_list:
                 self.rcp[specific]['requester'].remove(idx)
 
@@ -606,65 +607,29 @@ class RcpOverGcp(agent.ProcessAgent):
                     self.rcp[(interface_local, ccap_core_ip)]['status'] = self.UP
                     if interface_local == self.principal_core_interface and ccap_core_ip == self.principal_core:
                         self.process.orchestrator.set_active_principal_core(interface_local, ccap_core_ip)
-
-            # we need to send this flapping to mgr, otherwise will impact ptp status
-            if (interface_local, ccap_core_ip) in self.gcp_flapping_list:
-                flap_timer = self.gcp_flapping_list.pop((interface_local, ccap_core_ip))
-                self.dispatcher.timer_unregister(flap_timer)
-                for idx in self.mgrs:
-                    event_request_rsp = protoDef.msg_event_notification()
-                    event_request_rsp.mgr_event.mgr_id = idx
-                    event_request_rsp.mgr_event.event_id = self.id
-                    event_request_rsp.mgr_event.data = json.dumps("gcp_flapping/" +
-                                                                  interface_local + ";" + ccap_core_ip +
-                                                                  "/done")
-                    self.mgrs[idx]['transport'].sock.send(
-                        event_request_rsp.SerializeToString(), flags=zmq.NOBLOCK)
-                    self.logger.info("Send event notification to id %s, msg:%s" %
-                                     (idx, event_request_rsp))
         return status_changed, specific
 
-    def gcp_flap_timeout(self, args):
-        """handle gcp flapped case."""
+    @staticmethod
+    def _get_specific_core_para(rcp_msg, args):
+        try:
+            interface_local = None
+            ccap_core_ip = None
+            if rcp_msg.RcpMessageType in [t_RcpMessage.CONNECT_CLOSE_NOTIFICATION, t_RcpMessage.SESSION_INITIATED,
+                                          t_RcpMessage.REDIRECT_NOTIFICATION]:
+                core_para = json.loads(rcp_msg.parameter)
+                ccap_core_ip = core_para['addr_remote'] if None is not core_para['addr_remote'] else ''
+                interface_local = core_para['interface_local'] if None is not core_para['interface_local'] else ''
+            elif rcp_msg.RcpMessageType in [t_RcpMessage.RPD_CONFIGURATION, t_RcpMessage.RPD_CONFIGURATION_DONE,
+                                            t_RcpMessage.IRA_RECEIVED, t_RcpMessage.REX_RECEIVED]:
+                if args:
+                    session, transaction_identifier, trans_id = args
+                    interface_local = session.get_descriptor().interface_local
+                    ccap_core_ip = Convert.format_ip(session.get_descriptor().addr_remote)
+            specific = (interface_local, ccap_core_ip)
+            return specific
 
-        status_changed = False
-        specific = None
-
-        interface_local, ccap_core_ip = args
-        if (interface_local, ccap_core_ip) in self.rcp:
-            if self.rcp[(interface_local, ccap_core_ip)]['status'] != self.DOWN:
-                status_changed = True
-                specific = (interface_local, ccap_core_ip)
-                self.rcp[(interface_local, ccap_core_ip)]['status'] = self.DOWN
-
-        if (interface_local, ccap_core_ip) in self.gcp_flapping_list:
-            self.gcp_flapping_list.pop((interface_local, ccap_core_ip))
-
-        # send the status change to the requester
-        if not status_changed:
-            return
-
-        popup_list = list()
-        if None is not specific and specific in self.rcp:
-            for id in self.rcp[specific]["requester"]:
-                if id not in self.ccap_cores:
-                    popup_list.append(id)
-                    continue
-                event_request_rsp = protoDef.msg_event_notification()
-                event_request_rsp.core_event.id = id
-                event_request_rsp.core_event.ccap_core_id = id
-                event_request_rsp.core_event.status = protoDef.msg_core_event_notification.OK
-                event_request_rsp.core_event.reason = "Status changed"
-                event_request_rsp.core_event.event_id = self.id
-                event_request_rsp.core_event.result = self.rcp[specific]["status"]
-                ccap_core = self.ccap_cores[id]
-                transport = self.mgrs[ccap_core["mgr"]]['transport']
-                transport.sock.send(
-                    event_request_rsp.SerializeToString(), flags=zmq.NOBLOCK)
-                self.logger.debug("Send status change to id %s, msg:%s" %
-                                  (id, event_request_rsp))
-            for idx in popup_list:
-                self.rcp[specific]['requester'].remove(idx)
+        except Exception as e:
+            return None
 
     def cleanup_db(self, ccap_core_id):
         """cleanup the remain requester if exist."""
@@ -688,9 +653,10 @@ class RcpOverGcp(agent.ProcessAgent):
                 self.process.orchestrator.remove_sessions_by_core(
                     interface, ccap_core)
 
+
 if __name__ == "__main__":  # pragma: no cover
     setup_logging(("PROVISION", "GCP"), filename="provision_rcp.log")
     pagent = RcpOverGcp()
     pagent.start()
-    #import cProfile
-    #cProfile.run('pagent.start()', 'rcp.profile')
+    # import cProfile
+    # cProfile.run('pagent.start()', 'rcp.profile')

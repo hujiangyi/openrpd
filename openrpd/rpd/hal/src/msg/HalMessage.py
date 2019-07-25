@@ -97,7 +97,8 @@ class HalMessage(object):
                             setattr(
                                 innerInstance, paraInner, MsgParametr[para][paraInner])
                 else:
-                    setattr(self.msg, para, MsgParametr[para])
+                    if MsgParametr[para] is not None:
+                        setattr(self.msg, para, MsgParametr[para])
         else:
             raise Exception(
                 "Cannot create a msg since we can not find the msg definition")

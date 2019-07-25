@@ -17,7 +17,7 @@
 import copy
 import os
 import subprocess
-from json import JSONEncoder, loads
+from json import JSONEncoder
 import time
 import psutil
 import zmq
@@ -463,7 +463,7 @@ class ProcessAgent(object):
             if id not in self.mgrs:
                 self.logger.error(
                     "Cannot process the mgr unregister request since cannot find the id[%s] in local db"
-                                  % id)
+                    % id)
                 rsp = process_agent_pb2.msg_register_rsp()
                 rsp.id = id
                 rsp.agent_id = self.id
@@ -691,7 +691,7 @@ class ProcessAgent(object):
 
         try:
             self.api_transport.sock.send(ipc_msg.SerializeToString(), flags=zmq.NOBLOCK)
-        except Exception as e:
+        except Exception:  # as e:
             self.logger.error(
                 "Got error when send register response message: {}".format(ipc_msg))
 
@@ -705,7 +705,7 @@ class ProcessAgent(object):
         try:
             self.cli_transport.sock.send(
                 rsp_msg.SerializeToString(), flags=zmq.NOBLOCK)
-        except Exception as e:
+        except Exception:  # as e:
             self.logger.error(
                 "Got error when send CLI response message: {}".format(rsp_msg))
 
@@ -829,7 +829,6 @@ class ProcessAgent(object):
         popenObj.kill()
 
         return True
-
 
     def check_process_status(self, popenObj):
         """Check the status of the process.

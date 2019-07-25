@@ -157,7 +157,7 @@ class ProtoGenerator(object):
 
         rule = "optional"
         if tlv.is_tlv_key():
-            rule = "required"
+            rule = "optional"
         elif tlv.is_tlv_row():
             # If any child is key, then class must be marked as repeated
             if any(x.is_tlv_key()
@@ -206,6 +206,7 @@ def print_help(cl_args):
     print "Usage: {} [--gcp] <output-proto-name>\n".format(cl_args[0])
     print "Usage: {} [--ucd] <output-proto-name>\n".format(cl_args[0])
     print "Usage: {} [--ocd] <output-proto-name>\n".format(cl_args[0])
+
 
 if __name__ == '__main__':
     next_arg = 1

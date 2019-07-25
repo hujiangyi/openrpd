@@ -49,7 +49,7 @@ class HalClient(object):
 
     __metaclass__ = AddLoggerToClass
 
-    def __init__(self, appName, appDesc, appVer, interestedNotification,logConfigurePath=None,supportedMsgType=[]):
+    def __init__(self, appName, appDesc, appVer, interestedNotification, logConfigurePath=None, supportedMsgType=[]):
         """
         :param appName: The application name, such as RPD CLI
         :param appDesc: A brief description about this application, such as the functionality description
@@ -193,7 +193,7 @@ class HalClient(object):
                                          ClientDescription=self.appDesc,
                                          ClientVersion=self.appVer,
                                          ClientSupportedMessages=self.supportedMsgType)
-            else :
+            else:
                 registerMsg = HalMessage("HalClientRegister",
                                          ClientName=self.appName,
                                          ClientDescription=self.appDesc,
@@ -233,7 +233,7 @@ class HalClient(object):
         :return:
 
         """
-        self.logger.debug("Send a Hello message to Hal")
+        self.logger.debug(" ".join([str(self.appName), str(self.clientID), ":Send a Hello message to Hal"]))
         helloMsg = HalMessage("HalClientHello", ClientID=self.clientID)
         self._sendMsg(helloMsg.Serialize())
 
@@ -343,7 +343,7 @@ class HalClient(object):
         # create the connection again
         self.connectionSetup()
         self.register(self.clientID)
-                      # The zmq lower part will handle the reconnect
+        # The zmq lower part will handle the reconnect
 
         self.disconnected = True
 
@@ -376,6 +376,23 @@ class HalClient(object):
         seq = self.seqNum
         self.seqNum += 1
         return seq
+
+    def sendCfgRspMsg(self, cfg, rsp=None):
+        """The configuration response routine, the driver implementor should
+        fill sth into this function.
+
+        :param cfg: The original configuration message
+        :param rsp: respond
+        :return:
+
+        """
+        cfgMsg = cfg.msg
+        msg = HalMessage("HalConfigRsp", SrcClientID=cfgMsg.SrcClientID,
+                         SeqNum=cfgMsg.SeqNum, Rsp=rsp,
+                         CfgMsgType=cfgMsg.CfgMsgType,
+                         CfgMsgPayload=cfgMsg.CfgMsgPayload)
+        if None is not self.pushSock:
+            self.pushSock.send(msg.Serialize())
 
     def setHalDebugLevel(self, module, level):
         """Set the HAl debug level.
@@ -465,5 +482,5 @@ if __name__ == "__main__":
     # setup the logging
     setup_logging('HAL', filename="hal_client.log")
     application = HalClient("client0", "This is a test application", "1.9.0",
-                           (1, 2, 100, 102), "../../conf/ClientLogging.conf")
+                            (1, 2, 100, 102), "../../conf/ClientLogging.conf")
     application.start()

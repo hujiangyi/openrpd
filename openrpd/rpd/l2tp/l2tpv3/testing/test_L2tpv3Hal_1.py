@@ -15,10 +15,10 @@
 # limitations under the License.
 #
 import unittest
-import os
 import struct
+
 from rpd.dispatcher.dispatcher import Dispatcher
-from l2tpv3.src.L2tpv3Hal import L2tpHalClient,L2tpv3HalStats
+from l2tpv3.src.L2tpv3Hal import L2tpHalClient, L2tpv3HalStats
 from l2tpv3.src.L2tpv3Hal import L2tpHalClientError
 import rpd.hal.src.HalConfigMsg as HalConfigMsg
 import l2tpv3.src.L2tpv3Hal_pb2 as L2tpv3Hal_pb2
@@ -30,21 +30,37 @@ import l2tpv3.src.L2tpv3RFC3931AVPs as L2tpv3RFC3931AVPs
 import docsisAVPs.src.L2tpv3CableLabsAvps as L2tpv3CableLabsAvps
 from l2tpv3.src.L2tpv3Dispatcher import L2tpv3Dispatcher
 from l2tpv3.src.L2tpv3GlobalSettings import L2tpv3GlobalSettings
-from rpd.common.rpd_logging import AddLoggerToClass
+from rpd.common.rpd_logging import AddLoggerToClass, setup_logging
+import rpd.gpb.StaticPwConfig_pb2 as StaticPwConfig_pb2
+import l2tpv3.src.L2tpv3GcppConnection as L2tpv3GcppSession
+from l2tpv3.testing.test_L2tpv3GcppSession import StaticL2tpProvision
+import time
+from rpd.confdb.testing.test_rpd_redis_db import setup_test_redis, stop_test_redis
+from rpd.gpb.rcp_pb2 import t_RcpMessage
+from rpd.gpb.cfg_pb2 import config
+from rpd.hal.src.HalConfigMsg import MsgTypeRpdInfo
+from rpd.mcast.src.DepiMcastSessionRecord import DepiMcastSessionRecord
+from l2tpv3.src.L2tpv3SessionDb import L2tpSessionRecord
+from rpd.common import utils
+
 
 class TestExceptionError(Exception):
     pass
 
+
 def fake_cb(data):
     print "fake cb handled"
+
 
 def fake_cb_exception(data):
     raise TestExceptionError()
 
+
 class testL2tpv3HalStats(unittest.TestCase):
+
     def test_init_clear(self):
         stats = L2tpv3HalStats()
-        self.assertIsInstance(stats,L2tpv3HalStats)
+        self.assertIsInstance(stats, L2tpv3HalStats)
         stats.error = 1
         stats.exception = 1
         stats.zmq_error = 1
@@ -53,11 +69,16 @@ class testL2tpv3HalStats(unittest.TestCase):
         self.assertEqual(stats.exception, 0)
         self.assertEqual(stats.zmq_error, 0)
 
+
 class testL2tpv3Hal(unittest.TestCase):
     __metaclass__ = AddLoggerToClass
 
     @classmethod
     def setUpClass(cls):
+        # open logger
+        setup_logging("L2TP")
+        setup_test_redis()
+
         cls.conn_address = '127.0.0.1'
         global_dispatcher = Dispatcher()
         dispatcher = L2tpv3Dispatcher(
@@ -72,6 +93,7 @@ class testL2tpv3Hal(unittest.TestCase):
         cls.hal_client = L2tpHalClient("L2TP_HAL_CLIENT",
                                        "the HAL client of L2TP feature",
                                        "1.0", tuple(L2tpHalClient.notification_list.keys()), global_dispatcher)
+
         cls.hal_client.handler = dispatcher.receive_hal_message
         cls.conn = L2tpConnection(
             6661, 6662, cls.conn_address, cls.conn_address)
@@ -87,8 +109,8 @@ class testL2tpv3Hal(unittest.TestCase):
         DepiL2SpecificSublayerSubtype = L2tpv3CableLabsAvps.DepiL2SpecificSublayerSubtype(3)
         LocalMTUCableLabs = L2tpv3CableLabsAvps.LocalMTUCableLabs(1500)
         DepiRemoteMulticastJoin = L2tpv3CableLabsAvps.DepiRemoteMulticastJoin(("5.5.5.1", "229.1.1.255"))
-        DepiResourceAllocReq = L2tpv3CableLabsAvps.DepiResourceAllocReq(((0, 1),(1,2)))
-        UpstreamFlow = L2tpv3CableLabsAvps.UpstreamFlow(((0, 1), (1,2)))
+        DepiResourceAllocReq = L2tpv3CableLabsAvps.DepiResourceAllocReq(((0, 1), (1, 2)))
+        UpstreamFlow = L2tpv3CableLabsAvps.UpstreamFlow(((0, 1), (1, 2)))
 
         cls.session.avps_icrq.append(localSessionId)
         cls.session.avps_icrq.append(remoteSessionId)
@@ -107,7 +129,17 @@ class testL2tpv3Hal(unittest.TestCase):
         cls.conn.transport.network.close()
         L2tpv3GlobalSettings.Dispatcher._unregister_local_address(
             cls.conn_address)
+        stop_test_redis()
 
+    def setUp(self):
+        # clear db records
+        sessRec = DepiMcastSessionRecord()
+        sessRec.delete_all()
+
+    def tearDown(self):
+        # clear db records
+        sessRec = DepiMcastSessionRecord()
+        sessRec.delete_all()
 
     def test_get_route_table(self):
         route_table = L2tpHalClient.get_route_table()
@@ -193,7 +225,7 @@ class testL2tpv3Hal(unittest.TestCase):
             "HalNotification", ClientID="1", HalNotificationType=HalConfigMsg.MsgTypeRpdCapabilities,
             HalNotificationPayLoad=payload)
 
-        self.hal_client.handler= None
+        self.hal_client.handler = None
         ret = self.hal_client.recvHalNotification(notfication)
         self.assertTrue(ret)
 
@@ -229,15 +261,15 @@ class testL2tpv3Hal(unittest.TestCase):
         ret = self.hal_client.recvCfgMsgRspCb(msg)
         self.assertTrue(ret)
 
-        #case exception
+        # case exception
         self.hal_client.handler = None
         try:
             ret = self.hal_client.recvCfgMsgRspCb(msg)
-        except L2tpHalClientError as e:
+        except L2tpHalClientError:
             pass
 
         self.hal_client.handler = L2tpv3GlobalSettings.Dispatcher.receive_hal_message
-        #failed case
+        # failed case
         rsp = L2tpv3Hal_pb2.t_l2tpSessionReq()
         rsp.msg_type = L2tpv3Session.ADD_SESSION
         rsp.session_selector.local_ip = "127.0.0.1"
@@ -283,7 +315,7 @@ class testL2tpv3Hal(unittest.TestCase):
         rsp = L2tpv3Hal_pb2.t_l2tpLcceAssignmentRsp()
         rsp.lcce_id = self.conn.localConnID
         rsp.lcce_info.local_ip = "10.79.41.138"
-        rsp.lcce_info.remote_ip = "10.79.41.139" 
+        rsp.lcce_info.remote_ip = "10.79.41.139"
         rsp.lcce_info.local_mac = L2tpHalClient.get_mac_of_ip(rsp.lcce_info.local_ip)
         rsp.lcce_info.remote_mac = L2tpHalClient.get_mac_of_ip(rsp.lcce_info.remote_ip)
         rsp.lcce_info.mtu = 2342
@@ -299,7 +331,7 @@ class testL2tpv3Hal(unittest.TestCase):
         ret = self.hal_client.recvCfgMsgRspCb(msg)
         self.assertTrue(ret)
 
-        #case exception
+        # case exception
         self.hal_client.handler = None
         try:
             ret = self.hal_client.recvCfgMsgRspCb(msg)
@@ -314,7 +346,7 @@ class testL2tpv3Hal(unittest.TestCase):
         rsp = L2tpv3Hal_pb2.t_l2tpLcceAssignmentRsp()
         rsp.lcce_id = self.conn.localConnID
         rsp.lcce_info.local_ip = "10.79.41.138"
-        rsp.lcce_info.remote_ip = "10.79.41.139" 
+        rsp.lcce_info.remote_ip = "10.79.41.139"
         rsp.lcce_info.local_mac = L2tpHalClient.get_mac_of_ip(rsp.lcce_info.local_ip)
         rsp.lcce_info.remote_mac = L2tpHalClient.get_mac_of_ip(rsp.lcce_info.remote_ip)
         rsp.lcce_info.mtu = 2342
@@ -352,13 +384,13 @@ class testL2tpv3Hal(unittest.TestCase):
         ret = self.hal_client.recvCfgMsgRspCb(msg)
         self.assertFalse(ret)
 
-        #case exception
+        # case exception
         fake_msg = HalMessage("HalClientRegisterRsp",
-                         Rsp={
-                             "Status": HalCommon_pb2.NOTSUPPORTED,
-                             "ErrorDescription": ""
-                         },
-                         ClientID="214")
+                              Rsp={
+                                  "Status": HalCommon_pb2.NOTSUPPORTED,
+                                  "ErrorDescription": ""
+                              },
+                              ClientID="214")
         ret = self.hal_client.recvCfgMsgRspCb(cfg=fake_msg)
         self.assertFalse(ret)
 
@@ -386,7 +418,7 @@ class testL2tpv3Hal(unittest.TestCase):
         try:
             self.hal_client.get_message_type_from_remote_end_id(
                 remote_end_id_list)
-        except L2tpHalClientError as e:
+        except L2tpHalClientError:
             pass
 
         # case 3
@@ -410,7 +442,6 @@ class testL2tpv3Hal(unittest.TestCase):
         self.assertIn(L2tpHalClient.DS_OFDM, ret_type)
         self.assertIn(L2tpHalClient.DS_OFDM_PLC, ret_type)
 
-
     def test_fill_session_req_req_data(self):
         # case 1
         req_msg = L2tpv3Hal_pb2.t_l2tpSessionReq()
@@ -431,10 +462,8 @@ class testL2tpv3Hal(unittest.TestCase):
         try:
             ret = self.hal_client.fill_session_req_req_data(
                 self.conn, L2tpv3Session.ADD_SESSION, req_msg.req_data)
-        except L2tpHalClientError as e:
+        except L2tpHalClientError:
             pass
-
-
 
     def test_send_l2tp_session_req_msg(self):
         # case 1
@@ -447,13 +476,13 @@ class testL2tpv3Hal(unittest.TestCase):
         try:
             ret = self.hal_client.send_l2tp_session_req_msg(
                 self.conn, L2tpv3Session.ADD_SESSION)
-        except L2tpHalClientError as e:
+        except L2tpHalClientError:
             pass
 
         try:
             ret = self.hal_client.send_l2tp_session_req_msg(
                 self.session, 5)
-        except L2tpHalClientError as e:
+        except L2tpHalClientError:
             pass
 
     def test_send_l2tp_lcce_assignment_msg(self):
@@ -474,6 +503,41 @@ class testL2tpv3Hal(unittest.TestCase):
         except Exception as e:
             self.assertIsInstance(e, L2tpHalClientError)
 
+    def test_l2tp_arp_learn(self):
+        self.hal_client.arp_addr_dict["127.0.0.2"] = "00:00:00:00:00:00"
+        self.hal_client.arp_addr_dict["127.0.0.1"] = "00:00:00:00:00:00"
+        self.hal_client.startL2tpReCfgTimer()
+
+        self.fwdCfg = StaticL2tpProvision()
+        staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 12, 0x80000001, 4,
+                                          32768, True)
+        self.fwdCfg.add_usStaticSession(staticPwCfg, 12, False)
+        session1 = L2tpv3GcppSession.StaticL2tpSession(12)
+        session1.updateRetstaticPseudowire(staticPwCfg)
+        session1.updateComStaticPseudowire(staticPwCfg)
+        session1.destAddress = "127.0.0.1"
+        session1.write()
+
+        staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 12, 0x80000002, 5,
+                                          32768, True)
+        self.fwdCfg.add_usStaticSession(staticPwCfg, 12, False)
+        session2 = L2tpv3GcppSession.StaticL2tpSession(12)
+        session2.updateRetstaticPseudowire(staticPwCfg)
+        session2.updateComStaticPseudowire(staticPwCfg)
+        session2.destAddress = "127.0.0.2"
+        session2.write()
+        self.hal_client.update_us_l2tp_session_cfg(1)
+        time.sleep(10)
+
+        remoteMac = L2tpHalClient.get_mac_bytes_from_ip(session1.destAddress)
+        self.assertNotEquals(remoteMac, "00:00:00:00:00:00")
+        remoteMac = L2tpHalClient.get_mac_bytes_from_ip(session2.destAddress)
+        self.assertNotEquals(remoteMac, "00:00:00:00:00:00")
+        session1.delete()
+        session2.delete()
+
     def test_start(self):
         self.hal_client.handler = None
         self.hal_client.dispatcher = None
@@ -491,6 +555,306 @@ class testL2tpv3Hal(unittest.TestCase):
         self.hal_client.connectionDisconnectCb(None)
         self.hal_client.disconnected = True
         pass
+
+    def test_recvRpdInfo(self):
+        # db support
+        # clear db records
+        sessRec = DepiMcastSessionRecord()
+        sessRec.delete_all()
+        sessRec = DepiMcastSessionRecord()
+        test_count = 2
+        for test_session in range(0, test_count):
+            sessRec.updateDepiMcastSessionKey(IpAddrType=1,
+                                              GroupIpAddr="10.79.31.1",
+                                              SrcIpAddr="10.90.31.1",
+                                              SessionId=test_session)
+            sessRec.JoinTime = time.time()
+            sessRec.write()
+
+        print("######test_recvRpdInfo######")
+        rcp_msg = t_RcpMessage()
+        rcp_msg.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
+        rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
+
+        print("=====test case1: payload operation read, # no read count, no key=====")
+        data = config()
+        data.RpdInfo.DepiMcastSession.add()
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(data)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 2
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdInfo,
+                         CfgMsgPayload=payload)
+        return_str = self.hal_client.recvRpdInfo(msg.msg)
+        config_data = t_RcpMessage()
+        config_data.ParseFromString(msg.msg.CfgMsgPayload)
+        recv_rcp_msg = config_data.RpdDataMessage.RpdData
+        self.assertEqual(len(recv_rcp_msg.RpdInfo.DepiMcastSession), 2)
+        self.assertEqual(config_data.RcpDataResult, t_RcpMessage.RCP_RESULT_OK)
+
+        print("=====test case2: payload operation read, # read with keylist=====")
+        data = config()
+        for sessionId in range(0, 3):
+            req = data.RpdInfo.DepiMcastSession.add()
+            req.IpAddrType = 1
+            req.GroupIpAddr = "10.79.31.1"
+            req.SrcIpAddr = "10.90.31.1"
+            req.SessionId = sessionId + 1
+
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(data)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 2
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdInfo,
+                         CfgMsgPayload=payload)
+        return_str = self.hal_client.recvRpdInfo(msg.msg)
+        config_data = t_RcpMessage()
+        config_data.ParseFromString(msg.msg.CfgMsgPayload)
+        recv_rcp_msg = config_data.RpdDataMessage.RpdData
+        for item in recv_rcp_msg.RpdInfo.DepiMcastSession:
+            print item
+        self.assertEqual(len(recv_rcp_msg.RpdInfo.DepiMcastSession), 3)
+        self.assertEquals(config_data.RcpDataResult, t_RcpMessage.RCP_RESULT_OK)
+
+        print("=====test case3: payload operation read, # read with readcount=====")
+        data = config()
+        data.ReadCount = 3
+        req = data.RpdInfo.DepiMcastSession.add()
+        req.IpAddrType = 1
+        req.GroupIpAddr = "10.79.31.1"
+        req.SrcIpAddr = "10.90.31.1"
+        req.SessionId = 0
+
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(data)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 2
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdInfo,
+                         CfgMsgPayload=payload)
+        return_str = self.hal_client.recvRpdInfo(msg.msg)
+        config_data = t_RcpMessage()
+        config_data.ParseFromString(msg.msg.CfgMsgPayload)
+        recv_rcp_msg = config_data.RpdDataMessage.RpdData
+        for item in recv_rcp_msg.RpdInfo.DepiMcastSession:
+            print item
+        self.assertEqual(len(recv_rcp_msg.RpdInfo.DepiMcastSession), 2)
+        self.assertEquals(config_data.RcpDataResult, t_RcpMessage.RCP_RESULT_OK)
+
+    def test_recvRpdInfo_empty(self):
+        # nothing in db
+        sessRec = DepiMcastSessionRecord()
+        ret = []
+        for record in sessRec.get_next_n(count=100):
+            ret.append(record)
+        self.assertEquals(len(ret), 0)
+
+        print("######test_recvRpdInfo with empty database######")
+        rcp_msg = t_RcpMessage()
+        rcp_msg.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
+        rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
+
+        print("=====test case1: payload operation read, # no read count, no key=====")
+        data = config()
+        data.RpdInfo.DepiMcastSession.add()
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(data)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 2
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdInfo,
+                         CfgMsgPayload=payload)
+        return_str = self.hal_client.recvRpdInfo(msg.msg)
+        config_data = t_RcpMessage()
+        config_data.ParseFromString(msg.msg.CfgMsgPayload)
+        recv_rcp_msg = config_data.RpdDataMessage.RpdData
+        self.assertEqual(len(recv_rcp_msg.RpdInfo.DepiMcastSession), 1)
+        self.assertEqual(config_data.RcpDataResult, t_RcpMessage.RCP_RESULT_OK)
+
+        print("=====test case2: payload operation read, # read with keylist=====")
+        data = config()
+        for sessionId in range(0, 3):
+            req = data.RpdInfo.DepiMcastSession.add()
+            req.IpAddrType = 1
+            req.SessionId = sessionId + 1
+
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(data)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 2
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdInfo,
+                         CfgMsgPayload=payload)
+        return_str = self.hal_client.recvRpdInfo(msg.msg)
+        config_data = t_RcpMessage()
+        config_data.ParseFromString(msg.msg.CfgMsgPayload)
+        recv_rcp_msg = config_data.RpdDataMessage.RpdData
+        for item in recv_rcp_msg.RpdInfo.DepiMcastSession:
+            print item
+        self.assertEqual(len(recv_rcp_msg.RpdInfo.DepiMcastSession), 3)
+        self.assertEquals(config_data.RcpDataResult, t_RcpMessage.RCP_RESULT_OK)
+
+        print("=====test case3: payload operation read, # read with readcount=====")
+        data = config()
+        data.ReadCount = 3
+        req = data.RpdInfo.DepiMcastSession.add()
+        req.IpAddrType = 1
+        req.SessionId = 0
+
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(data)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 2
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdInfo,
+                         CfgMsgPayload=payload)
+        return_str = self.hal_client.recvRpdInfo(msg.msg)
+        config_data = t_RcpMessage()
+        config_data.ParseFromString(msg.msg.CfgMsgPayload)
+        recv_rcp_msg = config_data.RpdDataMessage.RpdData
+        for item in recv_rcp_msg.RpdInfo.DepiMcastSession:
+            print item
+        self.assertEqual(len(recv_rcp_msg.RpdInfo.DepiMcastSession), 1)
+        self.assertEquals(config_data.RcpDataResult, t_RcpMessage.RCP_RESULT_OK)
+
+    def create_ipv4_ipv6_mcast(self, test_count):
+        # create test_count records for ipv4 and test_count records for ipv6
+        sessRec = DepiMcastSessionRecord()
+        for test_session in range(0, test_count):
+            sessRec.updateDepiMcastSessionKey(IpAddrType=1,
+                                              GroupIpAddr="10.79.31.1",
+                                              SrcIpAddr="10.79.31.1",
+                                              SessionId=test_session)
+            sessRec.LocalLcceIpAddr = "10.79.31.2"
+            sessRec.RemoteLcceIpAddr = "10.79.31.1"
+            sessRec.JoinTime = time.time()
+            sessRec.write()
+            sessRec.updateDepiMcastSessionKey(IpAddrType=2,
+                                              GroupIpAddr="ff15:7079:7468:6f6e:6465:6d6f:6d63:6173",
+                                              SrcIpAddr="2001::1",
+                                              SessionId=test_session)
+            sessRec.LocalLcceIpAddr = "2001::2"
+            sessRec.RemoteLcceIpAddr = "2001::1"
+            sessRec.JoinTime = time.time()
+            sessRec.write()
+
+    def test_recvRpdInfo_l2tpsessinfo(self):
+        # db support
+        # clear db records
+        sessRec = L2tpSessionRecord()
+        sessRec.deleteAll()
+        sessRec = L2tpSessionRecord()
+        test_count = 2
+        for test_session in range(0, test_count):
+            sessRec.updateL2tpSessionKey("10.79.31.1",
+                                         "10.90.31.1",
+                                         0,
+                                         test_session)
+            counterDiscTime = utils.Convert.pack_timestamp_to_string(
+                int(time.time()))
+            sessRec.updateL2tpSessionRecordData(
+                coreId='1A2B3C4D5E6F',
+                connCtrlId=0x12345678,
+                udpPort=0,
+                descr='(0:4:1)',
+                sessionType=1,
+                sessionSubType=4,
+                maxPayload=1500,
+                pathPayload=0,
+                rpdIfMtu=9200,
+                coreIfMtu=1500,
+                errorCode=1,
+                creationTime=300,
+                operStatus=1,
+                localStatus=0,
+                lastChange=300,
+                counterDiscontinuityTime=counterDiscTime)
+            sessRec.write()
+
+        print("######test_recvRpdInfo_l2tpsessinfo######")
+        rcp_msg = t_RcpMessage()
+        rcp_msg.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
+        rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
+
+        print("=====test case1: payload operation read, # no read count, no key=====")
+        data = config()
+        data.RpdInfo.RpdL2tpSessionInfo.add()
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(data)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 2
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdInfo,
+                         CfgMsgPayload=payload)
+        return_str = self.hal_client.recvRpdInfo(msg.msg)
+        config_data = t_RcpMessage()
+        config_data.ParseFromString(msg.msg.CfgMsgPayload)
+        recv_rcp_msg = config_data.RpdDataMessage.RpdData
+        self.assertEqual(len(recv_rcp_msg.RpdInfo.RpdL2tpSessionInfo), 2)
+        self.assertEqual(config_data.RcpDataResult, t_RcpMessage.RCP_RESULT_OK)
+
+        print("=====test case2: payload operation read, # read with keylist=====")
+        data = config()
+        for sessionId in range(0, 3):
+            req = data.RpdInfo.RpdL2tpSessionInfo.add()
+            req.SessionIpAddrType = 1
+            req.RemoteLcceIpAddr = "10.79.31.1"
+            req.RpdLcceIpAddress = "10.90.31.1"
+            req.Direction = 0
+            req.LocalL2tpSessionId = sessionId
+
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(data)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 2
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdInfo,
+                         CfgMsgPayload=payload)
+        return_str = self.hal_client.recvRpdInfo(msg.msg)
+        config_data = t_RcpMessage()
+        config_data.ParseFromString(msg.msg.CfgMsgPayload)
+        recv_rcp_msg = config_data.RpdDataMessage.RpdData
+        for item in recv_rcp_msg.RpdInfo.RpdL2tpSessionInfo:
+            print item
+        self.assertEqual(len(recv_rcp_msg.RpdInfo.RpdL2tpSessionInfo), 3)
+        self.assertEquals(config_data.RcpDataResult, t_RcpMessage.RCP_RESULT_OK)
+
+        print("=====test case3: payload operation read, # read with readcount=====")
+        data = config()
+        data.ReadCount = 3
+        req = data.RpdInfo.RpdL2tpSessionInfo.add()
+        req.SessionIpAddrType = 1
+        req.RemoteLcceIpAddr = "10.79.31.1"
+        req.RpdLcceIpAddress = "10.90.31.1"
+        req.Direction = 0
+        req.LocalL2tpSessionId = 0
+
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(data)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 2
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdInfo,
+                         CfgMsgPayload=payload)
+        return_str = self.hal_client.recvRpdInfo(msg.msg)
+        config_data = t_RcpMessage()
+        config_data.ParseFromString(msg.msg.CfgMsgPayload)
+        recv_rcp_msg = config_data.RpdDataMessage.RpdData
+        for item in recv_rcp_msg.RpdInfo.RpdL2tpSessionInfo:
+            print item
+        self.assertEqual(len(recv_rcp_msg.RpdInfo.RpdL2tpSessionInfo), 2)
+        self.assertEquals(config_data.RcpDataResult, t_RcpMessage.RCP_RESULT_OK)
 
 
 if __name__ == "__main__":

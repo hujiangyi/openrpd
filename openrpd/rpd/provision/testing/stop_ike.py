@@ -21,14 +21,13 @@ import zmq
 import rpd.provision.proto.provision_pb2 as ppb2
 import rpd.provision.proto.process_agent_pb2 as pb2
 from rpd.provision.process_agent.agent.agent import ProcessAgent
-from rpd.common.utils import SysTools
 
 
 class TestProcessAgent(unittest.TestCase):
 
     @unittest.skip('skip register test')
     def test_register(self):
-        #process_agent = ProcessAgent("ipc:///tmp/p1sock", "ipc:///tmp/p3sock")
+        # process_agent = ProcessAgent("ipc:///tmp/p1sock", "ipc:///tmp/p3sock")
         context = zmq.Context()
         sock = context.socket(zmq.REQ)
         sock.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_INTERFACE_STATUS]['api'])
@@ -63,7 +62,6 @@ class TestProcessAgent(unittest.TestCase):
         reg_rsp.ParseFromString(data)
         print reg_rsp
 
-
         # unregister
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
@@ -83,7 +81,7 @@ class TestProcessAgent(unittest.TestCase):
     def runTest(self):
         pass
 
-    #@unittest.skip("skip tod check")
+    # @unittest.skip("skip tod check")
     def test_ike_event(self):
         context = zmq.Context()
         sock1 = context.socket(zmq.PUSH)
@@ -93,14 +91,14 @@ class TestProcessAgent(unittest.TestCase):
         sock.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_IPSEC]['api'])
 
         sock2 = context.socket(zmq.PULL)
-        sock2.bind("ipc:///tmp/sock4.scok")
+        sock2.bind("ipc:///tmp/sock4.sock")
 
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
         reg.id = "abcd"
         reg.action = pb2.msg_manager_register.REG
-        # reg.path_info = "ipc:///tmp/sock4.scok"
+        # reg.path_info = "ipc:///tmp/sock4.sock"
         reg.path_info = ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_IPSEC]['api']
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()

@@ -78,19 +78,19 @@ class MacsecCli(object):
             return
 
         para = json.loads(rsp.Cli8021x.Show8021xStatus.status)
-        name = ("Interface", "Core-id", "EAP_Received", "Status")
+        name = ("Interface", "EAP_Received", "Status")
         print_list = list()
         print_list.append(name)
         for dic in para:
             try:
-                print_list.append((dic["Interface"], dic["Core ID"],
+                print_list.append((dic["Interface"],
                                    dic["eap"], dic["Status"]))
             except KeyError as e:
                 self.cli.log.error("can't get key[%s] from msg" % str(e))
                 return
 
         for field in print_list:
-            print "%-17s%-25s%-17s%-17s" % field
+            print "%-17s%-17s%-17s" % field
 
     def show_8021x_detail(self):
         """'show 8021x cabllback."""
@@ -124,12 +124,12 @@ class MacsecCli(object):
 
         para = json.loads(rsp.Cli8021x.Show8021xStatus.status)
 
-        name = "%-17s%-25s%-20s%-17s" % ("Interface", "Core-id", "EAP_Received", "Status")
+        name = "%-17s%-20s%-17s" % ("Interface", "EAP_Received", "Status")
         print_list = list()
         print_list.append(name)
         for dic in para:
             try:
-                summary_info = "%-17s%-25s%-20s%-17s" % (dic["Interface"], dic["Core ID"], dic["eap"], dic["Status"])
+                summary_info = "%-17s%-20s%-17s" % (dic["Interface"], dic["eap"], dic["Status"])
 
                 print_list.append(summary_info)
                 print_list.append(" ")
@@ -142,4 +142,4 @@ class MacsecCli(object):
         for field in print_list:
             print field
 
-        #continue print other info
+        # continue print other info

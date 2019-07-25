@@ -34,6 +34,7 @@ class CfgDbAdapterError(Exception):
 class DataObj(object):
     """Stores data prepared for DB operations."""
     __metaclass__ = AddLoggerToClass
+
     def __init__(self, cfg_data, operation, path, is_bulk=False):
         if operation in CfgDbAdapter.RPD_DATA_OPER_WR_OR_AW \
                 and cfg_data is None:
@@ -66,8 +67,8 @@ class CfgDbAdapter(object):
                      RPD_DATA_OPER_AW)
     RPD_DATA_OPER_WR_OR_AW = (RPD_DATA_OPER_WR, RPD_DATA_OPER_AW)
 
-
     __metaclass__ = AddLoggerToClass
+
     def __init__(self, database):
         """
         :param database: DB on which a configuration operations will be

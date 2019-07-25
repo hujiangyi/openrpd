@@ -224,12 +224,14 @@ def _processConnectionQuery(socket, connection):
     msg.ParseFromString(data)
     print(msg)
 
+
 def _processClearStats(socket):
     cmd = l2tpMsg.L2tpCommandReq()
     cmd.cmd = l2tpMsg.CLEAR_STATS_INFO
     data = cmd.SerializeToString()
     socket.send(data)
     print("Clear l2tp stats successfully")
+
 
 def _processMcastinfo(socket):
     cmd = l2tpMsg.L2tpCommandReq()
@@ -240,6 +242,7 @@ def _processMcastinfo(socket):
     msg = l2tpMsg.L2tpCommandRsp()
     msg.ParseFromString(data)
     print(msg)
+
 
 if __name__ == "__main__":
     _main()

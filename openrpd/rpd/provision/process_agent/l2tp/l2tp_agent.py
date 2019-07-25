@@ -15,8 +15,6 @@
 # limitations under the License.
 #
 import os
-import logging
-import psutil
 import socket
 import zmq
 import traceback
@@ -34,7 +32,8 @@ from l2tpv3.src.L2tpv3Connection import L2tpConnection
 from l2tpv3.src.L2tpv3Hal import L2tpHalClient
 from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 from rpd.mcast.src.mcast import Mcast
-from rpd.common.utils import Convert, SysTools
+from rpd.common.utils import Convert, SysTools, PingPackage
+from rpd.dispatcher.timer import DpTimerManager
 
 
 class L2tpAgent(agent.ProcessAgent):
@@ -59,6 +58,7 @@ class L2tpAgent(agent.ProcessAgent):
 
     IFLA_IFNAME = 3
     IFLA_OPERSTATE = 16
+    ARP_LEARN_TIME = 10
     states = ('UNKNOWN',
               'NOTPRESENT',
               'DOWN',
@@ -91,6 +91,7 @@ class L2tpAgent(agent.ProcessAgent):
                                    L2tpHalClient.supportmsg_list)
         L2tpv3GlobalSettings.L2tpv3GlobalSettings.l2tp_hal_client = hal_client
         hal_client.start(l2tp_dispatcher.receive_hal_message)
+
         if L2tpv3GlobalSettings.L2tpv3GlobalSettings.l2tp_hal_client:
             self.logger.info("setup l2tp hal client successfully")
 
@@ -117,6 +118,31 @@ class L2tpAgent(agent.ProcessAgent):
         self.linksock.bind((os.getpid(), self.RTMGRP_LINK))
         self.dispatcher.fd_register(self.linksock.fileno(),
                                     zmq.POLLIN, self.process_link_status)
+
+        self.pingSocket = None
+        self.dispatcher.timer_register(self.ARP_LEARN_TIME,
+                                       self.learn_arp_us_l2tp_session,
+                                       None,
+                                       timer_type=DpTimerManager.TIMER_REPEATED)
+
+    def learn_arp_us_l2tp_session(self, _):
+        arp_addr_dict = \
+            L2tpv3GlobalSettings.L2tpv3GlobalSettings.l2tp_hal_client.arp_addr_dict
+        try:
+            if self.pingSocket is None:
+                self.pingSocket = socket.socket(socket.AF_INET, socket.SOCK_RAW,
+                                                socket.getprotobyname("icmp"))
+            for dest_addr in arp_addr_dict.keys():
+                addr_family = (socket.AF_INET if Convert.is_valid_ipv4_address(dest_addr)
+                               else socket.AF_INET6)
+                if addr_family == socket.AF_INET6:
+                    continue
+                self.pingSocket.sendto(
+                    PingPackage.pack_package(1, PingPackage.ICMP_DATA_STR, False),
+                    (dest_addr, 80))
+        except Exception as ex:
+            self.logger.warning("Got exception when send the arp package: %s",
+                                str(ex))
 
     def process_event_action(self, action):
         """Process the request from the client. Currently, we will support the
@@ -174,8 +200,8 @@ class L2tpAgent(agent.ProcessAgent):
             ret, reason = self.l2tp_dispatcher.register_local_address(ip_addr)
             if not ret:
                 self.logger.warn("Cannot start/check l2tp status for id %s, "
-                                  "reason:%s" %
-                                  (ccap_id, reason))
+                                 "reason:%s" %
+                                 (ccap_id, reason))
                 self._send_event_notification(
                     ccap_id, protoDef.msg_core_event_notification.FAIL, reason)
                 return
@@ -355,8 +381,9 @@ class L2tpAgent(agent.ProcessAgent):
 
         except Exception as e:
             self.logger.warn("Exception happens when handle link status, error:" + str(e) + ", The Trace back is:\n" +
-                              traceback.format_exc())
+                             traceback.format_exc())
         return
+
 
 if __name__ == "__main__":
 

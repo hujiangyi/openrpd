@@ -24,32 +24,39 @@ import errno
 
 import rpd.rcp.gcp.gcp_lib.gcp_object as gcp_object
 from rpd.rcp.gcp.gcp_sessions import GCPMasterDescriptor, GCPMaster,\
-    GCPSlaveDescriptor, GCPSlaveSession, GCPSession, GCPPacket, GCPSessionFull,GCPSlaveSessionError, \
-    GCPSessionError, GCPSessionOrchestrator,GCPMasterSessionError, GCPSessionDescriptor
+    GCPSlaveDescriptor, GCPSlaveSession, GCPSession, GCPPacket, GCPSessionFull, GCPSlaveSessionError, \
+    GCPSessionError, GCPSessionOrchestrator, GCPMasterSessionError, GCPSessionDescriptor
+
 
 class TestGCPPacket_encode_exception(object):
+
     def encode(self, buffer=None, offset=None, buf_data_len=None):
         raise gcp_object.GCPEncodeError("test error")
 
+
 class TestGCPPacket_encode_false(object):
+
     def encode(self, buffer=None, offset=None, buf_data_len=None):
         return False
 
+
 class TestGCPPacket_encode_get_sub_buffer(object):
+
     def get_data_sub_buffer(self, offset=None):
         return None
 
     def encode(self, buffer=None, offset=None, buf_data_len=None):
         return True
 
+
 class TestGCPSessions(unittest.TestCase):
     """Implements unit tests for GCPSlave and GCPMaster."""
+
     def test_master_init_close(self):
         try:
             GCPMasterDescriptor(addr_family=None)
         except Exception as e:
-            self.assertIsInstance(e,GCPMasterSessionError)
-
+            self.assertIsInstance(e, GCPMasterSessionError)
 
         desc = GCPMasterDescriptor(addr=None, port=60001)
         master = GCPMaster(session_descriptor=desc)
@@ -127,7 +134,7 @@ class TestGCPSessions(unittest.TestCase):
             if count > 60:
                 break
 
-            rd, vr,  ex = select.select(inputs, [], [], 1)
+            rd, vr, ex = select.select(inputs, [], [], 1)
             for r in rd:
                 if r is self.master.get_socket():
                     fd = self.master.accept_connection()
@@ -169,12 +176,12 @@ class TestGCPSessions(unittest.TestCase):
         try:
             slave = GCPSlaveSession(desc)
         except Exception as e:
-            self.assertIsInstance(e,GCPSlaveSessionError)
+            self.assertIsInstance(e, GCPSlaveSessionError)
 
         try:
             slave = GCPSession(desc)
         except Exception as e:
-            self.assertIsInstance(e,TypeError)
+            self.assertIsInstance(e, TypeError)
 
         # create slave
         desc = GCPSlaveDescriptor(addr_master='localhost', port_master=60001)
@@ -223,7 +230,7 @@ class TestGCPSessions(unittest.TestCase):
         # self.failUnless(packet_received._ut_compare(packet_send),
         #                 "Received broken packet")
 
-        #test add_tx_packet high queue case
+        # test add_tx_packet high queue case
         ctx.add_tx_packet(gcp_packet=packet_send, high_priority=True)
         rd, wr, ex = select.select([], [slave.get_socket()], [])
         self.assertFalse(not wr, "No any socket for write")
@@ -240,18 +247,18 @@ class TestGCPSessions(unittest.TestCase):
 
         # test add_tx_packet  low priority queue full case
         self.assertTrue(ctx.is_tx_empty())
-        for i in range(0,GCPSession.TX_LOW_PRI_QUEUE_SIZE):
-                ctx.add_tx_packet(packet_send)
-                if i < GCPSession.TX_LOW_PRI_QUEUE_HIGH_WATERMARK-1 :
-                    self.assertFalse(ctx.is_tx_low_pri_queue_at_high_watermark())
-                else:
-                    self.assertTrue(ctx.is_tx_low_pri_queue_at_high_watermark())
+        for i in range(0, GCPSession.TX_LOW_PRI_QUEUE_SIZE):
+            ctx.add_tx_packet(packet_send)
+            if i < GCPSession.TX_LOW_PRI_QUEUE_HIGH_WATERMARK - 1:
+                self.assertFalse(ctx.is_tx_low_pri_queue_at_high_watermark())
+            else:
+                self.assertTrue(ctx.is_tx_low_pri_queue_at_high_watermark())
 
         self.assertTrue(ctx.packet_tx_low_pri_queue.full())
         try:
             ctx.add_tx_packet(packet_send)
         except Exception as e:
-            self.assertIsInstance(e,GCPSessionFull)
+            self.assertIsInstance(e, GCPSessionFull)
 
         # test add_tx_packet  high priority queue full case
         for i in range(0, GCPSession.TX_HIGH_PRI_QUEUE_SIZE):
@@ -304,33 +311,32 @@ class TestGCPSessions(unittest.TestCase):
         packet_rvd = GCPPacket()
         ctx.packet_rx_high_pri_queue = None
         ctx.packet_rx_low_pri_queue = Queue.Queue(
-                GCPSession.RX_LOW_PRI_QUEUE_SIZE)
+            GCPSession.RX_LOW_PRI_QUEUE_SIZE)
         ret = ctx.add_rx_packet(packet_rvd)
         self.assertFalse(ret)
 
         ctx.packet_rx_high_pri_queue = Queue.Queue(
-                GCPSession.RX_HIGH_PRI_QUEUE_SIZE)
+            GCPSession.RX_HIGH_PRI_QUEUE_SIZE)
         ctx.packet_rx_low_pri_queue = None
         ret = ctx.add_rx_packet(packet_rvd)
         self.assertFalse(ret)
 
         # test add_rx_packet  low priority queue full case
         ctx.packet_rx_high_pri_queue = Queue.Queue(
-                GCPSession.RX_HIGH_PRI_QUEUE_SIZE)
+            GCPSession.RX_HIGH_PRI_QUEUE_SIZE)
 
         ctx.packet_rx_low_pri_queue = Queue.Queue(
-                GCPSession.RX_LOW_PRI_QUEUE_SIZE)
+            GCPSession.RX_LOW_PRI_QUEUE_SIZE)
 
         self.assertTrue(ctx.is_rx_empty())
-        for i in range(0,GCPSession.RX_LOW_PRI_QUEUE_SIZE):
-                ctx.add_rx_packet(packet_rvd)
+        for i in range(0, GCPSession.RX_LOW_PRI_QUEUE_SIZE):
+            ctx.add_rx_packet(packet_rvd)
 
         self.assertTrue(ctx.packet_rx_low_pri_queue.full())
         try:
             ctx.add_rx_packet(packet_rvd)
         except Exception as e:
-            self.assertIsInstance(e,GCPSessionFull)
-
+            self.assertIsInstance(e, GCPSessionFull)
 
         # test add_rx_packet  high priority queue full case
         for i in range(0, GCPSession.TX_HIGH_PRI_QUEUE_SIZE):
@@ -347,13 +353,12 @@ class TestGCPSessions(unittest.TestCase):
         ret = ctx.get_rx_low_pri_packet()
         self.assertEqual(ret, packet_rvd)
 
-
-        for i in range(0, GCPSession.RX_HIGH_PRI_QUEUE_SIZE-1):
+        for i in range(0, GCPSession.RX_HIGH_PRI_QUEUE_SIZE - 1):
             ret = ctx.get_rx_packet()
-            self.assertEqual(ret,packet_rvd)
+            self.assertEqual(ret, packet_rvd)
         self.assertTrue(ctx.packet_rx_high_pri_queue.empty())
 
-        for i in range(0, GCPSession.RX_LOW_PRI_QUEUE_SIZE-1):
+        for i in range(0, GCPSession.RX_LOW_PRI_QUEUE_SIZE - 1):
             ret = ctx.get_rx_packet()
             self.assertEqual(ret, packet_rvd)
         self.assertTrue(ctx.packet_rx_low_pri_queue.empty())
@@ -419,7 +424,7 @@ class TestGCPSessions(unittest.TestCase):
         desc = GCPSlaveDescriptor(addr_master='localhost', port_master=60001, interface_master='localhost',
                                   interface_local="localhost",
                                   addr_family=socket.AF_INET6)
-        self.assertEqual(str(desc),"{}: {}:{} --> {}:{}".format(
+        self.assertEqual(str(desc), "{}: {}:{} --> {}:{}".format(
             desc.get_node_type_str(),
             desc.addr_local,
             desc.port_local,
@@ -455,19 +460,19 @@ class TestGCPSessions(unittest.TestCase):
         try:
             orch.add_sessions(None)
         except Exception as e:
-            self.assertIsInstance(e,NotImplementedError)
+            self.assertIsInstance(e, NotImplementedError)
         try:
             orch.remove_sessions(None)
         except Exception as e:
-            self.assertIsInstance(e,NotImplementedError)
+            self.assertIsInstance(e, NotImplementedError)
         try:
             orch.replace_session(None, None)
         except Exception as e:
-            self.assertIsInstance(e,NotImplementedError)
+            self.assertIsInstance(e, NotImplementedError)
         try:
             orch.orchestrate_cb(None)
         except Exception as e:
-            self.assertIsInstance(e,NotImplementedError)
+            self.assertIsInstance(e, NotImplementedError)
 
     def test_GCPMaster_error(self):
         desc = None
@@ -479,7 +484,7 @@ class TestGCPSessions(unittest.TestCase):
         desc = GCPMasterDescriptor(addr='dummy', interface_name='eth0',
                                    addr_family=socket.AF_INET6)
         master = GCPMaster(desc)
-        self.assertIsInstance(master,GCPMaster)
+        self.assertIsInstance(master, GCPMaster)
         master.initiate()
         self.assertFalse(master.is_initiated())
         master.remove_connection(0)
@@ -513,7 +518,7 @@ class TestGCPSessions(unittest.TestCase):
         fd = master.io_ctx.socket.fileno()
         ret, pkt = master.send_pkt(fd)
         self.assertEqual(master.stats.TxQEmpty, 1)
-        self.assertEqual(ret,GCPSession.PKT_SEND_DONE)
+        self.assertEqual(ret, GCPSession.PKT_SEND_DONE)
         self.assertIsNone(pkt)
 
         pkt_test = TestGCPPacket_encode_exception()
@@ -521,23 +526,22 @@ class TestGCPSessions(unittest.TestCase):
         self.assertFalse(master.io_ctx.is_tx_empty())
         ret, pkt = master.send_pkt(fd)
         self.assertEqual(master.stats.TxEncodeErr, 1)
-        self.assertEqual(ret,GCPSession.PKT_SEND_FAILED)
-        self.assertEqual(pkt,pkt_test)
+        self.assertEqual(ret, GCPSession.PKT_SEND_FAILED)
+        self.assertEqual(pkt, pkt_test)
 
         pkt_test = TestGCPPacket_encode_false()
         master.io_ctx.add_tx_packet(pkt_test)
         self.assertFalse(master.io_ctx.is_tx_empty())
         ret, pkt = master.send_pkt(fd)
         self.assertEqual(master.stats.TxEncodeFail, 1)
-        self.assertEqual(ret,GCPSession.PKT_SEND_FAILED)
-        self.assertEqual(pkt,pkt_test)
-
+        self.assertEqual(ret, GCPSession.PKT_SEND_FAILED)
+        self.assertEqual(pkt, pkt_test)
 
         pkt_test = TestGCPPacket_encode_get_sub_buffer()
         master.io_ctx.packet_tx_fragment = (pkt_test, 3)
         ret, pkt = master.send_pkt(fd)
         self.assertEqual(master.stats.TxSockErr, 1)
-        self.assertEqual(ret,GCPSession.PKT_SEND_FAILED)
+        self.assertEqual(ret, GCPSession.PKT_SEND_FAILED)
         self.assertIsNone(pkt)
 
         master.close()
@@ -559,6 +563,7 @@ class TestGCPSessions(unittest.TestCase):
         self.assertEqual(master.stats.RxSockErr, 1)
         self.assertIsNone(ret)
         master.close()
+
 
 if __name__ == '__main__':
     unittest.main()

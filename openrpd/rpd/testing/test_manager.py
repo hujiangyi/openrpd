@@ -327,5 +327,6 @@ class TestManager(unittest.TestCase):
         # time should be >= initial value
         self.assertGreaterEqual(int(time.time()), 500)
 
+
 if __name__ == "__main__":
     unittest.main()

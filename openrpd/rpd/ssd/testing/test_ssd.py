@@ -22,6 +22,7 @@ import unittest
 import subprocess
 import signal
 import threading
+import json
 from rpd.hal.src.HalConfigMsg import *
 from zmq.utils.monitor import recv_monitor_message
 from rpd.hal.src.msg import HalCommon_pb2
@@ -32,9 +33,10 @@ from rpd.hal.simulator.start_hal import start_hal
 from rpd.common.rpd_logging import setup_logging
 from rpd.gpb.rcp_pb2 import t_RcpMessage
 from rpd.gpb.cfg_pb2 import config
+from rpd.common.utils import SysTools
 
 redis_sock_file = "/tmp/testHalSsdRedis" + \
-                time.strftime("%d%H%M%S", time.localtime()) + ".sock"
+    time.strftime("%d%H%M%S", time.localtime()) + ".sock"
 
 hal_conf_content = """
 {
@@ -49,6 +51,9 @@ hal_conf_content = """
 
 hal_conf_file_name = "/tmp/test_hal_ssd.conf"
 hal_process = None
+
+ERROR_SW_FILE_CORRUPTION = 52
+ERROR_CVC_MFR_NAME_MISMATCH = 1
 
 
 def setup_db():
@@ -83,12 +88,34 @@ def setup_db():
     hal_process = start_hal(hal_cfg_file=hal_conf_file_name)
 
 
+def wrap_download_process(para1, para2, para3):
+    return '/rpd/config'
+
+
+def wrap_verify_file_corruption(image_path):
+    return False, ERROR_SW_FILE_CORRUPTION
+
+
+def wrap_verify_cvc_name_mismatch(image_path):
+    return False, ERROR_CVC_MFR_NAME_MISMATCH
+
+
+class SysToolsTest(object):
+
+    @classmethod
+    def is_last_reset_by_power_off(cls):
+        return True
+
+    @classmethod
+    def check_ping_result(cls, addr):
+        return True
+
+
 class HalClientTest(HalSsdDriver):
     BOOT_ROOT_PATH = '/tmp/'
     BOOT_IMAGE_PATH = '/tmp/imagea'
     INIT_CODE_PATH = '/tmp/initcode'
     LOCAL_FILE_PATH = '/tmp/codefile.local'
-
 
     def connect_to_hal(self):
         self.connectionSetup()
@@ -144,6 +171,7 @@ class HalClientTest(HalSsdDriver):
 
 
 class HalClientTestErrorRsp(HalClientTest):
+
     def sendCfgRspMsg(self, cfg, rsp=None):
         """The configuration response routine, the driver implementor should fill sth into this function.
 
@@ -188,21 +216,31 @@ class TestSsdDriver(unittest.TestCase):
     def setUpClass(cls):
         setup_db()
         os.system("mkdir -p /tmp/ssd")
+        os.system("mkdir -p /rpd/config")
         time.sleep(1)
         currentPath = os.path.dirname(os.path.realpath(__file__))
         dirs = currentPath.split("/")
         rpd_index = dirs.index("testing") - 2
         cls.rootpath = "/".join(dirs[:rpd_index])
         cls.mgr_pid = subprocess.Popen("coverage run --parallel-mode --rcfile=" + cls.rootpath + "/.coverage.rc "
-                                        + cls.rootpath +
-                                        "/rpd/provision/manager/src/manager_main.py -s",
-                                        executable='bash', shell=True)
-        time.sleep(1)
+                                       + cls.rootpath +
+                                       "/rpd/provision/manager/src/manager_main.py -s",
+                                       executable='bash', shell=True)
+        process_num = 0
+        for i in range(12):
+            cmd = "ps -ef | grep rpd_fault_manager | grep -v grep | wc -l"
+            process_num = os.system(cmd)
+            if process_num > 0:
+                break
+            time.sleep(1)
+        if process_num == 0:
+            print "WARN: skip to check rpd process startup, due to reach max try times"
+
         cls.tftp_pid = subprocess.Popen("coverage run --parallel-mode --rcfile=" + cls.rootpath + "/.coverage.rc "
-                                         + cls.rootpath +
-                                         "/rpd/ssd/testing/start_tftp_server.py --root "
-                                         + cls.rootpath + " --server 127.0.0.1 --port "
-                                         + str(cls.TFTP_PORT), executable='bash', shell=True)
+                                        + cls.rootpath +
+                                        "/rpd/ssd/testing/start_tftp_server.py --root "
+                                        + cls.rootpath + " --server 127.0.0.1 --port "
+                                        + str(cls.TFTP_PORT), executable='bash', shell=True)
 
         time.sleep(3)
 
@@ -226,8 +264,6 @@ class TestSsdDriver(unittest.TestCase):
         driver = HalClientTest("SSD_Driver", "This is SSD Driver", "0.1.0",
                                (MsgTypeSsd,), None, rootca=rootca)
         driver.get_init_code()
-        # driver.connect_to_hal()
-        driver.start(simulate_mode=True)
         initcode = {"manufacturer": {"organizationName": "cisco", "codeAccessStart": "20160311122430Z",
                                      "cvcAccessStart": "20160311122430Z"},
                     "co-signer": {"organizationName": "comcast", "codeAccessStart": "20160311122430Z",
@@ -266,6 +302,7 @@ class TestSsdDriver(unittest.TestCase):
                          CfgMsgType=MsgTypeSsd,
                          CfgMsgPayload=cfgMsgPayload.SerializeToString())
 
+        driver.ssdInProgressFile = os.path.join("/tmp", "ssd_in_progress")
         driver.recvCfgMsgCb(msg)
 
         self.assertTrue('SsdServerAddress' in driver.ssdParam)
@@ -276,22 +313,33 @@ class TestSsdDriver(unittest.TestCase):
         self.assertEqual(driver.ssdParam['SsdCosignerCvcChain'], ssd.SsdCosignerCvcChain)
         self.assertEqual(driver.isProcessRunning, driver.TRIGGER_GCP)
 
+        for i in range(20):
+            if os.path.exists(driver.ssdInProgressFile):
+                break
+            else:
+                time.sleep(1)
+
+        self.assertTrue(os.path.exists(driver.ssdInProgressFile))
+
+        with open(driver.ssdInProgressFile, 'r') as f:
+            time.sleep(1)
+            test_ssdParam = json.load(f)
+            print test_ssdParam
+            self.assertTrue('SsdServerAddress' in test_ssdParam)
+            self.assertEqual(test_ssdParam['SsdServerAddress'], ssd.SsdServerAddress)
+            self.assertTrue('SsdFilename' in test_ssdParam)
+            self.assertEqual(test_ssdParam['SsdFilename'], ssd.SsdFilename)
+            self.assertTrue('SsdManufCvcChain' in test_ssdParam)
+            self.assertTrue('SsdCosignerCvcChain' in test_ssdParam)
+
         driver.ssdParam['SsdServerPort'] = self.TFTP_PORT
-        # origin_size = os.stat(ssd.SsdFilename).st_size
-        # if os.path.exists(driver.LOCAL_FILE_PATH):
-        #     os.system('rm -f ' + driver.LOCAL_FILE_PATH)
-        # driver._process_loop()
+
         start_time = time.time()
         while isinstance(driver.ssdProcess, threading.Thread) and \
                 driver.ssdProcess.isAlive() and time.time() < start_time + 8:
             time.sleep(1)
-        self.assertEqual(driver.isProcessRunning, driver.TRIGGER_NONE)
-        # self.assertTrue(os.path.exists(driver.LOCAL_FILE_PATH))
-        # self.assertEqual(os.stat(driver.LOCAL_FILE_PATH).st_size, origin_size)
-        # print '*' * 40 + 'recv size same:' + str(origin_size) + '*' * 40
-        # os.system('rm -f ' + driver.LOCAL_FILE_PATH)
 
-        #get ssd status
+        # get ssd status
         cfgMsgPayload.RpdDataMessage.RpdDataOperation = cfgMsgPayload.RpdDataMessage.RPD_CFG_READ
         msg = HalMessage("HalConfig", SrcClientID='123456789',
                          SeqNum=1,
@@ -299,7 +347,6 @@ class TestSsdDriver(unittest.TestCase):
                          CfgMsgPayload=cfgMsgPayload.SerializeToString())
 
         driver.recvCfgMsgCb(msg)
-
 
         # api: normal case
         driver.get_init_code()
@@ -328,22 +375,12 @@ class TestSsdDriver(unittest.TestCase):
         self.assertEqual(driver.ssdParam['SsdManufCvcChain'], ssd_api.manufacturerCvc)
         self.assertTrue('SsdCosignerCvcChain' in driver.ssdParam)
         self.assertEqual(driver.ssdParam['SsdCosignerCvcChain'], ssd_api.cosignerCvc)
-        self.assertEqual(driver.isProcessRunning, driver.TRIGGER_API)
 
         driver.ssdParam['SsdServerPort'] = self.TFTP_PORT
-        # origin_size = os.stat(ssd_api.file).st_size
-        # if os.path.exists(driver.LOCAL_FILE_PATH):
-        #     os.system('rm -f ' + driver.LOCAL_FILE_PATH)
-        # driver._process_loop()
         start_time = time.time()
         while isinstance(driver.ssdProcess, threading.Thread) and \
                 driver.ssdProcess.isAlive() and time.time() < start_time + 8:
             time.sleep(1)
-        self.assertEqual(driver.isProcessRunning, driver.TRIGGER_NONE)
-        # self.assertTrue(os.path.exists(driver.LOCAL_FILE_PATH))
-        # self.assertEqual(os.stat(driver.LOCAL_FILE_PATH).st_size, origin_size)
-        # print '*' * 40 + 'recv size same:' + str(origin_size) + '*' * 40
-        # os.system('rm -f ' + driver.LOCAL_FILE_PATH)
 
         driver.codeFile.root_cert = None
         driver.recvCfgMsgCb(msg_api)
@@ -373,20 +410,14 @@ class TestSsdDriver(unittest.TestCase):
         self.assertEqual(driver.ssdParam['SsdServerAddress'], ssd_api.server)
 
         driver.ssdParam['SsdServerPort'] = self.HTTP_PORT
-        origin_size = os.stat(ssd_api.file).st_size
-        # if os.path.exists(driver.LOCAL_FILE_PATH):
-        #     os.system('rm -f ' + driver.LOCAL_FILE_PATH)
-        # driver._process_loop()
+
         start_time = time.time()
         while isinstance(driver.ssdProcess, threading.Thread) and \
                 driver.ssdProcess.isAlive() and time.time() < start_time + 16:
             time.sleep(1)
-        self.assertEqual(driver.isProcessRunning, driver.TRIGGER_NONE)
-        # self.assertFalse(os.path.exists(driver.LOCAL_FILE_PATH))
 
-        #gcp: without required param
+        # gcp: without required param
         driver.get_init_code()
-        # driver.initCode = initcode
         driver.codeFile = CodeFileVerify(driver.initCode, rootca=rootca)
 
         halApi = t_HalApi()
@@ -406,18 +437,12 @@ class TestSsdDriver(unittest.TestCase):
         driver.recvCfgMsgCb(msg_api)
 
         self.assertTrue('SsdServerAddress' in driver.ssdParam)
-        self.assertEqual(driver.ssdParam['SsdServerAddress'], ssd_api.server)
         self.assertTrue('SsdManufCvcChain' in driver.ssdParam)
-        self.assertEqual(driver.ssdParam['SsdManufCvcChain'], ssd_api.manufacturerCvc)
-        self.assertFalse('SsdCosignerCvcChain' in driver.ssdParam)
-        self.assertEqual(driver.isProcessRunning, driver.TRIGGER_API)
 
         driver.ssdParam['SsdServerPort'] = self.TFTP_PORT
-        # origin_size = os.stat(ssd_api.file).st_size
-        # if os.path.exists(driver.LOCAL_FILE_PATH):
-        #     os.system('rm -f ' + driver.LOCAL_FILE_PATH)
+
         driver.ssdParam.pop('SsdTransport')
-        # driver._process_loop()
+
         start_time = time.time()
         while isinstance(driver.ssdProcess, threading.Thread) and \
                 driver.ssdProcess.isAlive() and time.time() < start_time + 8:
@@ -432,10 +457,121 @@ class TestSsdDriver(unittest.TestCase):
         ret = driver.download_process(driver.TRANSPORT_TFTP, driver.ssdParam['SsdServerAddress'],
                                       driver.ssdParam['SsdFilename'])
         self.assertEqual(ret, None)
-        # ret = driver.download_process(driver.TRANSPORT_HTTP, '127.0.0.1', 'none')
-        # self.assertEqual(ret, None)
+
         driver.connection_cleanup()
-        # driver.connection_cleanup()
+
+    def test_generate_event_66070405(self):
+        SysTools.check_ping_result = SysToolsTest.check_ping_result
+        self.assertTrue(SysTools.check_ping_result('127.0.0.1'))
+        rootca = self.rootpath + '/rpd/ssd/testing/CABLELABS_ROOT_CA_PEM.CRT'
+        driver = HalClientTest("SSD_Driver", "This is SSD Driver", "0.1.0",
+                               (MsgTypeSsd,), None, rootca=rootca)
+
+        driver.ssdParam['SsdServerAddress'] = '127.0.0.1'
+        driver.ssdParam['SsdFilename'] = self.rootpath + '/rpd/ssd/testing/codefile'
+        driver.ssdParam['SsdServerPort'] = driver.TRANSPORT_TFTP
+        driver.download_process(driver.TRANSPORT_TFTP, driver.ssdParam['SsdServerAddress'],
+                                driver.ssdParam['SsdFilename'])
+        driver.ssdParam['SsdServerAddress'] = 'fe80::204:9fff:fe03:115/64'
+        driver.connection_cleanup()
+
+    def test_generate_event_66070407(self):
+        rootca = self.rootpath + '/rpd/ssd/testing/CABLELABS_ROOT_CA_PEM.CRT'
+        driver = HalClientTest("SSD_Driver", "This is SSD Driver", "0.1.0",
+                               (MsgTypeSsd,), None, rootca=rootca)
+
+        initcode = {"manufacturer": {"organizationName": "cisco", "codeAccessStart": "20160311122430Z",
+                                     "cvcAccessStart": "20160311122430Z"},
+                    "co-signer": {"organizationName": "comcast", "codeAccessStart": "20160311122430Z",
+                                  "cvcAccessStart": "20160311122430Z"}}
+
+        driver.initCode = initcode
+        driver.codeFile = CodeFileVerify(driver.initCode, rootca=rootca)
+
+        halApi = t_HalApi()
+        ssd_api = halApi.ssdController
+        ssd_api.action = ssd_api.SSD_START
+        ssd_api.server = '127.0.0.1'
+        ssd_api.file = self.rootpath + '/rpd/ssd/testing/codefile'
+        ssd_api.transport = ssd_api.SSD_TRANSPORT_HTTP
+
+        driver.download_process = wrap_download_process
+        ret = driver.download_process(ssd_api.transport, ssd_api.server, ssd_api.file)
+        self.assertNotEqual(ret, None)
+
+        driver.codeFile.verify_file = wrap_verify_file_corruption
+        ret, val = driver.codeFile.verify_file('/rpd/config')
+        self.assertFalse(ret)
+        self.assertEqual(val, 52)
+
+        msg_api = HalMessage("HalConfig", SrcClientID='123456789',
+                             SeqNum=2,
+                             CfgMsgType=MsgTypeSsdApi,
+                             CfgMsgPayload=halApi.SerializeToString())
+        driver.recvCfgMsgCb(msg_api)
+
+        start_time = time.time()
+        while isinstance(driver.ssdProcess, threading.Thread) and \
+                driver.ssdProcess.isAlive() and time.time() < start_time + 16:
+            time.sleep(1)
+        self.assertEqual(driver.isProcessRunning, driver.TRIGGER_NONE)
+
+        driver.connection_cleanup()
+
+    def test_generate_event_66070406(self):
+        rootca = self.rootpath + '/rpd/ssd/testing/CABLELABS_ROOT_CA_PEM.CRT'
+        driver = HalClientTest("SSD_Driver", "This is SSD Driver", "0.1.0",
+                               (MsgTypeSsd,), None, rootca=rootca)
+
+        initcode = {"manufacturer": {"organizationName": "cisco", "codeAccessStart": "20160311122430Z",
+                                     "cvcAccessStart": "20160311122430Z"},
+                    "co-signer": {"organizationName": "comcast", "codeAccessStart": "20160311122430Z",
+                                  "cvcAccessStart": "20160311122430Z"}}
+        driver.initCode = initcode
+        driver.codeFile = CodeFileVerify(driver.initCode, rootca=rootca)
+
+        halApi = t_HalApi()
+        ssd_api = halApi.ssdController
+        ssd_api.action = ssd_api.SSD_START
+        ssd_api.server = '127.0.0.1'
+        ssd_api.file = self.rootpath + '/rpd/ssd/testing/codefile'
+        ssd_api.transport = ssd_api.SSD_TRANSPORT_HTTP
+
+        driver.download_process = wrap_download_process
+        ret = driver.download_process(ssd_api.transport, ssd_api.server, ssd_api.file)
+        self.assertNotEqual(ret, None)
+
+        driver.codeFile.verify_file = wrap_verify_cvc_name_mismatch
+        ret, val = driver.codeFile.verify_file('/rpd/config')
+        self.assertFalse(ret)
+        self.assertEqual(val, 1)
+
+        msg_api = HalMessage("HalConfig", SrcClientID='123456789',
+                             SeqNum=2,
+                             CfgMsgType=MsgTypeSsdApi,
+                             CfgMsgPayload=halApi.SerializeToString())
+        driver.recvCfgMsgCb(msg_api)
+
+        start_time = time.time()
+        while isinstance(driver.ssdProcess, threading.Thread) and \
+                driver.ssdProcess.isAlive() and time.time() < start_time + 16:
+            time.sleep(1)
+        self.assertEqual(driver.isProcessRunning, driver.TRIGGER_NONE)
+
+        driver.connection_cleanup()
+
+    def test_generate_event_66070408(self):
+        rootca = self.rootpath + '/rpd/ssd/testing/CABLELABS_ROOT_CA_PEM.CRT'
+        driver = HalClientTest("SSD_Driver", "This is SSD Driver", "0.1.0",
+                               (MsgTypeSsd,), None, rootca=rootca)
+
+        SysTools.is_last_reset_by_power_off = SysToolsTest.is_last_reset_by_power_off
+        self.assertTrue(SysTools.is_last_reset_by_power_off())
+        driver.ssdInProgressFile = self.rootpath + '/rpd/ssd/testing/test_ssdInProgressFile.json'
+        self.assertTrue(os.path.exists(driver.ssdInProgressFile))
+        driver.start(simulate_mode=True)
+
+        driver.connection_cleanup()
 
     def test_ssd_negative(self):
         rootca = self.rootpath + '/rpd/ssd/testing/CABLELABS_ROOT_CA_PEM.CRT'
@@ -495,15 +631,20 @@ class TestSsdDriver(unittest.TestCase):
         self.assertFalse(driver.is_same_img('http://differenrname.itb'))
         self.assertTrue(driver.is_same_img('/tftpboot/test/testimagename.itb'))
         self.assertTrue(driver.is_same_img('testimagename.itb'))
-        self.assertTrue(driver.is_same_img('testimagename.itb.act'))
+        self.assertFalse(driver.is_same_img('testimagename.itb.act'))
         os.system("rm -rf " + driver.BOOT_IMAGE_PATH)
         self.assertFalse(driver.is_same_img('differenrname.itb'))
         self.assertFalse(driver.is_same_img('testimagename.itb.act'))
         os.system("touch " + driver.BOOT_IMAGE_PATH)
         self.assertFalse(driver.is_same_img('testimagename.itb.act'))
+        os.system("touch /tmp/testimagename.itb.sign.SSA")
+        os.system("rm -rf " + driver.BOOT_IMAGE_PATH)
+        os.system("ln -sf /tmp/testimagename.itb.sign.SSA" + driver.BOOT_IMAGE_PATH)
+        self.assertFalse(driver.is_same_img('testimagename.itb.sign.SSA'))
 
         driver.connection_cleanup()
         driver.connection_cleanup()
+
 
 if __name__ == '__main__':
     setup_logging('HAL', filename="hal_client.log")

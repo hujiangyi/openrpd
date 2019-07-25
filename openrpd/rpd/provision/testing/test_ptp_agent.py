@@ -21,6 +21,16 @@ import rpd.provision.proto.process_agent_pb2 as pb2
 from rpd.provision.process_agent.agent.agent import ProcessAgent
 import subprocess
 import signal
+from rpd.gpb.rcp_pb2 import t_RcpMessage, t_RpdDataMessage
+import rpd.hal.src.HalConfigMsg as HalConfigMsg
+from rpd.hal.src.msg.HalMessage import HalMessage
+from rpd.hal.src.transport.HalTransport import HalTransport
+from rpd.gpb.GeneralNotification_pb2 import t_GeneralNotification
+from rpd.hal.src.HalConfigMsg import MsgTypeGeneralNtf, MsgTypeRoutePtpStatus, \
+    MsgTypePtpClockStatus, MsgTypeRpdState
+from rpd.dispatcher.dispatcher import Dispatcher
+from rpd.provision.process_agent.ptp1588.ptp_agent import HalPtpClient
+
 
 class TestPtpAgent(unittest.TestCase):
 
@@ -34,7 +44,8 @@ class TestPtpAgent(unittest.TestCase):
         self.start_hal()
         # HAL need some time to work
         time.sleep(5)
-        self.pid = subprocess.Popen("coverage run --parallel-mode --rcfile="+self.rootpath+"/.coverage.rc "
+        self.mastersim_pid = None
+        self.pid = subprocess.Popen("coverage run --parallel-mode --rcfile=" + self.rootpath + "/.coverage.rc "
                                     + self.rootpath +
                                     "/rpd/provision/process_agent/ptp1588/ptp_agent.py",
                                     executable='bash', shell=True)
@@ -74,14 +85,14 @@ class TestPtpAgent(unittest.TestCase):
 
         if time.time() > timeOut:
             raise Exception("Cannot setup the redis")
- 
+
     def start_hal(self):
         self.setup_db()
         self.hal_pid = \
-            subprocess.Popen("coverage run --parallel-mode --rcfile="+self.rootpath+"/.coverage.rc "
+            subprocess.Popen("coverage run --parallel-mode --rcfile=" + self.rootpath + "/.coverage.rc "
                              + self.rootpath + "/rpd/hal/src/HalMain.py"
-                             + " --conf=" + self.rootpath +"/rpd/hal/conf/hal.conf",
-                             executable='bash',shell=True
+                             + " --conf=" + self.rootpath + "/rpd/hal/conf/hal.conf",
+                             executable='bash', shell=True
                              )
 
     def stop_hal(self):
@@ -104,10 +115,10 @@ class TestPtpAgent(unittest.TestCase):
 
     def start_mastersim(self):
         # try to find the l2tp agent
-        self.mastersim_pid = subprocess.Popen("coverage run --parallel-mode --rcfile="+self.rootpath+"/.coverage.rc " 
+        self.mastersim_pid = subprocess.Popen("coverage run --parallel-mode --rcfile=" + self.rootpath + "/.coverage.rc "
                                               + self.rootpath +
                                               "/rpd/hal/lib/drivers/HalPtpDriver.py -s",
-                                              executable='bash',shell=True
+                                              executable='bash', shell=True
                                               )
 
     def stop_mastersim(self):
@@ -173,8 +184,8 @@ class TestPtpAgent(unittest.TestCase):
         event_request.action.action = pb2.msg_event.START
 
         sock_push.send(event_request.SerializeToString())
-
-        self.start_mastersim()
+        if self.mastersim_pid is None:
+            self.start_mastersim()
         # we want to receive 2 notifications, 1 for check status initial, 2 for
         # the status update
         timeout = time.time() + 60
@@ -243,6 +254,56 @@ class TestPtpAgent(unittest.TestCase):
         print reg_rsp
 
         self.assertEqual(reg_rsp.reg_rsp.status, reg_rsp.reg_rsp.OK)
+
+
+class TestPtpAgentMulti(TestPtpAgent):
+
+    def setUp(self):
+        self.instance_id = "0"
+        os.environ['INSTANCE_ID'] = str(self.instance_id)
+        super(TestPtpAgentMulti, self).setUp()
+
+    def tearDown(self):
+        super(TestPtpAgentMulti, self).tearDown()
+        del os.environ['INSTANCE_ID']
+
+
+class TestPtpHalPtpClient(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        global_dispatcher = Dispatcher()
+        cls.hal_client =\
+            HalPtpClient("PTPClient", "This is a PTP application", "1.9.0",
+                         [MsgTypeRoutePtpStatus, MsgTypeGeneralNtf, ],
+                         [MsgTypePtpClockStatus, MsgTypeRpdState, ],
+                         global_dispatcher, None)
+
+        cls.hal_client.pushSock = HalTransport(
+            HalTransport.HalTransportClientAgentPull,
+            HalTransport.HalClientMode, index=19,
+            socketMode=HalTransport.HalSocketPushMode,
+            disconnectHandlerCb=None)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.hal_client.pushSock:
+            cls.hal_client.pushSock.close()
+
+    def test_readRpdState(self):
+        rcp_msg = t_RcpMessage()
+        rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
+        rcp_msg.RpdDataMessage.RpdDataOperation = \
+            t_RpdDataMessage.RPD_CFG_READ
+        cfg_payload = rcp_msg.SerializeToString()
+
+        queryPtpMsg = HalMessage("HalConfig", SrcClientID="testMsgTypeRpdState",
+                                 SeqNum=325,
+                                 CfgMsgType=HalConfigMsg.MsgTypeRpdState,
+                                 CfgMsgPayload=cfg_payload)
+        self.hal_client.recvCfgMsgCb(queryPtpMsg)
+        self.assertTrue(self.hal_client.ptp_result == t_GeneralNotification.PTPACQUIRE)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import json, zmq
+import zmq
 
 from rpd.common.rpd_logging import setup_logging
 import rpd.provision.process_agent.agent.agent as agent
@@ -42,6 +42,7 @@ class InterfaceStatus(FakeAgent):
                     event_request_rsp.SerializeToString(), flags=zmq.NOBLOCK)
             except zmq.ZMQError as ex:
                 self.logger.error("failed to send to manager: %s" % str(ex))
+
 
 if __name__ == "__main__":
     setup_logging("PROVISION", filename="provision_interface_status.log")

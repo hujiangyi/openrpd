@@ -424,6 +424,8 @@ function='0x0'/>
             raise ValueError("Trying to get IP addr of not running VM")
         mac_addr = self.mac_addresses[0 if interface == 'eth0' else 1]
         # leases_file = '/var/lib/libvirt/dnsmasq/default.leases'
+        arpout = subprocess.check_output("arp", shell=True)
+        self.logger.info("arp output: \n%s\n", arpout)
         cmd = "arp | egrep {} | awk ' {{ print $1 }} '".format(
             mac_addr.lower())
         self.logger.info(

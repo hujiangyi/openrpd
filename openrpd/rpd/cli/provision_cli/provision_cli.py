@@ -221,7 +221,7 @@ class ProvisionCli(object):
 
             if rsp.MsgType != t_Provision.SHOW_PROVISION_CCAP_CORE:
                 raise Exception("MsgType %d is not correct, expect:%d" % (rsp.MsgType,
-                                                                           t_Provision.SHOW_PROVISION_CCAP_CORE))
+                                                                          t_Provision.SHOW_PROVISION_CCAP_CORE))
 
             if rsp.result != t_Provision.RESULT_OK:
                 raise Exception("Result is not correct.")
@@ -593,14 +593,14 @@ class ProvisionCli(object):
             return
 
         para = json.loads(rsp.parameter)
-        name = ("Core-ID", "Core-IP", "Local-IP", "Principle", "Status")
+        name = ("Core-ID", "Core-IP", "Local-IP", "Principal", "Status")
         print_list = list()
         print_list.append(name)
         max_len = [len(a) for a in name]
         for dic in para:
             try:
                 para_tuple = (dic["Core-ID"], self.format_ipv6(dic["Core-IP"]),
-                              self.format_ipv6(dic["Local-IP"]), dic["Principle"],
+                              self.format_ipv6(dic["Local-IP"]), dic["Principal"],
                               "OK" if dic["Status"] else 'Fail')
                 print_list.append(para_tuple)
                 max_len = [max_len[i] if max_len[i] > len(para_tuple[i]) else len(para_tuple[i])

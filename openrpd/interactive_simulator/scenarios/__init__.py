@@ -18,7 +18,7 @@ import glob
 from importlib import import_module
 from interactive_simulator.TesterExceptions import *
 
-_modules = glob.glob(dirname(__file__)+"/*.py")
+_modules = glob.glob(dirname(__file__) + "/*.py")
 _scenarios_names = [basename(
     f)[:-3] for f in _modules if isfile(f) and basename(f)[:-3].endswith("Scenario")]
 all_scenarios = {}

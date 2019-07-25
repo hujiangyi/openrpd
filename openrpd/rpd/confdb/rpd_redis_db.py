@@ -18,6 +18,8 @@
 import pickle
 import redis
 import json
+import os
+from sortedcontainers import SortedList
 from rpd.common.utils import singleton
 from rpd.common.rpd_logging import AddLoggerToClass
 
@@ -39,7 +41,8 @@ class RCPDB(object):
             with open(cfg_file, 'rt') as fp:
                 db_cfg = json.load(fp)
             self.redis_db = redis.StrictRedis(db=db_cfg["RES_DB_NUM"],
-                                              unix_socket_path=db_cfg["DB_SOCKET_PATH"])
+                                              unix_socket_path=db_cfg[
+                                                  "DB_SOCKET_PATH"])
         except Exception as e:
             self.logger.error("Resource db connection failure: %s", str(e))
 
@@ -50,7 +53,6 @@ class RCPDB(object):
     def read(self, key):
         value = self.redis_db.get(key)
         if value is None:
-            self.logger.debug("No result with db_key=%s", key)
             return None
         d = pickle.loads(value)
         return d
@@ -62,7 +64,8 @@ class RCPDB(object):
         return self.redis_db.keys(pattern)
 
 
-class RCPDBRecord(object):
+class DBRecord(object):
+
     """
     Prepares and stores some permanent data like configure tlv which is
     needed to support both write and read. Performs the permanent data into
@@ -72,7 +75,6 @@ class RCPDBRecord(object):
     db.
 
     """
-    __metaclass__ = AddLoggerToClass
 
     def _get_key(self):
         return '%s:%s' % (self.__class__.__name__, str(self.get_index()))
@@ -84,7 +86,6 @@ class RCPDBRecord(object):
         :param record
         """
         db = RCPDB()
-        self.get_index()
         db.write(self._get_key(), self)
 
     def read(self):
@@ -93,14 +94,14 @@ class RCPDBRecord(object):
         Return the entry by index identified which has already saved in
         database.
         :param index
-        :return RCPDBRecord
+        :return DBRecord
         """
         db = RCPDB()
         key = self._get_key()
         d = db.read(key)
         if d is None:
             return
-        assert(isinstance(d, RCPDBRecord))
+        assert(isinstance(d, DBRecord))
         for k, v in d.__dict__.items():
             self.__dict__[k] = v
 
@@ -114,15 +115,54 @@ class RCPDBRecord(object):
     def get_index(self):
         return self.index
 
+    @classmethod
+    def decode_index(cls, init_str):
+        return int(init_str)
 
-class RPDAllocateWriteRecord(RCPDBRecord):
+    @classmethod
+    def get_keys(cls):
+        db = RCPDB()
+        pattern = cls.__name__ + ":*"
+        keys = db.get_keys(pattern)
+        for key in keys:
+            index = key[(key.find(':') + 1):]
+            yield cls.decode_index(index)
+
+    @classmethod
+    def get_sorted_key_list(cls):
+        index_list = SortedList()
+        for dbindex in cls.get_keys():
+            index_list.add(dbindex)
+        return index_list
+
+    @classmethod
+    def get_all(cls):
+        for dbindex in cls.get_keys():
+            ses = cls(dbindex)
+            ses.read()
+            yield ses
+
+    @classmethod
+    def get_next_n(cls, key=None, count=0):
+        index_list = cls.get_sorted_key_list()
+        ret_count = 0
+        for index in index_list.irange(minimum=key):
+            if ret_count >= count:
+                break
+            ret_count += 1
+            ses = cls(index)
+            ses.read()
+            yield ses
+
+
+class RPDAllocateWriteRecord(DBRecord):
+
     """
-    Prepares and stores some permanent data like allocate write support, which need maintains
-    a index pool for the special Table.
+    Prepares and stores some permanent data like allocate write support, which
+    need maintains a index pool for the special Table.
     Please call this init function before you use it
 
     """
-    __metaclass__ = AddLoggerToClass
 
     indexDBPool = {}
 
@@ -132,7 +172,7 @@ class RPDAllocateWriteRecord(RCPDBRecord):
         different table has different index pool
         """
         self.poolName = self.__class__.__name__
-
+        self.range_max = rangeIdx
         if RPDAllocateWriteRecord.indexDBPool.get(self.poolName):
             return
         else:
@@ -141,9 +181,10 @@ class RPDAllocateWriteRecord(RCPDBRecord):
             db = RCPDB()
             for key in db.get_keys(pattern=self.poolName + ":*"):
                 '''sync with current db, will extension the key type'''
-                index = key.split(':')[1]
+                index = key[(key.find(':') + 1):]
                 assert(index)
-                RPDAllocateWriteRecord.indexDBPool[self.poolName].remove(int(index))
+                RPDAllocateWriteRecord.indexDBPool[self.poolName].remove(
+                    int(index))
 
     def allocateIndex(self, index=None):
         """
@@ -151,7 +192,7 @@ class RPDAllocateWriteRecord(RCPDBRecord):
         :return:
         """
         if not index:
-            self.index = RPDAllocateWriteRecord.indexDBPool.get(self.poolName).pop()
+            self.index = RPDAllocateWriteRecord.indexDBPool.get(self.poolName).pop(0)
         else:
             self.index = index
 
@@ -169,11 +210,16 @@ class RPDAllocateWriteRecord(RCPDBRecord):
         delete the record and reuse the index
         :return:
         """
-        if not RPDAllocateWriteRecord.indexDBPool.get(self.poolName):
+
+        if self.index is None:
             return
-        if self.index > self.MAX_INDEX or self.index in \
-                RPDAllocateWriteRecord.indexDBPool.get(self.poolName):
+        if self.index >= self.range_max:
             return
+        if self.poolName not in RPDAllocateWriteRecord.indexDBPool.keys():
+            return
+        if self.index in RPDAllocateWriteRecord.indexDBPool.get(self.poolName):
+            return
+
         RPDAllocateWriteRecord.indexDBPool.get(self.poolName).append(self.index)
         super(RPDAllocateWriteRecord, self).delete()
 

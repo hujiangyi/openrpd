@@ -153,7 +153,7 @@ class FakeAgent(agent.ProcessAgent):
                 self.prepare_agent_parameters(ccap_core_id, parameter)
                 # create a interface in self input_parameter
                 self.input_parameter[parameter] = {
-                    "requester": [ccap_core_id,],
+                    "requester": [ccap_core_id, ],
                     "lastChangeTime": time(),
                 }
 

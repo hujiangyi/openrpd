@@ -159,5 +159,6 @@ class TestSuiteManager(unittest.TestCase):
 
         self.disp.end_loop()
 
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,13 @@
+Index: Python-2.7.9/Lib/unittest/loader.py
+===================================================================
+--- Python-2.7.9-orig/Lib/unittest/loader.py	2014-12-10 08:59:49.000000000 -0700
++++ Python-2.7.9/Lib/unittest/loader.py	2018-06-29 12:38:24.122479000 -0600
+@@ -238,7 +238,7 @@
+ 
+     def _find_tests(self, start_dir, pattern):
+         """Used by discovery. Yields test suites it loads."""
+-        paths = os.listdir(start_dir)
++        paths = sorted(os.listdir(start_dir))
+ 
+         for path in paths:
+             full_path = os.path.join(start_dir, path)

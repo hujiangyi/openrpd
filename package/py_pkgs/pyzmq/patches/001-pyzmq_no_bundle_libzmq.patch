@@ -1,0 +1,7 @@
+Index: pyzmq-14.7.0/setup.cfg
+===================================================================
+--- /dev/null
++++ pyzmq-14.7.0/setup.cfg
+@@ -0,0 +1,2 @@
++[global]
++skip_check_zmq = True # skip checking zmq verson (due to cross-compiling)

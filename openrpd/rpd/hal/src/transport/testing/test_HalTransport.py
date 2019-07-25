@@ -334,6 +334,7 @@ class TestHalTransport(unittest.TestCase):
 
 
 class TestHalPoller(unittest.TestCase):
+
     def test_poller(self):
         poller = HalPoller()
         try:

@@ -172,5 +172,7 @@ class testL2tpv3Rfc3931AVP(unittest.TestCase):
         avp2 = CircuitStatus.decodeAll(buf)
         print avp2[0]
         print avp1
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -16,11 +16,11 @@
 #
 
 import socket
-
+from rpd.common import utils
 from rpd.rcp.gcp.gcp_lib import gcp_msg_def
 from rpd.rcp.rcp_lib import rcp
 from rpd.rcp.rcp_sessions import RCPSlaveSession, RCPMaster, \
-    RCPMasterCapabilities
+    CcapCoreIdentification
 from rpd.common.utils import Convert
 from rpd.common.rpd_logging import AddLoggerToClass
 from rpd.gpb.rcp_pb2 import t_RcpMessage
@@ -79,7 +79,7 @@ class RCPSlavePacketHandler(RCPPacketHandler):
         """
         __metaclass__ = AddLoggerToClass
 
-        def ccap_capabilities_update(self, session):  # pragma: no cover
+        def ccap_identification_update(self, session):  # pragma: no cover
             """This callback is called by the PacketHandler when an update of
             the CCAP's capabilities has been received.
 
@@ -225,7 +225,6 @@ class RCPSlavePacketHandler(RCPPacketHandler):
     # Internal methods
     #
     def _new_packet_req(self, slave):   # pragma: no cover
-
         """Creates new RCP packet with header set according to slave's
         state."""
 
@@ -293,19 +292,24 @@ class RCPSlavePacketHandler(RCPPacketHandler):
                 if rcp_msg.rcp_message_id == rcp_tlv_def.RCP_MSG_TYPE_IRA:
                     if slave.is_ira_recv == False:
                         slave.is_ira_recv = True
-                    if slave.ira_recv_timer is not None:
-                        self.logger.info("[IRA debug]:stop the ira receive timeout coreIp %s ",
-                                         slave.get_descriptor().addr_remote)
-                        slave.dispatcher.timer_unregister(slave.ira_recv_timer)
-                        slave.ira_recv_timer = None
-                        slave.clear_ira_retry_cnt()
+                        self.callback_set.configuration_to_rcp_wrapper(
+                            slave, seq, pkt.transaction_identifier,
+                            msg.msg_fields.TransactionID.get_val(),
+                            msg_type=t_RcpMessage.IRA_RECEIVED)
+                if rcp_msg.rcp_message_id == rcp_tlv_def.RCP_MSG_TYPE_REX:
+                    if slave.is_rex_recv == False:
+                        slave.is_rex_recv = True
+                        self.callback_set.configuration_to_rcp_wrapper(
+                            slave, seq, pkt.transaction_identifier,
+                            msg.msg_fields.TransactionID.get_val(),
+                            msg_type=t_RcpMessage.REX_RECEIVED)
                 if seq.parent_gpb.HasField("Ssd"):
                     self.logger.info("Handling Ssd received at %s" %
                                      slave.get_descriptor())
-                    if (not slave.ccap_capabilities.is_active) \
-                            or (not slave.ccap_capabilities.is_principal):
+                    if (not slave.ccap_identification.is_active) \
+                            or (not slave.ccap_identification.is_principal):
                         self.logger.debug("Ssd received from non active %d or non principal %d ",
-                                         slave.ccap_capabilities.is_active, slave.ccap_capabilities.is_principal)
+                                          slave.ccap_identification.is_active, slave.ccap_identification.is_principal)
                         try:
                             resp = self.pkt_director.get_positive_rsp_packets(slave, pkt)
                         except Exception as ex:
@@ -363,90 +367,83 @@ class RCPSlavePacketHandler(RCPPacketHandler):
                     continue
 
                 if len(seq.parent_gpb.CcapCoreIdentification) > 0:
+                    index = -1
+                    identRecord = CcapCoreIdentification()
                     self.logger.info("Handling CcapCoreIdentification update")
-
                     ccap_caps = seq.parent_gpb.CcapCoreIdentification[0]
+                    self.logger.debug("msg is: %s", ccap_caps)
+                    op = seq.operation
                     if len(seq.parent_gpb.CcapCoreIdentification) > 1:
                         self.logger.warning(
                             "Only one instance of CCAP caps is expected, but received: %u",
                             len(seq.parent_gpb.CcapCoreIdentification))
 
+                    core_ip = slave.get_descriptor().addr_remote
+
+                    if ccap_caps.HasField("CoreIpAddress"):
+                        core_ip = Convert.format_ip(ccap_caps.CoreIpAddress)
+                        ip = Convert.format_ip(ccap_caps.CoreIpAddress)
+
+                    if op == rcp_tlv_def.RCP_OPERATION_TYPE_WRITE:
+                        if ccap_caps.HasField("Index"):
+                            index = ccap_caps.Index
+                            identRecord.index = index
+                            identRecord.read()
+                        else:
+                            self.logger.warning("RCP write type %d should include index", op)
+                            self.pkt_director.send_eds_response_directly(slave, pkt.transaction_identifier,
+                                                                         msg.msg_fields.TransactionID.get_val(), seq, False)
+                            continue
+                    elif op == rcp_tlv_def.RCP_OPERATION_TYPE_ALLOCATE_WRITE:
+                        identRecord.allocateIndex(core_ip)
+                        ccap_caps.Index = identRecord.index
+                    elif op == rcp_tlv_def.RCP_OPERATION_TYPE_READ:
+                        seq_list.append(seq)
+                        continue
+
+                    identRecord.core_ip_addr = core_ip
                     if ccap_caps.HasField("IsPrincipal"):
                         self.logger.info("Received NotifyRSP from CCAP core is_principal[%s]",
                                          ccap_caps.IsPrincipal)
-                        if ccap_caps.IsPrincipal:
-                            is_principal = True
-                        else:
-                            is_principal = False
-                    else:
-                        is_principal = True
+                        identRecord.is_principal = True if ccap_caps.IsPrincipal else False
 
-                    # TODO need to add setting of active / standby
-                    index = ccap_caps.Index
+                    self.logger.debug("CcapCoreIdentification operation=%d index=%d", op, ccap_caps.Index)
 
                     if ccap_caps.HasField("CoreId"):
-                        core_id = ccap_caps.CoreId
-                    else:
-                        core_id = "NA"
-
-                    if ccap_caps.HasField("CoreIpAddress"):
-                        core_ip_addr = ccap_caps.CoreIpAddress
-                    else:
-                        core_ip_addr = "0.0.0.0"
+                        identRecord.core_id = ccap_caps.CoreId
 
                     if ccap_caps.HasField("CoreName"):
-                        core_name = ccap_caps.CoreName
-                    else:
-                        core_name = "NA"
+                        identRecord.core_name = ccap_caps.CoreName
 
                     if ccap_caps.HasField("VendorId"):
-                        vendor_id = ccap_caps.VendorId
-                    else:
-                        vendor_id = "NA"
+                        identRecord.vendor_id = ccap_caps.VendorId
 
                     if ccap_caps.HasField("CoreMode"):
-                        isActive = ccap_caps.CoreMode is t_CcapCoreIdentification.COREMODEACTIVE
-                    else:
-                        isActive = True
+                        identRecord.core_mode = ccap_caps.CoreMode
+                        identRecord.is_active = ccap_caps.CoreMode is t_CcapCoreIdentification.COREMODEACTIVE
 
                     if ccap_caps.HasField("InitialConfigurationComplete"):
-                        initial_configuration_complete = ccap_caps.InitialConfigurationComplete
-                    else:
-                        initial_configuration_complete = True
+                        identRecord.initial_configuration_complete = ccap_caps.InitialConfigurationComplete
 
                     if ccap_caps.HasField("MoveToOperational"):
-                        move_to_operational = ccap_caps.MoveToOperational
-                    else:
-                        move_to_operational = False
+                        identRecord.move_to_operational = ccap_caps.MoveToOperational
 
                     if ccap_caps.HasField("CoreFunction"):
-                        core_function = ccap_caps.CoreFunction
-                    else:
-                        core_function = 1
+                        identRecord.core_function = ccap_caps.CoreFunction
 
                     if ccap_caps.HasField("ResourceSetIndex"):
-                        resource_set_index = ccap_caps.ResourceSetIndex
-                    else:
-                        resource_set_index = 2
+                        identRecord.resource_set_index = ccap_caps.ResourceSetIndex
 
-                    caps = RCPMasterCapabilities(index=index,
-                                                 core_id=core_id,
-                                                 core_ip_addr=core_ip_addr,
-                                                 is_principal=is_principal,
-                                                 core_name=core_name,
-                                                 vendor_id=vendor_id,
-                                                 is_active=isActive,
-                                                 initial_configuration_complete=initial_configuration_complete,
-                                                 move_to_operational=move_to_operational,
-                                                 core_function=core_function,
-                                                 resource_set_index=resource_set_index
-                                                 )
-
-                    # Set the capabilities into the slave session
-                    slave.ccap_capabilities = caps
+                    if op in [rcp_tlv_def.RCP_OPERATION_TYPE_WRITE,
+                              rcp_tlv_def.RCP_OPERATION_TYPE_ALLOCATE_WRITE]:
+                        identRecord.write()
+                        self.logger.debug("Core ident DB save index =%d core_ip_addr=%s op=%d",
+                                          identRecord.index, identRecord.core_ip_addr, op)
+                    # Set the ccap core Identification into the slave session
+                    slave.ccap_identification = identRecord
 
                     # call CCAP caps update callback
-                    self.callback_set.ccap_capabilities_update(slave)
+                    self.callback_set.ccap_identification_update(slave)
 
                     try:
                         self.callback_set.configuration_to_rcp_wrapper(
@@ -473,22 +470,8 @@ class RCPSlavePacketHandler(RCPPacketHandler):
 
                     continue
 
-                if seq.parent_gpb.HasField('StaticPwConfig'):
-                    self.logger.info(
-                        "Receive StaticPwConfig message from Gcpp core %s",
-                        slave.get_descriptor())
-                    try:
-                        self.callback_set.configuration_to_rcp_wrapper(
-                            slave,
-                            seq, pkt.transaction_identifier,
-                            msg.msg_fields.TransactionID.get_val())
-                    except Exception as ex:
-                        self.logger.warning("Got StaticPwConfig msg: %s", str(ex))
-                        raise
-
-
                 if seq.parent_gpb.HasField('RpdGlobal'):
-                    if slave.ccap_capabilities.is_principal and slave.ccap_capabilities.is_active:
+                    if slave.ccap_identification.is_principal and slave.ccap_identification.is_active:
                         self.logger.info("Receive RpdGlobal message from active principal core via session %s",
                                          slave.get_descriptor())
                     else:
@@ -517,8 +500,15 @@ class RCPSlavePacketHandler(RCPPacketHandler):
                 if seq.parent_gpb.HasField('MultiCore'):
                     self.logger.info(
                         "Handling MultiCore configuration msg is_principal=%d is_active=%d",
-                        slave.ccap_capabilities.is_principal,
-                        slave.ccap_capabilities.is_active)
+                        slave.ccap_identification.is_principal,
+                        slave.ccap_identification.is_active)
+#                   ****** temporary 4 line hack follows to work around 
+#                   ****** the issue described in C3RPHY-122
+                    resource_set_index = 0
+                    for resource_set in seq.parent_gpb.MulitCore.ResourceSet:
+                        resource_set.ResourceSetIndex = resource_set_index
+                        resource_set_index = resource_set_index + 1
+#                   ****** end of 4 line hack to get around C3RPHY-122
                     self.pkt_director.send_eds_response_directly(
                         slave, pkt.transaction_identifier,
                         msg.msg_fields.TransactionID.get_val(), seq)
@@ -546,7 +536,6 @@ class RCPSlavePacketHandler(RCPPacketHandler):
                         raise
 
                     continue
-
                 seq_list.append(seq)
 
         if not seq_list:
@@ -628,7 +617,7 @@ class RCPSlavePacketHandler(RCPPacketHandler):
         self.logger.debug("Sent GDM RSP")
 
 
-class RCPMasterPacketHandler(RCPPacketHandler): # pragma: no cover
+class RCPMasterPacketHandler(RCPPacketHandler):  # pragma: no cover
     """Implements handling of RCP messages specific for Master side of the
     RCP session."""
     __metaclass__ = AddLoggerToClass

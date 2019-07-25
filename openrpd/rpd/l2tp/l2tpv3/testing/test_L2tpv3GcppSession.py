@@ -16,6 +16,7 @@
 #
 
 import unittest
+import rpd.python_path_resolver
 import l2tpv3.src.L2tpv3GcppConnection as L2tpv3GcppSession
 import rpd.gpb.StaticPwConfig_pb2 as StaticPwConfig_pb2
 from rpd.dispatcher.dispatcher import Dispatcher
@@ -24,13 +25,17 @@ from rpd.gpb.rcp_pb2 import t_RcpMessage, t_RpdDataMessage
 from l2tpv3.src.L2tpv3Hal import L2tpHalClient
 import rpd.hal.src.HalConfigMsg as HalConfigMsg
 from rpd.hal.src.msg.HalMessage import HalMessage
-import l2tpv3.src.L2tpv3_pb2 as l2tpMsg
 from rpd.hal.src.transport.HalTransport import HalTransport
 from l2tpv3.src.L2tpv3API import L2tpv3API
 import l2tpv3.src.L2tpv3GlobalSettings as L2tpv3GlobalSettings
 from rpd.gpb.cfg_pb2 import config
 import l2tpv3.src.L2tpv3Hal_pb2 as L2tpv3Hal_pb2
 from rpd.hal.src.msg import HalCommon_pb2
+from rpd.confdb.testing.test_rpd_redis_db import setup_test_redis, \
+    stop_test_redis
+from l2tpv3.src.L2tpv3GcppConnection import StaticL2tpSession
+from l2tpv3.src.L2tpv3SessionDb import L2tpSessionRecord
+
 
 class StaticL2tpProvision():
     __metaclass__ = AddLoggerToClass
@@ -38,13 +43,15 @@ class StaticL2tpProvision():
     def __init__(self):
         return
 
-    def add_dsStaticSession(self, staticPwCfg, index, is_MultiCast, is_IPV6, flag=True):
+    def add_dsStaticSession(self, staticPwCfg, index, is_MultiCast, is_IPV6,
+                            flag=True):
         fwdPwCfg = staticPwCfg.FwdStaticPwConfig
         fwdPwCfg.Index = index
         if flag:
             fwdPwCfg.CcapCoreOwner = "00:50:56:9A:22:18"
         else:
-            fwdPwCfg.CcapCoreOwner = L2tpv3GcppSession.StaticL2tpSession.DEFAULT_MAC_ADDR
+            fwdPwCfg.CcapCoreOwner = \
+                L2tpv3GcppSession.StaticL2tpSession.DEFAULT_MAC_ADDR
         if not is_IPV6:
             if is_MultiCast:
                 fwdPwCfg.GroupAddress = "225.0.0.1"
@@ -58,8 +65,8 @@ class StaticL2tpProvision():
                 fwdPwCfg.GroupAddress = "2001:9:9:9::2"
             fwdPwCfg.SourceAddress = "::1"
 
-    def add_commStaticSession(self, staticPwCfg, index,
-                              sessionId, channelIndex, circuitStatus, direction):
+    def add_commStaticSession(self, staticPwCfg, index, sessionId,
+                              channelIndex, circuitStatus, direction):
         commPwCfg = staticPwCfg.CommonStaticPwConfig
         commPwCfg.Direction = direction
         commPwCfg.Index = index
@@ -90,41 +97,43 @@ class StaticL2tpProvision():
         if flag:
             retPwCfg.CcapCoreOwner = "00:50:56:9A:22:18"
         else:
-            retPwCfg.CcapCoreOwner = L2tpv3GcppSession.StaticL2tpSession.DEFAULT_MAC_ADDR
+            retPwCfg.CcapCoreOwner = \
+                L2tpv3GcppSession.StaticL2tpSession.DEFAULT_MAC_ADDR
         retPwCfg.UsPhbId = 0
 
-    def check_StaticSession(self, staticPwCfg, staticL2tpDB):
+    def check_StaticSession(self, staticPwCfg, sess):
         if staticPwCfg.HasField("CommonStaticPwConfig"):
             commPwCfg = staticPwCfg.CommonStaticPwConfig
-            staticL2tpMsgBean = staticL2tpDB.get((commPwCfg.SessionId, commPwCfg.Direction))
-            if not staticL2tpMsgBean:
+            if not sess:
                 return False
-            if staticL2tpMsgBean.direction != commPwCfg.Direction:
+            if sess.direction != commPwCfg.Direction:
                 return False
-            if staticL2tpMsgBean.pwType != commPwCfg.PwType:
+            if sess.pwType != commPwCfg.PwType:
                 return False
-            if staticL2tpMsgBean.depiPwSubtype != commPwCfg.DepiPwSubtype:
+            if sess.depiPwSubtype != commPwCfg.DepiPwSubtype:
                 return False
-            if staticL2tpMsgBean.l2SublayerType != commPwCfg.L2SublayerType:
+            if sess.l2SublayerType != commPwCfg.L2SublayerType:
                 return False
-            if staticL2tpMsgBean.depiL2SublayerSubtype != commPwCfg.DepiL2SublayerSubtype:
+            if sess.depiL2SublayerSubtype != commPwCfg.DepiL2SublayerSubtype:
                 return False
-            if staticL2tpMsgBean.sessionId != commPwCfg.SessionId:
+            if sess.sessionId != commPwCfg.SessionId:
                 return False
-            if staticL2tpMsgBean.circuitStatus != commPwCfg.CircuitStatus:
+            if sess.circuitStatus != commPwCfg.CircuitStatus:
                 return False
-            if staticL2tpMsgBean.rpdEnetPortIndex != commPwCfg.RpdEnetPortIndex:
+            if sess.rpdEnetPortIndex != commPwCfg.RpdEnetPortIndex:
                 return False
-            if staticL2tpMsgBean.enableNotifications != commPwCfg.EnableStatusNotification:
+            if sess.enableNotifications != commPwCfg.EnableStatusNotification:
                 return False
             PwAssociate = commPwCfg.PwAssociation
             for pwAssociate in PwAssociate:
                 channelSelector = pwAssociate.ChannelSelector
                 flag = False
-                for index, channelBean in staticL2tpMsgBean.pwAssociation.items():
+                for index, channelBean in sess.pwAssociation.items():
                     if channelSelector.RfPortIndex == channelBean.rfPortIndex \
-                            and channelSelector.ChannelType == channelBean.channelType \
-                            and channelSelector.ChannelIndex == channelBean.channelIndex:
+                            and channelSelector.ChannelType == \
+                            channelBean.channelType \
+                            and channelSelector.ChannelIndex == \
+                            channelBean.channelIndex:
                         flag = True
                         break
                 if not flag:
@@ -132,371 +141,425 @@ class StaticL2tpProvision():
         else:
             return False
 
-        if staticL2tpMsgBean.direction == L2tpv3GcppSession.StaticL2tpSession.DIRECTION_FORWARD:
+        if sess.direction == \
+                L2tpv3GcppSession.StaticL2tpSession.DIRECTION_FORWARD:
             fwdStaticCfg = staticPwCfg.FwdStaticPwConfig
-            if staticL2tpMsgBean.groupAddress != fwdStaticCfg.GroupAddress:
+            if sess.groupAddress != fwdStaticCfg.GroupAddress:
                 return False
-            if staticL2tpMsgBean.localAddress != \
-                    L2tpv3GcppSession.L2tpv3GcppProvider.getLocalIp(fwdStaticCfg.SourceAddress):
+            if sess.localAddress != \
+                    L2tpv3GcppSession.L2tpv3GcppProvider.getLocalIp(
+                    fwdStaticCfg.SourceAddress):
                 return False
             if not fwdStaticCfg.CcapCoreOwner:
-                if staticL2tpMsgBean.ccapCoreOwner is not None:
+                if sess.ccapCoreOwner is not None:
                     return False
             else:
-                if staticL2tpMsgBean.ccapCoreOwner != fwdStaticCfg.CcapCoreOwner:
+                if sess.ccapCoreOwner != fwdStaticCfg.CcapCoreOwner:
                     return False
 
-        if staticL2tpMsgBean.direction == L2tpv3GcppSession.StaticL2tpSession.DIRECTION_RETURN:
+        if sess.direction == \
+                L2tpv3GcppSession.StaticL2tpSession.DIRECTION_RETURN:
             retStaticCfg = staticPwCfg.RetStaticPwConfig
-            if staticL2tpMsgBean.destAddress != retStaticCfg.DestAddress:
+            if sess.destAddress != retStaticCfg.DestAddress:
                 return False
-            if staticL2tpMsgBean.localAddress != \
-                    L2tpv3GcppSession.L2tpv3GcppProvider.getLocalIp(retStaticCfg.DestAddress):
+            if sess.localAddress != \
+                    L2tpv3GcppSession.L2tpv3GcppProvider.getLocalIp(
+                    retStaticCfg.DestAddress):
                 return False
-            if staticL2tpMsgBean.mtuSize != retStaticCfg.MtuSize:
+            if sess.mtuSize != retStaticCfg.MtuSize:
                 return False
-            if staticL2tpMsgBean.usPhbId != retStaticCfg.UsPhbId:
+            if sess.usPhbId != retStaticCfg.UsPhbId:
                 return False
             if not retStaticCfg.CcapCoreOwner:
-                if staticL2tpMsgBean.ccapCoreOwner is not None:
+                if sess.ccapCoreOwner is not None:
                     return False
             else:
-                if staticL2tpMsgBean.ccapCoreOwner != retStaticCfg.CcapCoreOwner:
+                if sess.ccapCoreOwner != retStaticCfg.CcapCoreOwner:
                     return False
         return True
 
 
 class TestGcppSession(unittest.TestCase):
+
     @classmethod
     def setUpClass(cls):
         setup_logging("GCPP Unit test")
-        cls.gcppSession = L2tpv3GcppSession.L2tpv3GcppProvider()
+        setup_test_redis()
         cls.fwdCfg = StaticL2tpProvision()
-        cls.ApiPath = L2tpv3GlobalSettings.L2tpv3GlobalSettings.APITransportPath
+        cls.ApiPath = \
+            L2tpv3GlobalSettings.L2tpv3GlobalSettings.APITransportPath
         cls.api = L2tpv3API(cls.ApiPath)
         global_dispatcher = Dispatcher()
         cls.hal_client = L2tpHalClient("L2TP_HAL_CLIENT",
-                                       "the HAL client of L2TP feature",
-                                       "1.0", tuple(L2tpHalClient.notification_list.keys()), global_dispatcher)
+                                       "the HAL client of L2TP feature", "1.0",
+                                       tuple(
+                                           L2tpHalClient.notification_list.keys()),
+                                       global_dispatcher)
         cls.hal_client.pushSock = HalTransport(
-                HalTransport.HalTransportClientAgentPull, HalTransport.HalClientMode,
-                index=19, socketMode=HalTransport.HalSocketPushMode, disconnectHandlerCb=None)
+            HalTransport.HalTransportClientAgentPull,
+            HalTransport.HalClientMode, index=19,
+            socketMode=HalTransport.HalSocketPushMode,
+            disconnectHandlerCb=None)
 
+    @classmethod
+    def tearDownClass(cls):
+        if cls.hal_client.pushSock:
+            cls.hal_client.pushSock.close()
+        del cls.hal_client
+        stop_test_redis()
+    '''
     def test_ipv4SaveGcppSessionDB(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         self.fwdCfg = StaticL2tpProvision()
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 11,
-                                          0x80001111, 3, 32768, False)
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 11, 0x80001111, 3,
+                                          32768, False)
         self.fwdCfg.add_dsStaticSession(staticPwCfg, 11, False, False)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg,
-                                                        self.gcppSession.staticPseudowireDB))
-        staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 12, 0x80000001, 4, 32768, True)
-        self.fwdCfg.add_usStaticSession(staticPwCfg, 12, False)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        ipv4 = self.gcppSession.getLocalIp("127.0.0.1")
-        flag, sessionMsg = self.gcppSession.getStaticSessionBySesId(0x80000001, ipv4, "")
-        self.assertTrue(flag)
-        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg,
-                                                        self.gcppSession.staticPseudowireDB))
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 2)
+        sess11 = L2tpv3GcppSession.StaticL2tpSession(11)
+        sess11.updateRetstaticPseudowire(staticPwCfg)
+        sess11.updateFwdStaticPseudowire(staticPwCfg)
+        sess11.updateComStaticPseudowire(staticPwCfg)
+        sess11.write()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg, sess11))
+        sess11 = None
+        sess11 = L2tpv3GcppSession.StaticL2tpSession(11)
+        sess11.read()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg, sess11))
 
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 13,
-                                          0x80001121, 3, 32768, False)
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 12, 0x80000001, 4,
+                                          32768, True)
+        self.fwdCfg.add_usStaticSession(staticPwCfg, 12, False)
+        sess12 = L2tpv3GcppSession.StaticL2tpSession(12)
+        sess12.updateRetstaticPseudowire(staticPwCfg)
+        sess12.updateFwdStaticPseudowire(staticPwCfg)
+        sess12.updateComStaticPseudowire(staticPwCfg)
+        sess12.write()
+        sess12 = None
+        sess12 = L2tpv3GcppSession.StaticL2tpSession(12)
+        sess12.read()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg, sess12))
+
+        staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 13, 0x80001121, 3,
+                                          32768, False)
         self.fwdCfg.add_dsStaticSession(staticPwCfg, 13, True, False)
 
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        flag, sessionMsg = self.gcppSession.getStaticSessionBySesId(0x80001121, "127.0.0.2", "")
-        self.assertFalse(flag)
-        flag, sessionMsg = self.gcppSession.getStaticSessionBySesId(0x80001121, ipv4, "")
-        self.assertTrue(flag)
-        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg,
-                                                        self.gcppSession.staticPseudowireDB))
+        sess13 = L2tpv3GcppSession.StaticL2tpSession(13)
+        sess13.updateRetstaticPseudowire(staticPwCfg)
+        sess13.updateFwdStaticPseudowire(staticPwCfg)
+        sess13.updateComStaticPseudowire(staticPwCfg)
+        sess13.write()
+
+        sess13 = None
+        sess13 = L2tpv3GcppSession.StaticL2tpSession(13)
+        sess13.read()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg, sess13))
 
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
         self.fwdCfg.add_usStaticSession(staticPwCfg, 14, False)
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 14,
-                                          0x80000021, 4, 32768, True)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg,
-                                                        self.gcppSession.staticPseudowireDB))
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 4)
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 14, 0x80000021, 4,
+                                          32768, True)
+        sess14 = L2tpv3GcppSession.StaticL2tpSession(14)
+        sess14.updateRetstaticPseudowire(staticPwCfg)
+        sess14.updateFwdStaticPseudowire(staticPwCfg)
+        sess14.updateComStaticPseudowire(staticPwCfg)
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg, sess14))
+        sess14.write()
+        sess14 = None
+        sess14 = L2tpv3GcppSession.StaticL2tpSession(14)
+        sess14.read()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg, sess14))
 
-        self.gcppSession.removeStaticSession(0x80001111, 0)
-        self.gcppSession.removeStaticSession(0x80000001, 1)
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 2)
-        self.gcppSession.removeStaticSession(0x80001111, 1)
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 2)
-        self.assertTrue(((0x80001111, 0) not in self.gcppSession.staticPseudowireDB.keys()))
-        self.assertTrue(((0x80000001, 1) not in self.gcppSession.staticPseudowireDB.keys()))
+        sess11 = L2tpv3GcppSession.StaticL2tpSession(11)
+        sess11.delete()
+        sess12 = L2tpv3GcppSession.StaticL2tpSession(12)
+        sess12.delete()
+
+        self.assertFalse(11 in StaticL2tpSession.get_keys())
+        self.assertFalse(12 in StaticL2tpSession.get_keys())
+        self.assertTrue(13 in StaticL2tpSession.get_keys())
+        self.assertTrue(14 in StaticL2tpSession.get_keys())
+        sess12 = StaticL2tpSession(12)
+        sess12.delete()
+        self.assertTrue(11 not in StaticL2tpSession.get_keys())
+        self.assertTrue(12 not in StaticL2tpSession.get_keys())
+        self.assertTrue(13 in StaticL2tpSession.get_keys())
+        self.assertTrue(14 in StaticL2tpSession.get_keys())
 
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 13,
-                                          0x80001121, 3, 32768, False)
-        self.fwdCfg.add_dsStaticSession(staticPwCfg, 13, True, False, False)
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 13, 0x80001121, 3,
+                                          32768, False)
+        self.fwdCfg.add_dsStaticSession(staticPwCfg, 13, True, False)
 
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        flag, sessionMsg = self.gcppSession.getStaticSessionBySesId(0x80001121,
-                                                                    ipv4, "")
-        if flag and sessionMsg.ccapCoreOwner is None:
-            self.gcppSession.removeStaticSession(0x80001121, 0)
-
-        staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        self.fwdCfg.add_usStaticSession(staticPwCfg, 14, False, False)
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 14,
-                                          0x80000021, 4, 32768, True)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        flag, sessionMsg = self.gcppSession.getStaticSessionBySesId(0x80000021,
-                                                                    ipv4, "")
-        if flag and sessionMsg.ccapCoreOwner is None:
-            self.gcppSession.removeStaticSession(0x80000021, 1)
-        self.assertTrue(((0x80001121, 0) not in self.gcppSession.staticPseudowireDB.keys()))
-        self.assertTrue(((0x80000021, 1) not in self.gcppSession.staticPseudowireDB.keys()))
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 0)
+        sess13 = StaticL2tpSession(13)
+        sess13.read()
+        sess13.updateRetstaticPseudowire(staticPwCfg)
+        sess13.write()
+        sess13.updateFwdStaticPseudowire(staticPwCfg)
+        sess13.write()
+        sess13.updateComStaticPseudowire(staticPwCfg)
+        sess13.write()
+        sess13 = StaticL2tpSession(13)
+        sess13.read()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg, sess13))
 
     def test_unexpect_ipv4SaveGcppSessionDB(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         self.fwdCfg = StaticL2tpProvision()
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 14,
-                                          0x80000021, 4, 32768, True)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 0)
-
-        staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 14,
-                                          0x80000021, 4, 32768, False)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 0)
-
-        staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        commPwCfg = staticPwCfg.CommonStaticPwConfig
-        commPwCfg.PwType = 3
-        commPwCfg.DepiPwSubtype = 3
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 0)
-        staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        fwdPwCfg = staticPwCfg.FwdStaticPwConfig
-        fwdPwCfg.CcapCoreOwner = "00:50:56:9A:22:18"
-        fwdPwCfg.GroupAddress = "127.0.0.1"
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 13,
-                                          0x80001121, 3, 32768, False)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 1)
-        self.gcppSession.removeStaticSession(0x80001121, 0)
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 0)
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 14, 0x80000021, 4,
+                                          32768, True)
+        ses14 = StaticL2tpSession(14)
+        ses14.updateComStaticPseudowire(staticPwCfg)
+        ses14.write()
+        self.assertTrue(14 in StaticL2tpSession.get_keys())
 
     def test_ipv6SaveGcppSessionDB(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         self.fwdCfg = StaticL2tpProvision()
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
         self.fwdCfg.add_dsStaticSession(staticPwCfg, 11, False, True)
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 11,
-                                          0x80001111, 3, 32768, False)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg,
-                                                        self.gcppSession.staticPseudowireDB))
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 11, 0x80001111, 3,
+                                          32768, False)
+        ses11 = StaticL2tpSession(11)
+        ses11.updateFwdStaticPseudowire(staticPwCfg)
+        ses11.updateComStaticPseudowire(staticPwCfg)
+        ses11.write()
+        ses11 = StaticL2tpSession(11)
+        ses11.read()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg, ses11))
 
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
         self.fwdCfg.add_usStaticSession(staticPwCfg, 12, True)
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 12,
-                                          0x80000001, 4, 32768, True)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 2)
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 12, 0x80000001, 4,
+                                          32768, True)
+        ses12 = StaticL2tpSession(12)
+        ses12.updateRetstaticPseudowire(staticPwCfg)
+        ses12.write()
+        ses12.updateComStaticPseudowire(staticPwCfg)
+        ses12.write()
+        self.assertTrue(11 in StaticL2tpSession.get_keys())
+        self.assertTrue(12 in StaticL2tpSession.get_keys())
 
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
         self.fwdCfg.add_dsStaticSession(staticPwCfg, 13, True, True)
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 13,
-                                          0x80001121, 3, 32768, False)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg,
-                                                        self.gcppSession.staticPseudowireDB))
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 13, 0x80001121, 3,
+                                          32768, False)
+        ses13 = StaticL2tpSession(13)
+        ses13.updateFwdStaticPseudowire(staticPwCfg)
+        ses13.write()
+        ses13.updateComStaticPseudowire(staticPwCfg)
+        ses13.write()
+        ses13 = StaticL2tpSession(13)
+        ses13.read()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg, ses13))
+
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
         self.fwdCfg.add_usStaticSession(staticPwCfg, 14, True)
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 14,
-                                          0x80000021, 4, 32768, True)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg,
-                                                        self.gcppSession.staticPseudowireDB))
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 4)
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 14, 0x80000021, 4,
+                                          32768, True)
+        ses14 = StaticL2tpSession(14)
+        ses14.updateRetstaticPseudowire(staticPwCfg)
+        ses14.write()
+        ses14.updateComStaticPseudowire(staticPwCfg)
+        ses14.write()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg, ses14))
+        self.assertTrue(14 in StaticL2tpSession.get_keys())
 
-        self.gcppSession.removeStaticSession(0x80001111, 0)
-        self.gcppSession.removeStaticSession(0x80000001, 1)
-        self.assertEqual(len(self.gcppSession.staticPseudowireDB.keys()), 2)
+        ses13.delete()
+        ses14.delete()
+        self.assertTrue(11 in StaticL2tpSession.get_keys())
+        self.assertTrue(12 in StaticL2tpSession.get_keys())
+        self.assertFalse(13 in StaticL2tpSession.get_keys())
+        self.assertFalse(14 in StaticL2tpSession.get_keys())
 
     def test_staticGcppSession_ipv4(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         self.fwdCfg = StaticL2tpProvision()
         rcp_msg = t_RcpMessage()
         rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
-        rcp_msg.RpdDataMessage.RpdDataOperation = t_RpdDataMessage.RPD_CFG_WRITE
+        rcp_msg.RpdDataMessage.RpdDataOperation = \
+            t_RpdDataMessage.RPD_CFG_ALLOCATE_WRITE
         cfg_msg = rcp_msg.RpdDataMessage.RpdData
         staticPwConfig = cfg_msg.StaticPwConfig
-        self.fwdCfg.add_dsStaticSession(staticPwConfig, 11, False, False)
-        self.fwdCfg.add_commStaticSession(staticPwConfig,
-                                          11, 0x80001111, 3, 32768, False)
+
         self.fwdCfg.add_usStaticSession(staticPwConfig, 12, False)
-        self.fwdCfg.add_commStaticSession(staticPwConfig,
-                                          12, 0x80001112, 3, 32768, True)
+        self.fwdCfg.add_commStaticSession(staticPwConfig, 12, 0x80001112, 3,
+                                          32768, True)
         cfg_payload = rcp_msg.SerializeToString()
 
-        staticL2tpMsg = HalMessage("HalConfig",
-                                   SrcClientID="testGCPPL2Static",
+        staticL2tpMsg = HalMessage("HalConfig", SrcClientID="testGCPPL2Static",
                                    SeqNum=325,
                                    CfgMsgType=HalConfigMsg.MsgTypeGcppToL2tp,
                                    CfgMsgPayload=cfg_payload)
         self.hal_client.recvCfgMsgCb(staticL2tpMsg)
-        self.assertTrue(self.fwdCfg.check_StaticSession(cfg_msg.StaticPwConfig,
-                                                        self.gcppSession.staticPseudowireDB))
+        for key in StaticL2tpSession.get_keys():
+            ses = StaticL2tpSession(key)
+            ses.read()
+            if ses.sessionId == 0x80001112:
+                break
+        self.assertTrue(
+            self.fwdCfg.check_StaticSession(cfg_msg.StaticPwConfig, ses))
 
     def test_staticGcppSession_ipv6(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         self.fwdCfg = StaticL2tpProvision()
         rcp_msg = t_RcpMessage()
         rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
-        rcp_msg.RpdDataMessage.RpdDataOperation = t_RpdDataMessage.RPD_CFG_WRITE
+        rcp_msg.RpdDataMessage.RpdDataOperation = \
+            t_RpdDataMessage.RPD_CFG_WRITE
         cfg_msg = rcp_msg.RpdDataMessage.RpdData
-        self.fwdCfg.add_dsStaticSession(cfg_msg.StaticPwConfig, 11, False, True)
-        self.fwdCfg.add_commStaticSession(cfg_msg.StaticPwConfig,
-                                          11, 0x80001111, 3, 32768, False)
+        self.fwdCfg.add_dsStaticSession(cfg_msg.StaticPwConfig, 11, False,
+                                        True)
+        self.fwdCfg.add_commStaticSession(cfg_msg.StaticPwConfig, 11,
+                                          0x80001111, 3, 32768, False)
         self.fwdCfg.add_usStaticSession(cfg_msg.StaticPwConfig, 12, False)
-        self.fwdCfg.add_commStaticSession(cfg_msg.StaticPwConfig,
-                                          12, 0x80001112, 3, 32768, True)
+        self.fwdCfg.add_commStaticSession(cfg_msg.StaticPwConfig, 12,
+                                          0x80001112, 3, 32768, True)
         cfg_payload = rcp_msg.SerializeToString()
-        global_dispatcher = Dispatcher()
-        staticL2tpMsg = HalMessage("HalConfig",
-                                   SrcClientID="testGCPPL2Static",
+        staticL2tpMsg = HalMessage("HalConfig", SrcClientID="testGCPPL2Static",
                                    SeqNum=325,
                                    CfgMsgType=HalConfigMsg.MsgTypeGcppToL2tp,
                                    CfgMsgPayload=cfg_payload)
         self.hal_client.recvCfgMsgCb(staticL2tpMsg)
-        self.assertTrue(self.fwdCfg.check_StaticSession(cfg_msg.StaticPwConfig,
-                                                        self.gcppSession.staticPseudowireDB))
+        ses = StaticL2tpSession(11)
+        ses.read()
+        self.assertTrue(
+            self.fwdCfg.check_StaticSession(cfg_msg.StaticPwConfig, ses))
 
     def test_MultiCastGcppSession_ipv4(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         self.fwdCfg = StaticL2tpProvision()
         rcp_msg = t_RcpMessage()
         rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
-        rcp_msg.RpdDataMessage.RpdDataOperation = t_RpdDataMessage.RPD_CFG_WRITE
+        rcp_msg.RpdDataMessage.RpdDataOperation = \
+            t_RpdDataMessage.RPD_CFG_WRITE
         cfg_msg = rcp_msg.RpdDataMessage.RpdData
-        self.fwdCfg.add_dsStaticSession(cfg_msg.StaticPwConfig, 13, True, False)
-        self.fwdCfg.add_commStaticSession(cfg_msg.StaticPwConfig,
-                                          13, 0x80001111, 3, 32768, False)
+        self.fwdCfg.add_dsStaticSession(cfg_msg.StaticPwConfig, 13, True,
+                                        False)
+        self.fwdCfg.add_commStaticSession(cfg_msg.StaticPwConfig, 13,
+                                          0x80001111, 3, 32768, False)
         self.fwdCfg.add_usStaticSession(cfg_msg.StaticPwConfig, 14, False)
-        self.fwdCfg.add_commStaticSession(cfg_msg.StaticPwConfig,
-                                          14, 0x80001112, 3, 32768, True)
+        self.fwdCfg.add_commStaticSession(cfg_msg.StaticPwConfig, 14,
+                                          0x80001112, 3, 32768, True)
         cfg_payload = rcp_msg.SerializeToString()
-        global_dispatcher = Dispatcher()
-        staticL2tpMsg = HalMessage("HalConfig",
-                                   SrcClientID="testGCPPL2Static",
+        staticL2tpMsg = HalMessage("HalConfig", SrcClientID="testGCPPL2Static",
                                    SeqNum=325,
                                    CfgMsgType=HalConfigMsg.MsgTypeGcppToL2tp,
                                    CfgMsgPayload=cfg_payload)
 
         self.hal_client.recvCfgMsgCb(staticL2tpMsg)
-        self.assertTrue(self.fwdCfg.check_StaticSession(cfg_msg.StaticPwConfig,
-                                                        self.gcppSession.staticPseudowireDB))
+        ses = StaticL2tpSession(13)
+        ses.read()
+        self.assertTrue(
+            self.fwdCfg.check_StaticSession(cfg_msg.StaticPwConfig, ses))
 
     def test_MultiCastGcppSession_ipv6(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         for index in range(162, 164):
             self.fwdCfg = StaticL2tpProvision()
             rcp_msg = t_RcpMessage()
             rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
-            rcp_msg.RpdDataMessage.RpdDataOperation = t_RpdDataMessage.RPD_CFG_WRITE
+            rcp_msg.RpdDataMessage.RpdDataOperation = \
+                t_RpdDataMessage.RPD_CFG_WRITE
             cfg_msg = config()
             staticPwConfig = cfg_msg.StaticPwConfig
             self.fwdCfg.add_dsStaticSession(staticPwConfig, index, True, True)
-            self.fwdCfg.add_commStaticSession(staticPwConfig,
-                                              index, 0x80001111 + index, index, 32768, False)
+            self.fwdCfg.add_commStaticSession(staticPwConfig, index,
+                                              0x80001111 + index, index, 32768,
+                                              False)
             rcp_msg.RpdDataMessage.RpdData.CopyFrom(cfg_msg)
             cfg_payload = rcp_msg.SerializeToString()
-            global_dispatcher = Dispatcher()
             staticL2tpMsg = HalMessage("HalConfig",
                                        SrcClientID="testGCPPL2Static",
                                        SeqNum=325,
-                                       CfgMsgType=HalConfigMsg.MsgTypeGcppToL2tp,
+                                       CfgMsgType=
+                                       HalConfigMsg.MsgTypeGcppToL2tp,
                                        CfgMsgPayload=cfg_payload)
             self.hal_client.recvCfgMsgCb(staticL2tpMsg)
-            self.assertTrue(self.fwdCfg.check_StaticSession(staticPwConfig,
-                                                            self.gcppSession.staticPseudowireDB))
-
+            ses = StaticL2tpSession(index)
+            ses.read()
+            self.assertTrue(
+                self.fwdCfg.check_StaticSession(staticPwConfig, ses))
 
             rcp_msg = t_RcpMessage()
             rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
-            rcp_msg.RpdDataMessage.RpdDataOperation = t_RpdDataMessage.RPD_CFG_WRITE
+            rcp_msg.RpdDataMessage.RpdDataOperation = \
+                t_RpdDataMessage.RPD_CFG_WRITE
             cfg_msg = config()
             staticPwConfig = cfg_msg.StaticPwConfig
             self.retCfg = StaticL2tpProvision()
             self.retCfg.add_usStaticSession(staticPwConfig, index + 163, False)
-            self.retCfg.add_commStaticSession(staticPwConfig,
-                                              index + 163, 0x80007111 + index, index, 32768, True)
+            self.retCfg.add_commStaticSession(staticPwConfig, index + 163,
+                                              0x80007111 + index, index, 32768,
+                                              True)
             rcp_msg.RpdDataMessage.RpdData.CopyFrom(cfg_msg)
             cfg_payload = rcp_msg.SerializeToString()
-            global_dispatcher = Dispatcher()
             staticL2tpMsg = HalMessage("HalConfig",
                                        SrcClientID="testGCPPL2Static",
                                        SeqNum=325,
-                                       CfgMsgType=HalConfigMsg.MsgTypeGcppToL2tp,
+                                       CfgMsgType=
+                                       HalConfigMsg.MsgTypeGcppToL2tp,
                                        CfgMsgPayload=cfg_payload)
 
             self.hal_client.recvCfgMsgCb(staticL2tpMsg)
-            self.assertTrue(self.fwdCfg.check_StaticSession(staticPwConfig,
-                                                            self.gcppSession.staticPseudowireDB))
+            ses = StaticL2tpSession(index + 163)
+            ses.read()
+            self.assertTrue(
+                self.fwdCfg.check_StaticSession(staticPwConfig, ses))
 
     def test_unexpectGcppSession(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
-        for index in range(0, 2):
+        for index in StaticL2tpSession.get_keys():
+            ses = StaticL2tpSession(index)
+            ses.delete()
+        self.assertTrue(len(StaticL2tpSession.indexDBPool[
+                        'StaticL2tpSession']) ==
+                        StaticL2tpSession.MAX_STATIC_PWS)
+
+        for index in range(0, 10):
             self.fwdCfg = StaticL2tpProvision()
             staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-            idx = 0
-            self.fwdCfg.add_dsStaticSession(staticPwCfg, idx, False, False)
-            self.fwdCfg.add_usStaticSession(staticPwCfg, idx, False)
-            self.gcppSession.saveGcppSessionData(staticPwCfg)
-            self.assertFalse(self.fwdCfg.check_StaticSession(staticPwCfg,
-                                                             self.gcppSession.staticPseudowireDB))
-            self.assertNotEqual(len(self.gcppSession.staticPseudowireDB.keys()), 2 * index + 2)
-            staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-            self.fwdCfg = StaticL2tpProvision()
-            self.fwdCfg.add_commStaticSession(staticPwCfg,
-                                              index, 0x80001111 + index, index, 32768, False)
-            self.fwdCfg.add_commStaticSession(staticPwCfg,
-                                              (163 + index), 0x80002112 + index, (167 + index), 32768, True)
-            self.gcppSession.saveGcppSessionData(staticPwCfg)
-            self.assertFalse(self.fwdCfg.check_StaticSession(staticPwCfg,
-                                                             self.gcppSession.staticPseudowireDB))
-            self.assertNotEqual(len(self.gcppSession.staticPseudowireDB.keys()), 2 * index + 2)
+            self.fwdCfg.add_dsStaticSession(staticPwCfg, index, False, False)
+            self.fwdCfg.add_usStaticSession(staticPwCfg, index, False)
+            ses = StaticL2tpSession(index)
+
+            ses.updateFwdStaticPseudowire(staticPwCfg)
+            ses.allocateIndex()
+            ses.write()
+            ses.updateRetstaticPseudowire(staticPwCfg)
+            ses.allocateIndex()
+            ses.write()
+
+            self.assertFalse(self.fwdCfg.check_StaticSession(staticPwCfg, ses))
+
+        for index in StaticL2tpSession.get_keys():
+            ses = StaticL2tpSession(index)
+            ses.read()
+        self.assertTrue(len(StaticL2tpSession.indexDBPool[
+                        'StaticL2tpSession']) ==
+                        StaticL2tpSession.MAX_STATIC_PWS - 1)
+        ses = StaticL2tpSession(0)
+        self.assertTrue(ses.index == 0)
+        ses.allocateIndex()
+        self.assertFalse((ses.index == 0))
         return
 
     def test_showL2tpSessionCLI(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         self.fwdCfg = StaticL2tpProvision()
-        self.ApiPath = L2tpv3GlobalSettings.L2tpv3GlobalSettings.APITransportPath
+        self.ApiPath = \
+            L2tpv3GlobalSettings.L2tpv3GlobalSettings.APITransportPath
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 11,
-                                          0x80001111, 3, 32768, False)
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 11, 0x80001111, 3,
+                                          32768, False)
         self.fwdCfg.add_dsStaticSession(staticPwCfg, 11, False, False)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
+        ses = StaticL2tpSession(11)
+        ses.updateComStaticPseudowire(staticPwCfg)
+        ses.updateFwdStaticPseudowire(staticPwCfg)
+        ses.write()
 
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 12,
-                                          0x80000001, 4, 32768, True)
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 12, 0x80000001, 4,
+                                          32768, True)
         self.fwdCfg.add_usStaticSession(staticPwCfg, 12, False)
 
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
+        ses = StaticL2tpSession(12)
+        ses.updateComStaticPseudowire(staticPwCfg)
+        ses.updateRetstaticPseudowire(staticPwCfg)
+        ses.write()
 
         self.api = L2tpv3API(self.ApiPath)
         cmd = l2tpMsg.L2tpCommandReq()
@@ -504,27 +567,32 @@ class TestGcppSession(unittest.TestCase):
         msg = self.api._handleMsg(cmd)
         # FAILURE = 2
         self.assertEqual(msg.rsp, 2)
-        self.assertEqual(
-            msg.retMsg, "Cannot find the session parameter in session query msg")
+        self.assertEqual(msg.retMsg,
+                         "Cannot find the session parameter in session "
+                         "query msg")
         return
 
     def test_unexpctShowL2tpCLI(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
         self.fwdCfg.add_dsStaticSession(staticPwCfg, 11, False, False)
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 11,
-                                          0x80001111, 3, 32768, False)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 11, 0x80001111, 3,
+                                          32768, False)
+        ses11 = StaticL2tpSession(11)
+        ses11.updateComStaticPseudowire(staticPwCfg)
+        ses11.updateFwdStaticPseudowire(staticPwCfg)
+        ses11.write()
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
         self.fwdCfg.add_usStaticSession(staticPwCfg, 12, False)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
+        ses12 = StaticL2tpSession(12)
+        ses12.updateRetstaticPseudowire(staticPwCfg)
+        ses12.write()
         cmd = l2tpMsg.L2tpCommandReq()
         cmd.cmd = l2tpMsg.STATIC_SESSION_INFO
         sess = cmd.sess
         conn = sess.conn
         conn.remoteAddr = '127.0.0.1'
-        conn.localAddr = L2tpv3GlobalSettings.L2tpv3GlobalSettings.LocalIPAddress
+        conn.localAddr = \
+            L2tpv3GlobalSettings.L2tpv3GlobalSettings.LocalIPAddress
         # Connection is not in connection DB
         conn.connectionID = 0
         # Local session is not in connection session
@@ -536,97 +604,89 @@ class TestGcppSession(unittest.TestCase):
         return
 
     def test_getAllocatedIndex(self):
-        for index in range(0, 0xFFFF):
-            L2tpv3GcppSession.StaticL2tpSession.indexList.append(index)
-        index = L2tpv3GcppSession.StaticL2tpSession.getAllocatedIndex()
-        self.assertEqual(index, -1)
+        for key in StaticL2tpSession.get_keys():
+            ses = StaticL2tpSession(key)
+            ses.delete()
 
+        for index in range(0, 0xFFFF):
+            ses.allocateIndex()
+
+        try:
+            ses.allocateIndex()
+        except IndexError:
+            pass
+
+        for key in StaticL2tpSession.get_keys():
+            ses = StaticL2tpSession(key)
+            ses.delete()
+    '''
 
     def test_L2tpv3Hall_GCPP(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         index = 0
         rcp_msg = t_RcpMessage()
         rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
-        rcp_msg.RpdDataMessage.RpdDataOperation = t_RpdDataMessage.RPD_CFG_WRITE
+        rcp_msg.RpdDataMessage.RpdDataOperation = \
+            t_RpdDataMessage.RPD_CFG_WRITE
         cfg_msg = config()
         staticPwConfig = cfg_msg.StaticPwConfig
         self.retCfg = StaticL2tpProvision()
-        self.retCfg.add_usStaticSession(staticPwConfig, index + 163, False, False)
-        self.retCfg.add_commStaticSession(staticPwConfig,
-                                        index + 163, 0x80007111 + index, index, 32768, True)
+        self.retCfg.add_usStaticSession(staticPwConfig, index + 163, False,
+                                        False)
+        self.retCfg.add_commStaticSession(staticPwConfig, index + 163,
+                                          0x80007111 + index, index, 32768,
+                                          True)
         rcp_msg.RpdDataMessage.RpdData.CopyFrom(cfg_msg)
         cfg_payload = rcp_msg.SerializeToString()
-        global_dispatcher = Dispatcher()
-        staticL2tpMsg = HalMessage("HalConfig",
-                                    SrcClientID="testGCPPL2Static",
-                                    SeqNum=325,
-                                    CfgMsgType=HalConfigMsg.MsgTypeGcppToL2tp,
-                                    CfgMsgPayload=cfg_payload)
+        staticL2tpMsg = HalMessage("HalConfig", SrcClientID="testGCPPL2Static",
+                                   SeqNum=325,
+                                   CfgMsgType=HalConfigMsg.MsgTypeGcppToL2tp,
+                                   CfgMsgPayload=cfg_payload)
 
         self.hal_client.recvCfgMsgCb(staticL2tpMsg)
-        self.assertFalse(self.fwdCfg.check_StaticSession(staticPwConfig,
-                                                        self.gcppSession.staticPseudowireDB))
+        ses = StaticL2tpSession(index + 163)
+        ses.read()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwConfig, ses))
 
     def test_L2tpv3Hall_Unexpect_GCPP(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
-        rcp_msg = t_RcpMessage()
-        rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
-        rcp_msg.RpdDataMessage.RpdDataOperation = t_RpdDataMessage.RPD_CFG_WRITE
-
-        cfg_msg = config()
-        cfg_payload = rcp_msg.SerializeToString()
-        staticL2tpMsg = HalMessage("HalConfig",
-                                    SrcClientID="testGCPPL2Static",
-                                    SeqNum=325,
-                                    CfgMsgType=HalConfigMsg.MsgTypeGcppToL2tp,
-                                    CfgMsgPayload=cfg_payload)
-
-        self.hal_client.recvCfgMsgCb(staticL2tpMsg)
-        self.assertTrue(len(self.gcppSession.staticPseudowireDB.keys())==0)
-
-    def test_L2tpv3Hall_Unexpect_GCPP(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         index = 0
         rcp_msg = t_RcpMessage()
         rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
-        rcp_msg.RpdDataMessage.RpdDataOperation = t_RpdDataMessage.RPD_CFG_WRITE
+        rcp_msg.RpdDataMessage.RpdDataOperation = \
+            t_RpdDataMessage.RPD_CFG_WRITE
         cfg_msg = config()
         staticPwConfig = cfg_msg.StaticPwConfig
         self.retCfg = StaticL2tpProvision()
         self.retCfg.add_usStaticSession(staticPwConfig, index + 163, False)
-        self.retCfg.add_commStaticSession(staticPwConfig,
-                                        index + 163, 0x80007111 + index, index, 0, True)
+        self.retCfg.add_commStaticSession(staticPwConfig, index + 163,
+                                          0x80007111 + index, index, 0, True)
         rcp_msg.RpdDataMessage.RpdData.CopyFrom(cfg_msg)
         cfg_payload = rcp_msg.SerializeToString()
-        global_dispatcher = Dispatcher()
-        staticL2tpMsg = HalMessage("HalConfig",
-                                    SrcClientID="testGCPPL2Static",
-                                    SeqNum=325,
-                                    CfgMsgType=HalConfigMsg.MsgTypeGcppToL2tp,
-                                    CfgMsgPayload=cfg_payload)
+        staticL2tpMsg = HalMessage("HalConfig", SrcClientID="testGCPPL2Static",
+                                   SeqNum=325,
+                                   CfgMsgType=HalConfigMsg.MsgTypeGcppToL2tp,
+                                   CfgMsgPayload=cfg_payload)
 
         self.hal_client.recvCfgMsgCb(staticL2tpMsg)
-        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwConfig,
-                                                        self.gcppSession.staticPseudowireDB))
-
+        ses = StaticL2tpSession(index + 163)
+        ses.read()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwConfig, ses))
 
     def test_GCPP_recvCfgMsgRspCb(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         self.fwdCfg = StaticL2tpProvision()
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 11,
-                                          0x80001111, 3, 32768, False)
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 11, 0x80001111, 3,
+                                          32768, False)
         self.fwdCfg.add_dsStaticSession(staticPwCfg, 11, False, False)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg,
-                                                        self.gcppSession.staticPseudowireDB))
+        ses = StaticL2tpSession(11)
+        ses.updateComStaticPseudowire(staticPwCfg)
+        ses.updateFwdStaticPseudowire(staticPwCfg)
+        ses.write()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg, ses))
 
         rsp = L2tpv3Hal_pb2.t_l2tpSessionRsp()
-        rsp.session_selector.local_ip = self.gcppSession.getLocalIp("127.0.0.1")
+        rsp.session_selector.local_ip = \
+            L2tpv3GcppSession.L2tpv3GcppProvider.getLocalIp(
+                "127.0.0.1")
         rsp.session_selector.remote_ip = "127.0.0.1"
         rsp.session_selector.lcce_id = 0
         rsp.session_selector.local_session_id = 0x80001111
@@ -634,30 +694,29 @@ class TestGcppSession(unittest.TestCase):
         rsp.result = True
         payload = rsp.SerializeToString()
         msg = HalMessage("HalConfigRsp", SrcClientID="123", SeqNum=2,
-                         Rsp={
-                             "Status": HalCommon_pb2.SUCCESS,
-                             "ErrorDescription": ""
-                         },
+                         Rsp={"Status": HalCommon_pb2.SUCCESS,
+                              "ErrorDescription": ""},
                          CfgMsgType=HalConfigMsg.MsgTypeL2tpv3SessionReqUsAtdma,
                          CfgMsgPayload=payload)
         ret = self.hal_client.recvCfgMsgRspCb(msg)
         self.assertTrue(ret)
 
     def test_GCPP_recvCfgMsgRspCb_FAILED(self):
-        self.gcppSession.staticPseudowireDB.clear()
-        L2tpv3GcppSession.StaticL2tpSession.indexList = []
         self.fwdCfg = StaticL2tpProvision()
         staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
-        self.fwdCfg.add_commStaticSession(staticPwCfg, 11,
-                                          0x80001111, 3, 32768, False)
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 11, 0x80001111, 3,
+                                          32768, False)
         self.fwdCfg.add_dsStaticSession(staticPwCfg, 11, False, False)
-        self.gcppSession.saveGcppSessionData(staticPwCfg)
-        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg,
-                                                        self.gcppSession.staticPseudowireDB))
-        print(self.gcppSession.staticPseudowireDB)
+        ses = StaticL2tpSession(11)
+        ses.updateFwdStaticPseudowire(staticPwCfg)
+        ses.updateComStaticPseudowire(staticPwCfg)
+        ses.write()
+        self.assertTrue(self.fwdCfg.check_StaticSession(staticPwCfg, ses))
 
         rsp = L2tpv3Hal_pb2.t_l2tpSessionRsp()
-        rsp.session_selector.local_ip = self.gcppSession.getLocalIp("127.0.0.1")
+        rsp.session_selector.local_ip = \
+            L2tpv3GcppSession.L2tpv3GcppProvider.getLocalIp(
+                "127.0.0.1")
         rsp.session_selector.remote_ip = "127.0.0.1"
         rsp.session_selector.lcce_id = 0
         rsp.session_selector.local_session_id = 0x80001111
@@ -665,21 +724,54 @@ class TestGcppSession(unittest.TestCase):
         rsp.result = True
         payload = rsp.SerializeToString()
         msg = HalMessage("HalConfigRsp", SrcClientID="123", SeqNum=2,
-                         Rsp={
-                             "Status": HalCommon_pb2.FAILED,
-                             "ErrorDescription": ""
-                         },
+                         Rsp={"Status": HalCommon_pb2.FAILED,
+                              "ErrorDescription": ""},
                          CfgMsgType=HalConfigMsg.MsgTypeL2tpv3SessionReqUsAtdma,
                          CfgMsgPayload=payload)
         ret = self.hal_client.recvCfgMsgRspCb(msg)
         self.assertFalse(ret)
 
-    @classmethod
-    def tearDownClass(cls):
-        if cls.hal_client.pushSock:
-            cls.hal_client.pushSock.close()
-        del cls.hal_client
-        del cls.gcppSession
+    def test_staticGcppSession_CFG_WRITE_l2tpsessinfo_DB(self):
+        sessRec = L2tpSessionRecord()
+        sessRec.deleteAll()
+        self.fwdCfg = StaticL2tpProvision()
+        rcp_msg = t_RcpMessage()
+        rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
+        rcp_msg.RpdDataMessage.RpdDataOperation = \
+            t_RpdDataMessage.RPD_CFG_WRITE
+        cfg_msg = rcp_msg.RpdDataMessage.RpdData
+        staticPwConfig = cfg_msg.StaticPwConfig
+
+        self.fwdCfg.add_usStaticSession(staticPwConfig, 12, False)
+        self.fwdCfg.add_commStaticSession(staticPwConfig, 12, 0x80001112, 3,
+                                          32768, True)
+        cfg_payload = rcp_msg.SerializeToString()
+
+        staticL2tpMsg = HalMessage("HalConfig", SrcClientID="testGCPPL2Static",
+                                   SeqNum=325,
+                                   CfgMsgType=HalConfigMsg.MsgTypeGcppToL2tp,
+                                   CfgMsgPayload=cfg_payload)
+        self.hal_client.recvCfgMsgCb(staticL2tpMsg)
+        # cfg 2nd CFG_WRITE msg
+        self.fwdCfg.add_usStaticSession(staticPwConfig, 12, False)
+        self.fwdCfg.add_commStaticSession(staticPwConfig, 12, 0x80001113, 3,
+                                          32768, True)
+        cfg_payload = rcp_msg.SerializeToString()
+
+        staticL2tpMsg = HalMessage("HalConfig", SrcClientID="testGCPPL2Static",
+                                   SeqNum=325,
+                                   CfgMsgType=HalConfigMsg.MsgTypeGcppToL2tp,
+                                   CfgMsgPayload=cfg_payload)
+        self.hal_client.recvCfgMsgCb(staticL2tpMsg)
+        # check DB record
+        sessRec = L2tpSessionRecord()
+        retlist = sessRec.get_all()
+        listlen = 0
+        for sessRecord in retlist:
+            listlen = listlen + 1
+        self.assertEqual(listlen, 1)
+        self.assertEqual(sessRecord.index.l2tpSessionId, 0x80001113)
+
 
 if __name__ == "__main__":
     unittest.main()

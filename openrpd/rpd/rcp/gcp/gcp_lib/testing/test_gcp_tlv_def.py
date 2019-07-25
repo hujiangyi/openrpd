@@ -33,12 +33,14 @@ class TEST_TLV(TLVDesc):
     Used to enforce usage of 1B long TLV length field for GCP TLVs.
 
     """
+
     def __init__(self, tlv_id, name, parent=None,
                  format_str=None, length=None, constraint=None,
                  rw=DataDescription.RW_FLAG_rw):
         super(TEST_TLV, self).__init__(tlv_id, name, parent, format_str,
                                        length, constraint,
                                        length_field_len=1, rw=rw)
+
 
 TestCapabilities = TEST_TLV(43, "TestCapabilities",
                             parent=(Testing_GCP_TLV_SET,

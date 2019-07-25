@@ -52,6 +52,8 @@ class Dispatcher(object):
         # Dictionary of registered file descriptors, or zmq sockets
         self._tm = DpTimerManager()
         self._end_loop = False
+        self.loop_stopped = True
+        self.max_timeout_sec = 10
 
     def _handle_poll_events(self, events):
         self._tm.fire_timeouted()  # trigger and delete all timeout timers
@@ -85,6 +87,7 @@ class Dispatcher(object):
     def loop(self):
         """Loops over the registered file descriptors, calls callbacks."""
         self._end_loop = False
+        self.loop_stopped = False
         while True:
             events = None
             timeout_sec = 0
@@ -93,8 +96,8 @@ class Dispatcher(object):
                 # to the poller handler to run, which can help to check the
                 # system time change.
                 timeout_sec = self._tm.get_next_timeout()
-                if timeout_sec >= 10:
-                    timeout_sec = 10
+                if timeout_sec >= self.max_timeout_sec:
+                    timeout_sec = self.max_timeout_sec
                 # the reason to multiply 1000 is that, the zmq unit is
                 # different with select poll unit.
                 timeout = timeout_sec * 1000
@@ -107,9 +110,14 @@ class Dispatcher(object):
                     "Time difference is overflow:%d, error:%s", timeout_sec, exceptions.OverflowError)
                 raise DispatcherTimeoutError("Invalid time difference")
 
-            self._handle_poll_events(events)
+            try:
+                self._handle_poll_events(events)
+            except Exception as e:
+                self.logger.warning("dispatch poll events error:%s",
+                                    str(e))
             if self._end_loop is True:
                 self.logger.debug('end_loop mark found, breaking out of loop')
+                self.loop_stopped = True
                 break
 
     def fd_register(self, fd, eventmask, callback):
@@ -197,3 +205,23 @@ class Dispatcher(object):
     def end_loop(self):
         """Ends the loop."""
         self._end_loop = True
+
+    def handle_one_event(self):
+        events = None
+        timeout_sec = 0
+        try:
+            # the reason to limit the max value is, we want to give a chance
+            # to the poller handler to run, which can help to check the
+            # system time change.
+            timeout_sec = self._tm.get_next_timeout()
+            if timeout_sec >= 10:
+                timeout_sec = 10
+            # the reason to multiply 1000 is that, the zmq unit is
+            # different with select poll unit.
+            timeout = timeout_sec * 1000
+            if timeout <= 10:
+                timeout = 10
+            events = self._poll.poll(timeout=long(timeout))
+            self._handle_poll_events(events)
+        except Exception:
+            pass

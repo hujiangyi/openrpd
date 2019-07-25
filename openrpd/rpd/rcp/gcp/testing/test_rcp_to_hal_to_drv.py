@@ -50,9 +50,11 @@ import socket
 drv_logger = None
 threads_list = []
 
+
 class RcpGlobalSettings(object):
     hal_ipc = None
     gDispatcher = None
+
 
 def create_cfg_read_sequence():
 
@@ -67,7 +69,7 @@ def create_cfg_read_sequence():
     # seq.RpdCapabilities.RpdIdentification.VendorName.set_val('31')
     # seq.RpdCapabilities.RpdIdentification.VendorId.set_val('32')
     # seq.RpdCapabilities.RpdIdentification.DeviceMacAddress.set_val(
-        # (0xAB, 0xCD, 0xEF, 0x12, 0x34, 0x56))
+    # (0xAB, 0xCD, 0xEF, 0x12, 0x34, 0x56))
     # seq.RpdCapabilities.RpdIdentification.SerialNumber.set_val('33')
 
     return seq
@@ -136,32 +138,34 @@ def demoHalmain():
     HalGlobal.StopHal = False
     print "demoHalmain thread done!"
 
+
 def demoDrvmain():
     print "demoDrvmain thread start!"
-    setup_logging('HAL', filename="hal.log",logging_level=logging.DEBUG)
+    setup_logging('HAL', filename="hal.log", logging_level=logging.DEBUG)
     drv_logger = logging.getLogger("DrvMain")
     drv_logger.info("hello demo DrvMain Log")
     driver = OpenRpdDriver("openrpd_generic_driver", "This is a Generic OpenRPD Driver", "1.0.0",
-                             (0,10000), (2, 3, 4))
+                           (0, 10000), (2, 3, 4))
     driver.start()
     print "demoDrvmain thread done!"
 
+
 def demoRCP():
     print "demoRCP thread start!"
-    setup_logging('HAL', filename="hal.log",logging_level=logging.DEBUG)
+    setup_logging('HAL', filename="hal.log", logging_level=logging.DEBUG)
     drv_logger = logging.getLogger("demoRCP")
     drv_logger.info("hello demoRCP Log")
     RcpGlobalSettings.gDispatcher = Dispatcher()
     rcpProcess = RcpHalProcess("ipc:///tmp/_test_rcp_to_hal.tmp", RcpGlobalSettings.gDispatcher)
 
     RcpGlobalSettings.hal_ipc = RcpHalIpc("RCP-HalClient", "This is a RCP test application",
-                                 "1.9.0", (1, 100, 102), rcpProcess,
-                                 "../hal/conf/ClientLogging.conf", shadowLayerConf=TMP_CFG_PATH)
+                                          "1.9.0", (1, 100, 102), rcpProcess,
+                                          "../hal/conf/ClientLogging.conf", shadowLayerConf=TMP_CFG_PATH)
 
     try:
         if None is not RcpGlobalSettings.hal_ipc:
             RcpGlobalSettings.hal_ipc.start(rcpProcess.orchestrator.config_operation_rsp_cb,
-                                rcpProcess.orchestrator.notification_process_cb)
+                                            rcpProcess.orchestrator.notification_process_cb)
             RcpGlobalSettings.gDispatcher.loop()
         else:
             print ("demoRCP: hal_ipc is NONE")
@@ -195,7 +199,7 @@ class RcpHalConfigTest(unittest.TestCase):
         t = threading.Thread(target=demoDrvmain)
         t.daemon = True
         t.start()
-        threads_list.append(t)        
+        threads_list.append(t)
         time.sleep(5)
 
     @classmethod
@@ -203,21 +207,22 @@ class RcpHalConfigTest(unittest.TestCase):
         HalGlobal.StopHal = True
         time.sleep(4)
         #os.system("ps ax |grep python|awk '{print $1}'|xargs kill -9")
-        #time.sleep(2)
+        # time.sleep(2)
         subprocess.call(["killall", "redis-server"])
         time.sleep(2)
         for t in threads_list:
             if (t is not None and t.isAlive):
                 t.join(2)
 
-
     def setUp(self):
         self.hal_ipc = RcpGlobalSettings.hal_ipc
         self.dispatcher = RcpGlobalSettings.gDispatcher
 
     def fake_cb(self, cb):
-        print "fake cb handled" 
+        print "fake cb handled"
 
+    # GANG OF FIVE SKIP
+    @unittest.skip("skip test_get_cfg")
     def test_get_cfg(self):
         print "test_get_cfg\n"
         timeOut = time.time() + 10
@@ -225,9 +230,9 @@ class RcpHalConfigTest(unittest.TestCase):
             pass
 
         desc = GCPSlaveDescriptor(
-                         "127.0.0.1", port_master=9999, addr_local="127.0.0.1",
-                         interface_local="lo",
-                         addr_family=socket.AF_INET)
+            "127.0.0.1", port_master=9999, addr_local="127.0.0.1",
+            interface_local="lo",
+            addr_family=socket.AF_INET)
         dummy_session = RCPSlaveSession(desc, self.dispatcher,
                                         self.fake_cb,
                                         self.fake_cb,
@@ -257,6 +262,7 @@ class RcpHalConfigTest(unittest.TestCase):
         else:
             print ("tearDown: self.dispatcher is None!")
     """
+
 
 if __name__ == "__main__":
     unittest.main()

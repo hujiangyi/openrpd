@@ -14,36 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import logging
-import re
 import zmq
 import signal
-#import time
-import time
-import threading
-import socket
 import sys
-import psutil
 import rpd.python_path_resolver
 from rpd.hal.src.transport.HalTransport import HalTransport
 from rpd.hal.src.msg.HalMessage import HalMessage
 from rpd.hal.src.msg import HalCommon_pb2
 from rpd.dispatcher.dispatcher import Dispatcher
 from zmq.utils.monitor import recv_monitor_message
-from rpd.gpb.rcp_pb2 import t_RcpMessage, t_RpdDataMessage
+from rpd.gpb.rcp_pb2 import t_RcpMessage
 import rpd.hal.src.HalConfigMsg as HalConfigMsg
-from rpd.gpb.cfg_pb2 import config
-from rpd.common.rpd_logging import AddLoggerToClass, setup_logging
-##import l2tpv3.src.L2tpv3Hal_pb2 as L2tpv3Hal_pb2
+from rpd.common.rpd_logging import setup_logging
 from rpd.hal.lib.drivers.HalDriver0 import HalDriverClient, HalDriverClientError
-from zmq.utils.monitor import recv_monitor_message
-from open_rpd_drv_msg_handlers import *
+import rpd.hal.lib.drivers.open_rpd_drv_msg_handlers as OpenRpdMsgHandler
 import rpd.l2tp.l2tpv3.src.L2tpv3Hal_pb2 as L2tpv3Hal_pb2
 import l2tpv3.src.L2tpv3VspAvp_pb2 as L2tpv3VspAvp_pb2
-import string
-import random
-import struct
-    
+
+
 class OpenRpdDriverError(HalDriverClientError):
 
     def __init__(self, msg, expr=None):
@@ -54,7 +42,7 @@ class OpenRpdDriverError(HalDriverClientError):
 
 class OpenRpdDriver(HalDriverClient):
     """The OpenRPD base driver
-    
+
     """
 
 ##    __metaclass__ = AddLoggerToClass
@@ -63,7 +51,7 @@ class OpenRpdDriver(HalDriverClient):
                  supportedNotificationMsgs,
                  interestedNotification=None):
         """
-        
+
         :param drvName: The driver name, such as Generic Driver
         :param drvDesc: driver for full Cable Labs RPHY support
         :param drvVer: driver version
@@ -78,11 +66,11 @@ class OpenRpdDriver(HalDriverClient):
         """
 
         if supportedMsgType is None:
-            supportedMsgType = default_supported_msg_types
+            supportedMsgType = OpenRpdMsgHandler.default_supported_msg_types
         super(OpenRpdDriver, self).__init__(drvName, drvDesc, drvVer,
-                                               supportedMsgType,
-                                               supportedNotificationMsgs,
-                                               interestedNotification)
+                                            supportedMsgType,
+                                            supportedNotificationMsgs,
+                                            interestedNotification)
 
         # update the supported messages
         self.HalMsgsHandler = {
@@ -95,72 +83,73 @@ class OpenRpdDriver(HalDriverClient):
 
         # Handlers for different configuration messages
         self.hal_config_msg_handlers = {
-            HalConfigMsg.MsgTypeRpdCapabilities:             capabilities_get,
-            HalConfigMsg.MsgTypeDsRfPort:                    config_ds_port,
-            HalConfigMsg.MsgTypeDsScQamChannelConfig:        config_dsqam_channel,
-            HalConfigMsg.MsgTypeDsOfdmChannelConfig:         config_dsofdm_channel,
-            HalConfigMsg.MsgTypeDsOfdmProfile:               config_dsofdm_profile,
-            HalConfigMsg.MsgTypeDsRfPortPerf:                req_dummy,
-            HalConfigMsg.MsgTypeDsScQamChannelPerf:          req_dsqam_channel_status,
-            HalConfigMsg.MsgTypeDsOfdmChannelPerf:           req_dsofdm_channel_status,
-            HalConfigMsg.MsgTypeDsOob551IPerf:               req_oob551_mod_status,
-            HalConfigMsg.MsgTypeDsOob552Perf:                req_oob552_mod_status,
-            HalConfigMsg.MsgTypeNdfPerf:                     req_dummy,
-            HalConfigMsg.MsgTypeUsRfPortPerf:                req_dummy,
-            HalConfigMsg.MsgTypeUsScQamChannelConfig:        config_usatdma_channel,
-            HalConfigMsg.MsgTypeUsOfdmaChannelConfig:        config_usofdma_channel,
-            HalConfigMsg.MsgTypeUsOfdmaInitialRangingIuc:    config_dummy,
-            HalConfigMsg.MsgTypeUsOfdmaFineRangingIuc:       config_dummy,
-            HalConfigMsg.MsgTypeUsOfdmaDataRangingIuc:       config_dummy,
-            HalConfigMsg.MsgTypeUsOfdmaSubcarrierCfgState:   req_dummy,
-            HalConfigMsg.MsgTypeUsScQamChannelPerf:          req_dummy,
-            HalConfigMsg.MsgTypeUsOfdmaChannelPerf:          req_dummy,
-            HalConfigMsg.MsgTypeUsOob551IPerf:               req_oob551_demod_status,
-            HalConfigMsg.MsgTypeUsOob552Perf:                req_oob552_demod_status,
-            HalConfigMsg.MsgTypeNdrPerf:                     req_dummy,
-            HalConfigMsg.MsgTypeSidQos:                      config_sid_qos,
-            # # L2TPv3 messages
-            HalConfigMsg.MsgTypeL2tpv3CapabilityQuery:       capabilities_get,
-            HalConfigMsg.MsgTypeL2tpv3SessionReqNone:        req_depi_pw,
-            HalConfigMsg.MsgTypeL2tpv3SessionReqDsOfdm:      req_depi_pw,
-            HalConfigMsg.MsgTypeL2tpv3SessionReqDsOfdmPlc:   req_depi_pw,
-            HalConfigMsg.MsgTypeL2tpv3SessionReqDsScqam:     req_depi_pw,
-            HalConfigMsg.MsgTypeL2tpv3SessionReqUsAtdma:     req_uepi_pw,
-            HalConfigMsg.MsgTypeL2tpv3SessionReqUsOfdma:     req_uepi_pw,
-            HalConfigMsg.MsgTypeL2tpv3SessionReqScte551Fwd:  req_dummy,
-            HalConfigMsg.MsgTypeL2tpv3SessionReqScte551Ret:  req_dummy,
-            HalConfigMsg.MsgTypeL2tpv3SessionReqScte552Fwd:  req_dummy,
-            HalConfigMsg.MsgTypeL2tpv3SessionReqScte552Ret:  req_dummy,
-            HalConfigMsg.MsgTypeL2tpv3SessionReqNdf:         req_ndf,
-            HalConfigMsg.MsgTypeL2tpv3SessionReqNdr:         req_ndr,
-            # Ptp
-            #HalConfigMsg.MsgTypeRdtiConfig:                  config_docsis_timer
+            HalConfigMsg.MsgTypeRpdCapabilities: OpenRpdMsgHandler.capabilities_get,
+            HalConfigMsg.MsgTypeDsRfPort: OpenRpdMsgHandler.config_ds_port,
+            HalConfigMsg.MsgTypeDsScQamChannelConfig: OpenRpdMsgHandler.config_dsqam_channel,
+            HalConfigMsg.MsgTypeDsOfdmChannelConfig: OpenRpdMsgHandler.config_dsofdm_channel,
+            HalConfigMsg.MsgTypeDsOfdmProfile: OpenRpdMsgHandler.config_dsofdm_profile,
+            HalConfigMsg.MsgTypeDsRfPortPerf: OpenRpdMsgHandler.req_dummy,
+            HalConfigMsg.MsgTypeDsScQamChannelPerf: OpenRpdMsgHandler.req_dsqam_channel_status,
+            HalConfigMsg.MsgTypeDsOfdmChannelPerf: OpenRpdMsgHandler.req_dsofdm_channel_status,
+            HalConfigMsg.MsgTypeDsOob551IPerf: OpenRpdMsgHandler.req_oob551_mod_status,
+            HalConfigMsg.MsgTypeDsOob552Perf: OpenRpdMsgHandler.req_oob552_mod_status,
+            HalConfigMsg.MsgTypeNdfPerf: OpenRpdMsgHandler.req_dummy,
+            HalConfigMsg.MsgTypeUsRfPortPerf: OpenRpdMsgHandler.req_dummy,
+            HalConfigMsg.MsgTypeUsScQamChannelConfig: OpenRpdMsgHandler.config_usatdma_channel,
+            HalConfigMsg.MsgTypeUsOfdmaChannelConfig: OpenRpdMsgHandler.config_usofdma_channel,
+            HalConfigMsg.MsgTypeUsOfdmaInitialRangingIuc: OpenRpdMsgHandler.config_dummy,
+            HalConfigMsg.MsgTypeUsOfdmaFineRangingIuc: OpenRpdMsgHandler.config_dummy,
+            HalConfigMsg.MsgTypeUsOfdmaDataRangingIuc: OpenRpdMsgHandler.config_dummy,
+            HalConfigMsg.MsgTypeUsOfdmaDataIuc: OpenRpdMsgHandler.config_dummy,
+            HalConfigMsg.MsgTypeUsOfdmaSubcarrierCfgState: OpenRpdMsgHandler.req_dummy,
+            HalConfigMsg.MsgTypeUsScQamChannelPerf: OpenRpdMsgHandler.req_dummy,
+            HalConfigMsg.MsgTypeUsOfdmaChannelPerf: OpenRpdMsgHandler.req_dummy,
+            HalConfigMsg.MsgTypeUsOob551IPerf: OpenRpdMsgHandler.req_oob551_demod_status,
+            HalConfigMsg.MsgTypeUsOob552Perf: OpenRpdMsgHandler.req_oob552_demod_status,
+            HalConfigMsg.MsgTypeNdrPerf: OpenRpdMsgHandler.req_dummy,
+            HalConfigMsg.MsgTypeSidQos: OpenRpdMsgHandler.config_sid_qos,
+            # L2TPv3 messages
+            HalConfigMsg.MsgTypeL2tpv3CapabilityQuery: OpenRpdMsgHandler.capabilities_get,
+            HalConfigMsg.MsgTypeL2tpv3SessionReqNone: OpenRpdMsgHandler.req_depi_pw,
+            HalConfigMsg.MsgTypeL2tpv3SessionReqDsOfdm: OpenRpdMsgHandler.req_depi_pw,
+            HalConfigMsg.MsgTypeL2tpv3SessionReqDsOfdmPlc: OpenRpdMsgHandler.req_depi_pw,
+            HalConfigMsg.MsgTypeL2tpv3SessionReqDsScqam: OpenRpdMsgHandler.req_depi_pw,
+            HalConfigMsg.MsgTypeL2tpv3SessionReqUsAtdma: OpenRpdMsgHandler.req_uepi_pw,
+            HalConfigMsg.MsgTypeL2tpv3SessionReqUsOfdma: OpenRpdMsgHandler.req_uepi_pw,
+            HalConfigMsg.MsgTypeL2tpv3SessionReqScte551Fwd: OpenRpdMsgHandler.req_dummy,
+            HalConfigMsg.MsgTypeL2tpv3SessionReqScte551Ret: OpenRpdMsgHandler.req_dummy,
+            HalConfigMsg.MsgTypeL2tpv3SessionReqScte552Fwd: OpenRpdMsgHandler.req_dummy,
+            HalConfigMsg.MsgTypeL2tpv3SessionReqScte552Ret: OpenRpdMsgHandler.req_dummy,
+            HalConfigMsg.MsgTypeL2tpv3SessionReqNdf: OpenRpdMsgHandler.req_ndf,
+            HalConfigMsg.MsgTypeL2tpv3SessionReqNdr: OpenRpdMsgHandler.req_ndr,
 
-            HalConfigMsg.MsgTypeL2tpv3CinIfAssignment:       cin_if_assign,
-            HalConfigMsg.MsgTypeL2tpv3LcceIdAssignment:      lcce_id_assign,
+            # Ptp
+            # HalConfigMsg.MsgTypeRdtiConfig:                  config_docsis_timer
+
+            HalConfigMsg.MsgTypeL2tpv3CinIfAssignment: OpenRpdMsgHandler.cin_if_assign,
+            HalConfigMsg.MsgTypeL2tpv3LcceIdAssignment: OpenRpdMsgHandler.lcce_id_assign,
 
             # VspAvpQuery
-            HalConfigMsg.MsgTypeVspAvpExchange:              vsp_avp_handler,
+            HalConfigMsg.MsgTypeVspAvpExchange: OpenRpdMsgHandler.vsp_avp_handler,
             # RcpVendorSpecificTlv
-            HalConfigMsg.MsgTypeRcpVendorSpecific:           vsp_tlv_handler,
+            HalConfigMsg.MsgTypeRcpVendorSpecific: OpenRpdMsgHandler.vsp_tlv_handler,
         }
 
         self.disconnected = True
         self.dispatcher = Dispatcher()
 
         # setup the logging
-        self.logger = get_msg_handler_logger()
+        self.logger = OpenRpdMsgHandler.get_msg_handler_logger()
         self.logger.info("OpenRPD Driver Initialized")
         self.seqNum = 0
 
-
-    ## start modeled from HalPtpDriver.py
+    # start modeled from HalPtpDriver.py
 
     def start(self, simulate_mode=False):
         """start poll the transport socket
-        
+
         :return:
-        
+
         """
         self.logger.info("Setup the Hal Transport connection...")
         self.connectionSetup()
@@ -176,10 +165,10 @@ class OpenRpdDriver(HalDriverClient):
         """the callback handler for the configuration message
         Modified from base class by registering the sockets
         with dispatcher.
-        
+
         :param cfg: the configuration message received from the Hal
         :return:
-        
+
         """
         # self.logger.debug("Recv a Message from the Hal:" % str(cfg.msg))
 
@@ -231,9 +220,9 @@ class OpenRpdDriver(HalDriverClient):
 
     def connectionSetup(self):
         """Create the connection to the mgr
-        
+
         :return:
-        
+
         """
         self.logger.info("Create the connection to the mgr....")
         # Create a connection to Hal driver mgr
@@ -251,9 +240,9 @@ class OpenRpdDriver(HalDriverClient):
 
     def connection_cleanup(self):
         """Close the connection to the mgr
-        
+
         :return:
-        
+
         """
         if self.disconnected:
             self.logger.debug("A previous event has been processed, skip it!")
@@ -281,15 +270,14 @@ class OpenRpdDriver(HalDriverClient):
 
         self.disconnected = True
 
-
     def disconnectCb(self, msg):
         """A disconnect condition has been detected, 
         clean up the connection and then reconnect
         and re-register with the Hal.
-        
+
         :param msg:
         :return:
-        
+
         """
         self.logger.error("Detected disconnected condition")
 
@@ -365,22 +353,22 @@ class OpenRpdDriver(HalDriverClient):
 
     def send_cfg_msg(self, cfgMsgType, payload):
         msg = HalMessage(
-            "HalConfig", SrcClientID=self.drvID, 
+            "HalConfig", SrcClientID=self.drvID,
             CfgMsgType=cfgMsgType,
             SeqNum=self.seqNum,
             CfgMsgPayload=payload)
         self.logger.debug(
-                "sending config - type: %d, msg: %s"% (cfgMsgType,msg))
+            "sending config - type: %d, msg: %s" % (cfgMsgType, msg))
         self.pushSock.send(msg.Serialize())
         self.seqNum += 1
         return
 
     def send_cfg_rsp_msg(self, cfg):
         """The configuration response routine
-        
+
         :param cfg: The original configuration message
         :return:
-        
+
         """
         result = HalCommon_pb2.SUCCESS
         cfgMsg = cfg.msg
@@ -410,15 +398,18 @@ class OpenRpdDriver(HalDriverClient):
         elif (cfgMsg.CfgMsgType == HalConfigMsg.MsgTypeVspAvpExchange):
             rsp = L2tpv3VspAvp_pb2.t_l2tpVspAvpMsg()
             rsp.ParseFromString(cfgMsg.CfgMsgPayload)
-            self.logger.debug("vsp_avp_handler re-parse srcClientID: %s, Seq num:  %d, op: %d, vid %d, attr %d, strVal %s" %
-                      (cfg.msg.SrcClientID, cfg.msg.SeqNum, rsp.oper, rsp.vendorId, rsp.attrType, rsp.attrValBuf))
+            self.logger.debug("vsp_avp_handler re-parse srcClientID: %s, Seq num:  %d, "
+                              "op: %d, vid %d, attr %d, strVal %s" %
+                              (cfg.msg.SrcClientID, cfg.msg.SeqNum, rsp.oper, rsp.vendorId,
+                               rsp.attrType, rsp.attrValBuf))
             if rsp.rspCode == L2tpv3VspAvp_pb2.t_l2tpVspAvpMsg().VSP_AVP_STATUS_FAILURE:
                 # send HalConfigRsp with failure status if OpenRPD driver can't handle this.
                 result = HalCommon_pb2.FAILED
         elif (cfgMsg.CfgMsgType == HalConfigMsg.MsgTypeRcpVendorSpecific):
             rsp = t_RcpMessage()
             rsp.ParseFromString(cfgMsg.CfgMsgPayload)
-            self.logger.debug("send_cfg_rsp_msg payload: %s, result: %d" % (rsp.RpdDataMessage.RpdData, rsp.RcpDataResult))
+            self.logger.debug("send_cfg_rsp_msg payload: %s, result: %d" %
+                              (rsp.RpdDataMessage.RpdData, rsp.RcpDataResult))
         else:
             rsp = t_RcpMessage()
             rsp.ParseFromString(cfgMsg.CfgMsgPayload)
@@ -427,7 +418,7 @@ class OpenRpdDriver(HalDriverClient):
         payload = rsp.SerializeToString()
 
         self.logger.debug("cfg response srcClientID: %s, Seq num:  %d" %
-                      (cfgMsg.SrcClientID, cfgMsg.SeqNum))
+                          (cfgMsg.SrcClientID, cfgMsg.SeqNum))
         msg = HalMessage(
             "HalConfigRsp", SrcClientID=cfgMsg.SrcClientID, SeqNum=cfgMsg.SeqNum,
             Rsp={
@@ -437,20 +428,21 @@ class OpenRpdDriver(HalDriverClient):
             CfgMsgType=cfgMsg.CfgMsgType,
             CfgMsgPayload=payload)
         self.logger.debug(
-                "sending cfg response - type: %d, msg: %s"% (cfgMsg.CfgMsgType,msg))
+            "sending cfg response - type: %d, msg: %s" % (cfgMsg.CfgMsgType, msg))
         self.pushSock.send(msg.Serialize())
 
     def recv_cfg_msg_rsp_cb(self, cfg):
+        cfgMsg = cfg.msg
         self.logger.debug(
-                "receive cfg response - type: %d, msg: %s"% (cfgMsg.CfgMsgType,msg))
+            "receive cfg response - type: %d" % (cfgMsg.CfgMsgType))
         pass
-        
+
     def recv_cfg_msg_cb(self, cfg):
         """Receive a configuration message from the Hal, processing it
-        
+
         :param cfg:
         :return:
-        
+
         """
         try:
             handler = self.hal_config_msg_handlers[cfg.msg.CfgMsgType]
@@ -473,6 +465,7 @@ class OpenRpdDriver(HalDriverClient):
             sock.close()
         self.fd_to_socket.clear()
 
+
 def handle_interrupt_signal(signum, frame):
     sys.exit(0)
 
@@ -481,7 +474,7 @@ if __name__ == "__main__":
     setup_logging('HAL', filename="open_rpd_drv.log")
     signal.signal(signal.SIGINT, handle_interrupt_signal)
     driver = OpenRpdDriver("openrpd_generic_driver", "This is a Generic OpenRPD Driver", "1.0.0",
-                             (default_supported_msg_types), (2, 3, 4))
+                           (OpenRpdMsgHandler.default_supported_msg_types), (2, 3, 4))
     # test_cfg = HalMessage("HalConfigRsp")
     # test_cfg.msg.SeqNum = 123456
     # test_cfg.msg.Rsp.Status = HalCommon_pb2.SUCCESS

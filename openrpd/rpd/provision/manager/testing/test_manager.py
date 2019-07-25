@@ -31,6 +31,7 @@ from rpd.gpb.tpc_pb2 import t_TpcMessage
 class _e_obj(object):
     pass
 
+
 @unittest.skip("skip")
 class TestCcapCoreOrchestrator(unittest.TestCase):
 
@@ -58,7 +59,7 @@ class TestCcapCoreOrchestrator(unittest.TestCase):
         subprocess.call(["killall", "python"])
 
     def test_seek_principal_core(self):
-        print '*'*80
+        print '*' * 80
         print "start to test orchestrator seek_principal_core"
         mgr = ManagerProcess(simulator=False)
         mgr.fsm.INTERFACE_SCAN(interface='eth0')
@@ -100,6 +101,7 @@ class TestCcapCoreOrchestrator(unittest.TestCase):
 
         mgr.fsm.Error(msg='test fsm error')
 
+
 @unittest.skip("skip")
 class TestManagerProcess(unittest.TestCase):
 
@@ -133,21 +135,21 @@ class TestManagerProcess(unittest.TestCase):
 
         """
         print 'end the test of provision manager'
-        print '*'*80
+        print '*' * 80
         if mgr:
             mgr.dispatcher.end_loop()
             mgr.fsm.Error(msg='test fsm error')
 
     def test_start_fake_process(self):
         """Start provision process with fake agent."""
-        print '*'*80
+        print '*' * 80
         print "start to test provision manager with fake agent"
         mgr = ManagerProcess(simulator=True)
         mgr.dispatcher.timer_register(10, self.end_manager, arg=mgr)
         mgr.start()
 
     def test_seek_principal_failure_1(self):
-        print '*'*80
+        print '*' * 80
         print "start to test seek_principal_failure 1"
         mgr = ManagerProcess(simulator=False)
         mgr.fsm.INTERFACE_SCAN(interface='eth0')
@@ -184,7 +186,7 @@ class TestManagerProcess(unittest.TestCase):
         mgr3.fsm.Error(msg='test fsm error')
 
     def test_core_map(self):
-        print '*'*80
+        print '*' * 80
         print "start to test interface fail"
         mgr = ManagerProcess(simulator=False)
         mgr.is_ip_in_core_map('eth0', '1.1.1.1')
@@ -195,7 +197,7 @@ class TestManagerProcess(unittest.TestCase):
         mgr.is_valid_ip('1.1')
 
     def test_interface_fail(self):
-        print '*'*80
+        print '*' * 80
         print "start to test interface fail"
         mgr = ManagerProcess(simulator=False)
         mgr.fsm.INTERFACE_SCAN(interface='eth0')
@@ -203,7 +205,7 @@ class TestManagerProcess(unittest.TestCase):
         mgr.fsm.Error(msg='test fsm error')
 
     def test_core_fail(self):
-        print '*'*80
+        print '*' * 80
         print "start to test interface fail"
         mgr = ManagerProcess(simulator=False)
         mgr.fsm.INTERFACE_SCAN(interface='eth0')
@@ -221,7 +223,7 @@ class TestManagerProcess(unittest.TestCase):
         mgr1.fsm.Error(msg='test fsm error')
 
     def test_basic_fun(self):
-        print '*'*80
+        print '*' * 80
         print "start to test basic function"
         mgr = ManagerProcess(simulator=False)
 
@@ -235,7 +237,7 @@ class TestManagerProcess(unittest.TestCase):
 
     def test_start_process(self):
         """Start provision process with real agent."""
-        print '*'*80
+        print '*' * 80
         print "start to test provision manager with real agent"
         mgr = ManagerProcess(simulator=False)
         mgr.dhcp_parameter['eth0'] = {
@@ -259,9 +261,9 @@ class TestManagerProcess(unittest.TestCase):
 
         mgr.add_ip_to_core_map('eth0', ('1.1.1.1', '', mgr.HA_CORE_TRIGGER))
         mgr.interface_list.append({
-                        "interface": 'eth0',
-                        "status": mgr.INTERFACE_UP,
-                    })
+            "interface": 'eth0',
+            "status": mgr.INTERFACE_UP,
+        })
         mgr.core_orchestrator.orchestrator_cb(None)
 
         # is system time confirmed.
@@ -292,7 +294,7 @@ class TestManagerProcess(unittest.TestCase):
         mgr.fsm.Error(msg='test fsm error')
 
     def test_fsm_provision_startup_core_fail_1(self):
-        print '*'*80
+        print '*' * 80
         print "start to test fsm_provision_startup_core_fail 1"
         mgr = ManagerProcess(simulator=False)
         mgr.fsm.INTERFACE_SCAN(interface='eth0')
@@ -304,13 +306,13 @@ class TestManagerProcess(unittest.TestCase):
         e = _e_obj()
         event = {"name": 'core_fail', "src": "dhcp", "dst": 'core_fail'}
         e.fsm, e.event, e.src, e.dst, e.msg, e.interface = mgr.fsm, event, \
-                                                           'dhcp', 'core_fail', 'test core fail', 'eth0'
+            'dhcp', 'core_fail', 'test core fail', 'eth0'
         # eth0 in candidate
         mgr._fsm_provision_startup_core_fail(e)
         mgr.fsm.Error(msg='test fsm error')
 
     def test_fsm_provision_startup_core_fail_2(self):
-        print '*'*80
+        print '*' * 80
         print "start to test fsm_provision_startup_core_fail 2"
         # second scenario, eth1 not in candidate
         mgr1 = ManagerProcess(simulator=False)
@@ -320,7 +322,7 @@ class TestManagerProcess(unittest.TestCase):
         e = _e_obj()
         event = {"name": 'core_fail', "src": "dhcp", "dst": 'core_fail'}
         e.fsm, e.event, e.src, e.dst, e.msg, e.interface = mgr1.fsm, event, \
-                                                           'dhcp', 'core_fail', 'test core fail', 'eth1'
+            'dhcp', 'core_fail', 'test core fail', 'eth1'
 
         keys = CCAPCore.ccap_core_db.keys()
         for key in keys:
@@ -340,7 +342,7 @@ class TestManagerProcess(unittest.TestCase):
         e = _e_obj()
         event = {"name": 'core_fail', "src": "dhcp", "dst": 'core_fail'}
         e.fsm, e.event, e.src, e.dst, e.msg, e.interface = mgr2.fsm, event, \
-                                                           'dhcp', 'core_fail', 'test core fail', 'eth0'
+            'dhcp', 'core_fail', 'test core fail', 'eth0'
         keys = CCAPCore.ccap_core_db.keys()
         for key in keys:
             CCAPCore.ccap_core_db.pop(key)
@@ -348,7 +350,7 @@ class TestManagerProcess(unittest.TestCase):
         mgr2.fsm.Error(msg='test fsm error')
 
     def test_fsm_provision_core_fail(self):
-        print '*'*80
+        print '*' * 80
         print "start to test _fsm_provision_core_fail"
         mgr = ManagerProcess(simulator=False)
         mgr.fsm.INTERFACE_SCAN(interface='eth0')
@@ -356,7 +358,7 @@ class TestManagerProcess(unittest.TestCase):
         e = _e_obj()
         event = {"name": 'core_fail', "src": "dhcp", "dst": 'core_fail'}
         e.fsm, e.event, e.src, e.dst, e.msg, e.interface = mgr.fsm, event, \
-                                                           'dhcp', 'core_fail', 'test core fail', 'eth0'
+            'dhcp', 'core_fail', 'test core fail', 'eth0'
         mgr._fsm_provision_core_fail(e)
         mgr.fsm.Error(msg='test fsm error')
 
@@ -366,7 +368,7 @@ class TestManagerProcess(unittest.TestCase):
         e = _e_obj()
         event = {"name": 'core_fail', "src": "dhcp", "dst": 'core_fail'}
         e.fsm, e.event, e.src, e.dst, e.msg, e.interface = mgr1.fsm, event, \
-                                                           'dhcp', 'core_fail', 'test core fail', 'eth0'
+            'dhcp', 'core_fail', 'test core fail', 'eth0'
         mgr1.set_time(time.time(), step=t_TpcMessage.SUCCESS)
         mgr1._fsm_provision_core_fail(e)
 
@@ -535,7 +537,7 @@ class TestManagerProcess(unittest.TestCase):
         mgr.fsm.Error(msg='test fsm error')
 
     def test_handle_mgr_ipsec_event(self):
-        print '*'*80
+        print '*' * 80
         print "start to test _handle_mgr_ipsec_event"
         mgr = ManagerProcess(simulator=False)
         mgr.fsm.INTERFACE_SCAN(interface='eth0')
@@ -551,7 +553,7 @@ class TestManagerProcess(unittest.TestCase):
         mgr.fsm.Error(msg='test fsm error')
 
     def test_handle_mgr_gcp_event(self):
-        print '*'*80
+        print '*' * 80
         print "start to test _handle_mgr_gcp_event"
         mgr = ManagerProcess(simulator=False)
         mgr.fsm.INTERFACE_SCAN(interface='eth0')
@@ -634,7 +636,7 @@ class TestManagerProcess(unittest.TestCase):
         core_a.fsm.TRIGGER_IPSEC_FAIL()
 
     def test_config_table(self):
-        print '*'*80
+        print '*' * 80
         print "start to test _handle_mgr_gcp_event config_table"
         mgr = ManagerProcess(simulator=False)
         mgr.fsm.INTERFACE_SCAN(interface='eth0')
@@ -659,7 +661,7 @@ class TestManagerProcess(unittest.TestCase):
         #          CoreDescription.CORE_MODE_ACTIVE, mgr=mgr,
         #          ccap_core_interface='etho0', ccap_core_network_address='1.1.1.5')
         caps = {"ccap_core": '1.1.1.5', 'interface': 'eth0',
-                "operation": 0} # add
+                "operation": 0}  # add
         event_request_rsp.mgr_event.data = json.dumps("config_table/" + json.dumps(caps))
         mgr._handle_mgr_gcp_event(event_request_rsp.mgr_event)
 
@@ -799,6 +801,7 @@ class TestManagerProcess(unittest.TestCase):
         mgr._handle_mgr_gcp_event(event_request_rsp.mgr_event)
 
         mgr.fsm.Error(msg='test fsm error')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -28,7 +28,7 @@ define Package/pyzmq/description
 endef
 
 define Build/Compile
-	$(call Build/Compile/PyMod,,install --prefix="$(PKG_INSTALL_DIR)/usr")
+	$(call Build/Compile/PyMod,,install --prefix="$(PKG_INSTALL_DIR)/usr" --zmq="$(STAGING_DIR)")
 endef
 
 define Package/pyzmq/install

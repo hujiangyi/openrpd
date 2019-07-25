@@ -19,180 +19,249 @@ import rpd.provision.manager.src.manager_fsm as CCAPFsm
 
 
 class TestProvisionFsm(unittest.TestCase):
-    def test_principle_fsm(self):
-        """test CCAPFsm state machine running procedure."""
-        fsm = CCAPFsm.PrincipleCCAPFsm([])
 
-        # test the straight normal case
-        fsm.TRIGGER_Startup()
-        fsm.TRIGGER_INTERFACE_UP()
-        self.assertEqual(fsm.STATE_INTERFACE_UP, fsm.current)
+    @classmethod
+    def setUpClass(cls):
+        pass
 
-        fsm.TRIGGER_MAC_8021X_OK()
-        self.assertEqual(fsm.STATE_8021X_OK, fsm.current)
+    @classmethod
+    def tearDownClass(cls):
+        pass
 
-        fsm.TRIGGER_DHCP_OK()
-        self.assertEqual(fsm.STATE_DHCP_OK, fsm.current)
+    def setUp(self):
+        self.callbacks_startup = [
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsmStartup.STATE_INIT,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsmStartup.STATE_INTERFACE_UP,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsmStartup.STATE_8021X_OK,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsmStartup.STATE_DHCP_OK,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsmStartup.STATE_TOD_OK,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsmStartup.STATE_FAIL,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsmStartup.STATE_CHANGE,
+                "TrackPoint": ("on",),
+                "Handler": self.callback,
+            },
+            # event callbacks
+        ]
+        self.callbacks_gcp = [
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_IPSEC,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_REINIT_IPSEC,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_FAIL,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_CHANGE,
+                "TrackPoint": ("on",),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_INIT_TCP,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_INIT_GCP_IRA,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_INIT_GCP_CFG,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_INIT_GCP_CFG_CPL,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_INIT_GCP_OP,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_REINIT_TCP,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_REINIT_GCP_IRA,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_ONLINE,
+                "TrackPoint": ("on",),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.CCAPFsm.STATE_ONLINE,
+                "TrackPoint": ("leave",),
+                "Handler": self.callback,
+            },
+        ]
+        self.callbacks_mgr = [
+            {
+                "Type": "event",
+                "Name": CCAPFsm.ManagerFsm.EVENT_STARTUP,
+                "TrackPoint": "on",
+                "Handler": self.callback,
+            },
+            {
+                "Type": "event",
+                "Name": CCAPFsm.ManagerFsm.EVENT_INTERFACE_SCAN,
+                "TrackPoint": "on",
+                "Handler": self.callback,
+            },
+            {
+                "Type": "event",
+                "Name": CCAPFsm.ManagerFsm.EVENT_USER_MGMT,
+                "TrackPoint": "on",
+                "Handler": self.callback,
+            },
+            {
+                "Type": "event",
+                "Name": CCAPFsm.ManagerFsm.EVENT_GCP_MGMT,
+                "TrackPoint": "on",
+                "Handler": self.callback,
+            },
+            {
+                "Type": "event",
+                "Name": CCAPFsm.ManagerFsm.EVENT_DHCP,
+                "TrackPoint": "on",
+                "Handler": self.callback,
+            },
+            {
+                "Type": "event",
+                "Name": CCAPFsm.ManagerFsm.EVENT_STARTUP_DHCP_OK,
+                "TrackPoint": "on",
+                "Handler": self.callback,
+            },
+            {
+                "Type": "event",
+                "Name": CCAPFsm.ManagerFsm.EVENT_PROVISION_INTERFACE_FAIL,
+                "TrackPoint": "on",
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.ManagerFsm.STATE_OPERATIONAL,
+                "TrackPoint": "on",
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.ManagerFsm.STATE_OPERATIONAL,
+                "TrackPoint": "leave",
+                "Handler": self.callback,
+            },
+            {
+                "Type": "event",
+                "Name": CCAPFsm.ManagerFsm.EVENT_CORE_FAIL,
+                "TrackPoint": "on",
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.ManagerFsm.STATE_FAIL,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.ManagerFsm.STATE_PRINCIPLE_RETRY_FIRST,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.ManagerFsm.STATE_PRINCIPLE_RETRY_SECOND,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.ManagerFsm.STATE_PRINCIPLE_RETRY_THIRD,
+                "TrackPoint": ("reenter", "on"),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.ManagerFsm.STATE_CHANGE,
+                "TrackPoint": ("on",),
+                "Handler": self.callback,
+            },
+            {
+                "Type": "state",
+                "Name": CCAPFsm.ManagerFsm.STATE_PRINCIPAL_FOUND,
+                "TrackPoint": ("on", "reenter"),
+                "Handler": self.callback,
+            },
+        ]
+        self.cb_cnt = 0
+        self.cb_cnt = 0
 
-        fsm.TRIGGER_TOD_OK()
-        self.assertEqual(fsm.STATE_TOD_OK, fsm.current)
+    def tearDown(self):
+        self.cb_cnt = 0
 
-        fsm.TRIGGER_IPSEC_OK()
-        self.assertEqual(fsm.STATE_IPSEC_OK, fsm.current)
-
-        fsm.TRIGGER_RCP_OK()
-        self.assertEqual(fsm.STATE_RCP_OK, fsm.current)
-
-        fsm.TRIGGER_PTPT1588_OK()
-        self.assertEqual(fsm.STATE_PTP1588_OK, fsm.current)
-        # test "fail" case
-
-        fsm.TRIGGER_PTP1588_FAIL()
-        self.assertEqual(fsm.STATE_RCP_OK, fsm.current)
-
-        fsm.TRIGGER_RCP_FAIL()
-        self.assertEqual(fsm.STATE_IPSEC_OK, fsm.current)
-
-        fsm.TRIGGER_IPSEC_FAIL()
-        self.assertEqual(fsm.STATE_TOD_OK, fsm.current)
-
-        fsm.TRIGGER_TOD_FAIL()
-        self.assertEqual(fsm.STATE_DHCP_OK, fsm.current)
-
-        fsm.TRIGGER_DHCP_FAIL()
-        self.assertEqual(fsm.STATE_8021X_OK, fsm.current)
-
-        fsm.TRIGGER_MAC_8021X_FAIL()
-        self.assertEqual(fsm.STATE_INTERFACE_UP, fsm.current)
-
-        fsm.TRIGGER_INTERFACE_DOWN()
-        self.assertEqual(fsm.STATE_INIT, fsm.current)
-
-        # test the random events
-        fsm.TRIGGER_INTERFACE_UP()
-        fsm.TRIGGER_MAC_8021X_OK()
-        fsm.TRIGGER_DHCP_OK()
-        fsm.TRIGGER_TOD_OK()
-        fsm.TRIGGER_IPSEC_OK()
-        fsm.TRIGGER_RCP_OK()
-        fsm.TRIGGER_PTPT1588_OK()
-
-        fsm.TRIGGER_INTERFACE_DOWN()
-
-        self.assertEqual(fsm.STATE_INIT, fsm.current)
-
-        fsm.TRIGGER_INTERFACE_UP()
-        fsm.TRIGGER_MAC_8021X_OK()
-        fsm.TRIGGER_DHCP_OK()
-        fsm.TRIGGER_TOD_OK()
-        fsm.TRIGGER_IPSEC_OK()
-        fsm.TRIGGER_RCP_OK()
-        fsm.TRIGGER_PTPT1588_OK()
-
-        fsm.TRIGGER_RCP_FAIL()
-        self.assertEqual(fsm.STATE_IPSEC_OK, fsm.current)
-
-        # Test the timeout and can not reach
-        fsm.TRIGGER_TIMEOUT()
-        self.assertEqual(fsm.STATE_FAIL, fsm.current)
-
-    def test_gcpp_principle_fsm(self):
-        """test CCAPFsm state machine running procedure."""
-        fsm = CCAPFsm.PrincipleCCAPFsm([])
-
-        # test the straight normal case
-        fsm.TRIGGER_Startup()
-        fsm.TRIGGER_INTERFACE_UP()
-        self.assertEqual(fsm.STATE_INTERFACE_UP, fsm.current)
-
-        fsm.TRIGGER_MAC_8021X_OK()
-        self.assertEqual(fsm.STATE_8021X_OK, fsm.current)
-
-        fsm.TRIGGER_DHCP_OK()
-        self.assertEqual(fsm.STATE_DHCP_OK, fsm.current)
-
-        fsm.TRIGGER_TOD_OK()
-        self.assertEqual(fsm.STATE_TOD_OK, fsm.current)
-
-        fsm.TRIGGER_IPSEC_OK()
-        self.assertEqual(fsm.STATE_IPSEC_OK, fsm.current)
-
-        fsm.TRIGGER_RCP_OK()
-        self.assertEqual(fsm.STATE_RCP_OK, fsm.current)
-
-        fsm.TRIGGER_PTPT1588_OK()
-        self.assertEqual(fsm.STATE_PTP1588_OK, fsm.current)
-
-        fsm.TRIGGER_MOVE_OPERATIONAL()
-        self.assertEqual(fsm.STATE_OPERATIONAL_OK, fsm.current)
-
-        fsm.TRIGGER_PTP1588_FAIL()
-        self.assertEqual(fsm.STATE_RCP_OK, fsm.current)
-
-        fsm.TRIGGER_RCP_FAIL()
-        self.assertEqual(fsm.STATE_IPSEC_OK, fsm.current)
-
-        fsm.TRIGGER_IPSEC_FAIL()
-        self.assertEqual(fsm.STATE_TOD_OK, fsm.current)
-
-        fsm.TRIGGER_TOD_FAIL()
-        self.assertEqual(fsm.STATE_DHCP_OK, fsm.current)
-
-        fsm.TRIGGER_DHCP_FAIL()
-        self.assertEqual(fsm.STATE_8021X_OK, fsm.current)
-
-        fsm.TRIGGER_MAC_8021X_FAIL()
-        self.assertEqual(fsm.STATE_INTERFACE_UP, fsm.current)
-
-        fsm.TRIGGER_INTERFACE_DOWN()
-        self.assertEqual(fsm.STATE_INIT, fsm.current)
-
-        # test the random events
-        fsm.TRIGGER_INTERFACE_UP()
-        fsm.TRIGGER_MAC_8021X_OK()
-        fsm.TRIGGER_DHCP_OK()
-        fsm.TRIGGER_TOD_OK()
-        fsm.TRIGGER_IPSEC_OK()
-        fsm.TRIGGER_RCP_OK()
-        fsm.TRIGGER_PTPT1588_OK()
-        fsm.TRIGGER_MOVE_OPERATIONAL()
-
-        fsm.TRIGGER_INTERFACE_DOWN()
-
-        self.assertEqual(fsm.STATE_INIT, fsm.current)
-
-        fsm.TRIGGER_INTERFACE_UP()
-        fsm.TRIGGER_MAC_8021X_OK()
-        fsm.TRIGGER_DHCP_OK()
-        fsm.TRIGGER_TOD_OK()
-        fsm.TRIGGER_IPSEC_OK()
-        fsm.TRIGGER_RCP_OK()
-        fsm.TRIGGER_PTPT1588_OK()
-        fsm.TRIGGER_MOVE_OPERATIONAL()
-
-        fsm.TRIGGER_RCP_FAIL()
-        self.assertEqual(fsm.STATE_IPSEC_OK, fsm.current)
-
-        # Test the timeout and can not reach
-        fsm.TRIGGER_TIMEOUT()
-        self.assertEqual(fsm.STATE_FAIL, fsm.current)
-
-    def test_auxiliary_fsm(self):
-        """Create an auxiliary core fsm."""
-        fsm = CCAPFsm.AuxiliaryCCAPFsm([])
-
-    def test_manager_fsm(self):
-        """Create an manager fsm."""
-        CCAPFsm.ManagerFsm([])
-
-    def _fsm_enter_state_init(self, event):
-        """Called when event triggered.
-
-        :param event: trigger event
-
-        """
+    def callback(self, event):
         print ("Entering state %s from state %s, triggered by event:%s." % (event.fsm.current,
-                                                                                      event.src, event.event))
+                                                                            event.src, event.event))
+        self.cb_cnt += 1
 
     def test_fsm_state_callbacks(self):
         """test FsmBase callback generate process."""
@@ -200,9 +269,9 @@ class TestProvisionFsm(unittest.TestCase):
         callbacks = [
             {
                 "Type": "state",
-                "Name": CCAPFsm.CCAPFsm.STATE_INIT,
+                "Name": CCAPFsm.CCAPFsm.STATE_INIT_IPSEC,
                 "TrackPoint": "on",
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         CCAPFsm.CCAPFsm(callbacks=callbacks)
@@ -211,9 +280,9 @@ class TestProvisionFsm(unittest.TestCase):
         callbacks = [
             {
                 "Type": "event",
-                "Name": CCAPFsm.CCAPFsm.EVENT_INTERFACE_UP,
+                "Name": CCAPFsm.CCAPFsm.EVENT_STARTUP,
                 "TrackPoint": ["on"],
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         CCAPFsm.CCAPFsm(callbacks=callbacks)
@@ -222,9 +291,9 @@ class TestProvisionFsm(unittest.TestCase):
         callbacks = [
             {
                 "Type": "event",
-                "Name": CCAPFsm.CCAPFsm.EVENT_INTERFACE_UP,
+                "Name": CCAPFsm.CCAPFsm.EVENT_STARTUP,
                 "TrackPoint": ["before"],
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         CCAPFsm.CCAPFsm(callbacks=callbacks)
@@ -233,9 +302,9 @@ class TestProvisionFsm(unittest.TestCase):
         callbacks = [
             {
                 "Type": "event",
-                "Name": CCAPFsm.CCAPFsm.EVENT_INTERFACE_UP,
+                "Name": CCAPFsm.CCAPFsm.EVENT_STARTUP,
                 "TrackPoint": "after",
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         CCAPFsm.CCAPFsm(callbacks=callbacks)
@@ -244,9 +313,9 @@ class TestProvisionFsm(unittest.TestCase):
         callbacks = [
             {
                 "Type": "event",
-                "Name": CCAPFsm.CCAPFsm.EVENT_INTERFACE_UP,
+                "Name": CCAPFsm.CCAPFsm.EVENT_STARTUP,
                 "TrackPoint": "leave",
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         try:
@@ -258,9 +327,9 @@ class TestProvisionFsm(unittest.TestCase):
         callbacks = [
             {
                 "Type": "event",
-                "Name": CCAPFsm.CCAPFsm.EVENT_INTERFACE_UP,
+                "Name": CCAPFsm.CCAPFsm.EVENT_STARTUP,
                 "TrackPoint": ["leave"],
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         try:
@@ -272,9 +341,9 @@ class TestProvisionFsm(unittest.TestCase):
         callbacks = [
             {
                 "Type": "event",
-                "Name": CCAPFsm.CCAPFsm.EVENT_INTERFACE_UP,
+                "Name": CCAPFsm.CCAPFsm.EVENT_STARTUP,
                 "TrackPoint": {"leave"},
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         try:
@@ -288,7 +357,7 @@ class TestProvisionFsm(unittest.TestCase):
                 "Type": "event",
                 "Name": "Not Supported",
                 "TrackPoint": "on",
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         try:
@@ -300,9 +369,9 @@ class TestProvisionFsm(unittest.TestCase):
         callbacks = [
             {
                 "Type": "state",
-                "Name": CCAPFsm.CCAPFsm.EVENT_INTERFACE_UP,
+                "Name": CCAPFsm.CCAPFsm.EVENT_STARTUP,
                 "TrackPoint": "Not Supported",
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         try:
@@ -314,9 +383,9 @@ class TestProvisionFsm(unittest.TestCase):
         callbacks = [
             {
                 "Type": "state",
-                "Name": CCAPFsm.CCAPFsm.EVENT_INTERFACE_UP,
+                "Name": CCAPFsm.CCAPFsm.EVENT_STARTUP,
                 "TrackPoint": ["Not Supported"],
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         try:
@@ -328,9 +397,9 @@ class TestProvisionFsm(unittest.TestCase):
         callbacks = [
             {
                 "Type": "state",
-                "Name": CCAPFsm.CCAPFsm.EVENT_INTERFACE_UP,
+                "Name": CCAPFsm.CCAPFsm.EVENT_STARTUP,
                 "TrackPoint": {"on"},
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         try:
@@ -344,7 +413,7 @@ class TestProvisionFsm(unittest.TestCase):
                 "Type": "state",
                 "Name": "Not Supported",
                 "TrackPoint": "on",
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         try:
@@ -356,9 +425,9 @@ class TestProvisionFsm(unittest.TestCase):
         callbacks = [
             {
                 "Type": "Not Supported",
-                "Name": CCAPFsm.CCAPFsm.EVENT_INTERFACE_UP,
+                "Name": CCAPFsm.CCAPFsm.EVENT_STARTUP,
                 "TrackPoint": "on",
-                "Handler": self._fsm_enter_state_init,
+                "Handler": self.callback,
             },
         ]
         try:
@@ -370,7 +439,7 @@ class TestProvisionFsm(unittest.TestCase):
         callbacks = [
             {
                 "Type": "state",
-                "Name": CCAPFsm.CCAPFsm.EVENT_INTERFACE_UP,
+                "Name": CCAPFsm.CCAPFsm.STATE_FAIL,
                 "TrackPoint": 'on',
                 "Handler": 'Not Callable',
             },
@@ -379,6 +448,91 @@ class TestProvisionFsm(unittest.TestCase):
             CCAPFsm.CCAPFsm(callbacks=callbacks)
         except CCAPFsm.CCAPFsmError:
             pass
+
+    def _fsm_enter_state_callback(self, event):
+        print ("Entering state %s from state %s, triggered by event:%s." % (event.fsm.current,
+                                                                            event.src, event.event))
+
+    def test_fsm_CCAPFsm(self):
+        fsm = CCAPFsm.CCAPFsm(callbacks=self.callbacks_gcp)
+        fsm.TRIGGER_Startup()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsm.STATE_INIT_IPSEC)
+        fsm.TRIGGER_IPSEC_OK()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsm.STATE_INIT_TCP)
+        fsm.TRIGGER_TCP_OK()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsm.STATE_INIT_GCP_IRA)
+        fsm.TRIGGER_GCP_IRA()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsm.STATE_INIT_GCP_CFG)
+        fsm.TRIGGER_GCP_CFG()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsm.STATE_INIT_GCP_CFG_CPL)
+        fsm.TRIGGER_GCP_CFG_CPL()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsm.STATE_INIT_GCP_OP)
+        fsm.TRIGGER_GCP_OP()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsm.STATE_ONLINE)
+        fsm.TRIGGER_TCP_FAIL()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsm.STATE_REINIT_IPSEC)
+        fsm.TRIGGER_IPSEC_OK()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsm.STATE_REINIT_TCP)
+        fsm.TRIGGER_TCP_OK()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsm.STATE_REINIT_GCP_IRA)
+        fsm.TRIGGER_GCP_IRA()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsm.STATE_ONLINE)
+
+        # other branch
+        fsm.TRIGGER_GCP_NO_CFG_CPL()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsm.STATE_ONLINE)
+
+    def test_fsm_CCAPFsmStartup(self):
+        fsm = CCAPFsm.CCAPFsmStartup(callbacks=self.callbacks_startup)
+        fsm.TRIGGER_Startup()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsmStartup.STATE_INIT)
+        fsm.TRIGGER_INTERFACE_UP()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsmStartup.STATE_INTERFACE_UP)
+        fsm.TRIGGER_MAC_8021X_OK()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsmStartup.STATE_8021X_OK)
+        fsm.TRIGGER_DHCP_OK()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsmStartup.STATE_DHCP_OK)
+        fsm.TRIGGER_TOD_OK()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsmStartup.STATE_TOD_OK)
+        # other branch
+        fsm.TRIGGER_DHCP_FAIL()
+        self.assertEqual(fsm.current, CCAPFsm.CCAPFsmStartup.STATE_8021X_OK)
+
+    def test_fsm_ManagerFsm(self):
+        fsm = CCAPFsm.ManagerFsm(callbacks=self.callbacks_mgr)
+        self.assertIsInstance(fsm, CCAPFsm.ManagerFsm)
+        fsm.Startup()
+        result = fsm.is_startup()
+        self.assertTrue(result)
+        fsm.INTERFACE_SCAN()
+        result = fsm.is_startup()
+        self.assertTrue(result)
+        result = fsm.is_provisioning()
+        self.assertFalse(result)
+        fsm.STARTUP_DHCP_OK()
+        result = fsm.is_provisioning()
+        self.assertTrue(result)
+        result = fsm.is_startup()
+        self.assertFalse(result)
+        fsm.SEEK_PRINCIPAL_FAIL()
+        result = fsm.is_provision_retry()
+        self.assertTrue(result)
+        result = fsm.is_principal_found()
+        self.assertFalse(result)
+        result = fsm.is_operational()
+        self.assertFalse(result)
+        fsm.SEEK_PRINCIPAL_OK()
+        result = fsm.is_principal_found()
+        self.assertTrue(result)
+        fsm.OPERATIONAL_OK()
+        result = fsm.is_operational()
+        self.assertTrue(result)
+        result = fsm.is_fail()
+        self.assertFalse(result)
+        fsm.Error()
+        result = fsm.is_fail()
+        self.assertTrue(result)
+
 
 if __name__ == '__main__':
     unittest.main()

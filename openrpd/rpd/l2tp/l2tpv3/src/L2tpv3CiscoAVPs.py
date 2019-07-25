@@ -83,7 +83,7 @@ class AssignedConnectionIDCisco(l2tpv3AVP):
 
         if (not isinstance(value, int) and not isinstance(value, long))\
                 or not isinstance(mustAvp, bool) or not isinstance(hiddenAvp, bool):
-            msg = "parameter type error, value type: %s, mustAVP type:%s , hiddenAVP error:%s." %(
+            msg = "parameter type error, value type: %s, mustAVP type:%s , hiddenAVP error:%s." % (
                 type(value), type(mustAvp), type(hiddenAvp)
             )
             self.logger.warn(msg)
@@ -137,7 +137,7 @@ class PseudowireCapListCisco(l2tpv3AVP):
     def __init__(self, value=(), mustAvp=False, hiddenAvp=False, attrValue=None):
 
         if not isinstance(value, tuple) or not isinstance(mustAvp, bool) or not isinstance(hiddenAvp, bool):
-            msg = "parameter type error, value type: %s, mustAVP type:%s , hiddenAVP error:%s." %(
+            msg = "parameter type error, value type: %s, mustAVP type:%s , hiddenAVP error:%s." % (
                 type(value), type(mustAvp), type(hiddenAvp)
             )
             self.logger.warn(msg)
@@ -197,7 +197,7 @@ class LocalSessionIDCisco(l2tpv3AVP):
 
         if (not isinstance(value, int) and not isinstance(value, long)) \
                 or not isinstance(hiddenAvp, bool) or not isinstance(mustAvp, bool):
-            msg = "parameter type error, value type: %s, mustAVP type:%s , hiddenAVP error:%s." %(
+            msg = "parameter type error, value type: %s, mustAVP type:%s , hiddenAVP error:%s." % (
                 type(value), type(mustAvp), type(hiddenAvp)
             )
             self.logger.warn(msg)
@@ -253,7 +253,7 @@ class RemoteSessionIDCisco(l2tpv3AVP):
 
         if (not isinstance(value, int) and not isinstance(value, long))\
                 or not isinstance(hiddenAvp, bool) or not isinstance(mustAvp, bool):
-            msg = "parameter type error, value type: %s, mustAVP type:%s , hiddenAVP error:%s." %(
+            msg = "parameter type error, value type: %s, mustAVP type:%s , hiddenAVP error:%s." % (
                 type(value), type(mustAvp), type(hiddenAvp)
             )
             self.logger.warn(msg)
@@ -309,7 +309,7 @@ class PseudowireTypeCisco(l2tpv3AVP):
 
         if (not isinstance(value, int) and not isinstance(value, long)) \
                 or not isinstance(mustAvp, bool) or not isinstance(hiddenAvp, bool):
-            msg = "parameter type error, value type: %s, mustAVP type:%s , hiddenAVP error:%s." %(
+            msg = "parameter type error, value type: %s, mustAVP type:%s , hiddenAVP error:%s." % (
                 type(value), type(mustAvp), type(hiddenAvp)
             )
             self.logger.warn(msg)
@@ -356,7 +356,7 @@ class DraftAVPVersionCisco(l2tpv3AVP):
     def __init__(self, value=0, attrValue=None):
 
         if not isinstance(value, int) and not isinstance(value, long):
-            msg = "parameter type error, value type: %s" %type(value)
+            msg = "parameter type error, value type: %s" % type(value)
             self.logger.warn(msg)
             raise l2tpv3AVPerror(msg)
 

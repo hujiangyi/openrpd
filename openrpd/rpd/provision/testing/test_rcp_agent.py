@@ -34,54 +34,29 @@ from rpd.gpb.rcp_pb2 import t_RcpMessage
 from rpd.rcp.rcp_sessions import RCPSlaveSession
 from rpd.rcp.gcp.gcp_sessions import GCPSlaveDescriptor
 from rpd.provision.manager.src.manager_process import ManagerProcess
-from rpd.rcp.rcp_orchestrator import RCPMasterCapabilities
+from rpd.rcp.rcp_sessions import CcapCoreIdentification
+from rpd.confdb.testing.test_rpd_redis_db import create_db_conf,\
+    start_redis, stop_redis
+from rpd.confdb.rpd_redis_db import RCPDB
 
 
 timeStampSock = "/tmp/redis.sock"
-
-
-def setupDB():
-    """Create and start the redis server, then set up the DB.
-
-    :parameter: None
-    :return: None
-
-    """
-    global timeStampSock
-    cmd = "redis-server --version"
-    output = subprocess.check_output(cmd.split(" "))
-    if output.find("Redis") < 0:
-        raise Exception("Cannot find redis installation")
-
-    # start a redis server
-    configurefileContent = "daemonize  yes \nport 0 \nunixsocket " + \
-        timeStampSock + " \nunixsocketperm 700\n"
-    filename = "/tmp/test_rcpagent.conf"
-    with open(filename, "w") as f:
-        f.write(configurefileContent)
-
-    subprocess.call(["redis-server", filename])
-
-    timeOut = time.time() + 5
-    while time.time() < timeOut:
-        if os.path.exists(timeStampSock):
-            break
-        time.sleep(1)
-
-    if time.time() > timeOut:
-        raise Exception("Cannot setup the redis")
+CONF_FILE = '/tmp/rcp_db.conf'
 
 
 class TestRcpAgent(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        setupDB()
+        create_db_conf()
+        start_redis()
+        RCPDB.DB_CFG_FILE = CONF_FILE
 
     @classmethod
     def tearDownClass(cls):
-        subprocess.call(["killall", "redis-server"])
         time.sleep(2)
+        stop_redis()
+        os.remove(CONF_FILE)
 
     def setUp(self):
         # try to find the rcp agent
@@ -90,13 +65,13 @@ class TestRcpAgent(unittest.TestCase):
         rpd_index = dirs.index("testing") - 2
         self.rootpath = "/".join(dirs[:rpd_index])
         print "python " + self.rootpath + "/rpd/hal/src/HalMain.py --conf " + self.rootpath + "/rpd/hal/conf/hal.conf"
-        self.hal_pid = subprocess.Popen("coverage run --parallel-mode --rcfile="+self.rootpath+"/.coverage.rc "
-                                        + self.rootpath +
+        self.hal_pid = subprocess.Popen("coverage run --parallel-mode --rcfile=" + self.rootpath + "/.coverage.rc " +
+                                        self.rootpath +
                                         "/rpd/hal/src/HalMain.py --conf " +
                                         self.rootpath + "/rpd/hal/conf/hal.conf",
                                         executable='bash', shell=True)
-        self.rcp_pid = subprocess.Popen("coverage run --parallel-mode --rcfile="+self.rootpath+"/.coverage.rc " 
-                                        + self.rootpath +
+        self.rcp_pid = subprocess.Popen("coverage run --parallel-mode --rcfile=" + self.rootpath + "/.coverage.rc " +
+                                        self.rootpath +
                                         "/rpd/provision/process_agent/rcp/rcp_agent.py",
                                         executable='bash', shell=True)
         time.sleep(2)
@@ -120,11 +95,10 @@ class TestRcpAgent(unittest.TestCase):
         self.stop_mastersim()
         os.system('rm -rf /tmp/ProcessAgent_AGENTTYPE_*')
 
-
     def start_mastersim(self):
         print "*" * 40 + 'start_mastersim' + "*" * 40
-        self.mastersim_pid = subprocess.Popen("coverage run --parallel-mode --rcfile="+self.rootpath+"/.coverage.rc "
-                                              + self.rootpath +
+        self.mastersim_pid = subprocess.Popen("coverage run --parallel-mode --rcfile=" + self.rootpath +
+                                              "/.coverage.rc " + self.rootpath +
                                               "/rpd/rcp/simulator/rcp_master_sim.py" +
                                               " --use_interface 127.0.0.1",
                                               executable='bash',
@@ -165,17 +139,17 @@ class TestRcpAgent(unittest.TestCase):
         sock.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_GCP]['api'])
 
         sock2 = context.socket(zmq.PULL)
-        sock2.bind("ipc:///tmp/sock4.scok")
+        sock2.bind("ipc:///tmp/sock4.sock")
 
-        mgr_scok = context.socket(zmq.REP)
-        mgr_scok.bind("ipc:///tmp/rpd_provision_manager_api.sock")
+        mgr_sock = context.socket(zmq.REP)
+        mgr_sock.bind("ipc:///tmp/rpd_provision_manager_api.sock")
 
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
         reg.id = "test_rcp"
         reg.action = pb2.msg_manager_register.REG
-        reg.path_info = "ipc:///tmp/sock4.scok"
+        reg.path_info = "ipc:///tmp/sock4.sock"
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()
 
@@ -273,16 +247,19 @@ class TestRcpAgent(unittest.TestCase):
 class TestRcpAgentFunc(unittest.TestCase):
 
     def setUp(self):
+        create_db_conf()
+        start_redis()
+        RCPDB.DB_CFG_FILE = CONF_FILE
         setup_logging(("PROVISION", "GCP"), filename="provision_rcp.log")
         self.agent = RcpOverGcp()
-        self.agent.ccap_cores['CORE-1234567890'] = {"mgr": "MGR-1234567890",}
+        self.agent.ccap_cores['CORE-1234567890'] = {"mgr": "MGR-1234567890", }
         self.agent.rcp[('eth0', '1.1.1.1')] = {
             "status": self.agent.DOWN,
             "requester": ['CORE-1234567890', ],
             "lastChangeTime": 1,
         }
 
-        path = "ipc:///tmp/rcp.scok"
+        path = "ipc:///tmp/rcp.sock"
         transport = Transport(
             path, Transport.PUSHSOCK, Transport.TRANSPORT_CLIENT)
 
@@ -301,9 +278,9 @@ class TestRcpAgentFunc(unittest.TestCase):
                           unittest=True)
         self.agent.rcp_req_group[(1, '1.1.1.1')] = (seq, None, 'transaction_identifier', 'trans_id', time.time() - 5)
 
-        self.agent.gcp_flapping_list[('eth0', '1.1.1.1')] = None
-
     def tearDown(self):
+        stop_redis()
+        os.remove(CONF_FILE)
         self.agent.mgrs["MGR-1234567890"]['transport'].sock.close()
         self.agent = None
         os.system("rm /tmp/ProcessAgent_AGENTTYPE_GCP")
@@ -317,16 +294,12 @@ class TestRcpAgentFunc(unittest.TestCase):
             "requester": ['CORE-1234567895', ],
             "lastChangeTime": 1,
         }
-        self.agent.gcp_flapping_list[('eth0', '1.1.1.5')] = None
-        self.agent.gcp_flap_timeout(('eth0', '1.1.1.5'))
 
-        self.agent.ccap_cores['CORE-1234567895'] = {"mgr": "MGR-1234567890",}
+        self.agent.ccap_cores['CORE-1234567895'] = {"mgr": "MGR-1234567890", }
         self.agent.rcp[('eth0', '1.1.1.5')]['status'] = self.agent.UP
-        self.agent.gcp_flap_timeout(('eth0', '1.1.1.5'))
         self.agent.ccap_cores.pop('CORE-1234567895')
 
         self.agent.rcp[('eth0', '1.1.1.5')]['status'] = self.agent.UP
-        self.agent.gcp_flap_timeout(('eth0', '1.1.1.5'))
 
     def test_mgr_rcp_rsp_not_exist(self):
         print '############test not exist case#############'
@@ -414,11 +387,11 @@ class TestRcpAgentFunc(unittest.TestCase):
                                   orch.session_initiate_cb,
                                   orch.session_timeout_cb,
                                   orch.session_connecting_timeout_cb)
-        self.agent.rcp_msg_cb(seq,  (session, 'transaction_identifier', 'trans_id'))
+        self.agent.rcp_msg_cb(seq, (session, 'transaction_identifier', 'trans_id'))
 
     def test_rcp_msg_cb_event(self):
         print '############test rcp_msg_cb event case#############'
-
+        RCPDB.DB_CFG_FILE = CONF_FILE
         seq = RCPSequence(gcp_msg_def.DataStructREQ,
                           rcp_tlv_def.RCP_MSG_TYPE_REX,
                           1,
@@ -478,7 +451,7 @@ class TestRcpAgentFunc(unittest.TestCase):
         red = cfg.RedundantCoreIpAddress.add()
         red.ActiveCoreIpAddress = '1.1.1.1'
         red.StandbyCoreIpAddress = '1.1.1.3'
-        self.agent.rcp_msg_cb(rcp_msg) # no must field
+        self.agent.rcp_msg_cb(rcp_msg)  # no must field
 
         desc1 = GCPSlaveDescriptor(
             '1.1.1.1', port_master='8190', addr_local='1.1.1.2',
@@ -486,22 +459,22 @@ class TestRcpAgentFunc(unittest.TestCase):
             addr_family=socket.AF_INET)
         orch = self.agent.process.orchestrator
         session_1 = RCPSlaveSession(desc1, self.agent.process.dispatcher,
-                                  orch.session_initiate_cb,
-                                  orch.session_timeout_cb,
-                                  orch.session_connecting_timeout_cb)
+                                    orch.session_initiate_cb,
+                                    orch.session_timeout_cb,
+                                    orch.session_connecting_timeout_cb)
         self.agent.process.orchestrator.sessions_active[desc1.get_uniq_id()] = session_1
-        caps1 = RCPMasterCapabilities(index=1,
-                                      core_id="CoreId-1",
-                                      core_ip_addr='1.1.1.1',
-                                      is_principal=True,
-                                      core_name="SIM_GCPP",
-                                      vendor_id=0,
-                                      is_active=True,
-                                      initial_configuration_complete=True,
-                                      move_to_operational=True,
-                                      core_function=1,
-                                      resource_set_index=2)
-        session_1.ccap_capabilities = caps1
+        caps1 = CcapCoreIdentification(index=1,
+                                       core_id="CoreId-1",
+                                       core_ip_addr='1.1.1.1',
+                                       is_principal=True,
+                                       core_name="SIM_GCPP",
+                                       vendor_id=0,
+                                       core_mode=True,
+                                       initial_configuration_complete=True,
+                                       move_to_operational=True,
+                                       core_function=1,
+                                       resource_set_index=2)
+        session_1.ccap_identification = caps1
 
         desc2 = GCPSlaveDescriptor(
             '1.1.1.3', port_master='8190', addr_local='1.1.1.2',
@@ -509,24 +482,23 @@ class TestRcpAgentFunc(unittest.TestCase):
             addr_family=socket.AF_INET)
         orch = self.agent.process.orchestrator
         session_2 = RCPSlaveSession(desc2, self.agent.process.dispatcher,
-                                  orch.session_initiate_cb,
-                                  orch.session_timeout_cb,
-                                  orch.session_connecting_timeout_cb)
+                                    orch.session_initiate_cb,
+                                    orch.session_timeout_cb,
+                                    orch.session_connecting_timeout_cb)
         # self.agent.process.orchestrator.add_sessions([desc2])
         self.agent.process.orchestrator.sessions_active[desc2.get_uniq_id()] = session_2
-        caps2 = RCPMasterCapabilities(index=1,
-                                      core_id="CoreId-2",
-                                      core_ip_addr='1.1.1.1',
-                                      is_principal=True,
-                                      core_name="SIM_GCPP",
-                                      vendor_id=0,
-                                      is_active=True,
-                                      initial_configuration_complete=True,
-                                      move_to_operational=True,
-                                      core_function=1,
-                                      resource_set_index=2)
-        session_2.ccap_capabilities = caps2
-
+        caps2 = CcapCoreIdentification(index=1,
+                                       core_id="CoreId-2",
+                                       core_ip_addr='1.1.1.1',
+                                       is_principal=True,
+                                       core_name="SIM_GCPP",
+                                       vendor_id=0,
+                                       core_mode=True,
+                                       initial_configuration_complete=True,
+                                       move_to_operational=True,
+                                       core_function=1,
+                                       resource_set_index=2)
+        session_2.ccap_identification = caps2
 
         caps1.is_active = False
         caps2.is_active = True
@@ -609,7 +581,7 @@ class TestRcpAgentFunc(unittest.TestCase):
         req.action.action = pb2.msg_event.START
         self.agent.process_event_action(req.action)
 
-        self.agent.ccap_cores['CORE-1234567891'] = {"mgr": "MGR-1234567890",}
+        self.agent.ccap_cores['CORE-1234567891'] = {"mgr": "MGR-1234567890", }
         req.action.ccap_core_id = "CORE-1234567891"
         req.action.parameter = "eth0;1.1.1.1"
         req.action.action = pb2.msg_event.START
@@ -653,6 +625,7 @@ class TestRcpAgentFunc(unittest.TestCase):
 
     def test_cleanup_db(self):
         self.agent.cleanup_db('CORE-1234567890')
+
 
 if __name__ == "__main__":
     unittest.main()

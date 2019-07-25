@@ -1,0 +1,222 @@
+--- a/src/ra.c
++++ b/src/ra.c
+@@ -32,6 +32,8 @@
+ 
+ #include <linux/rtnetlink.h>
+ 
++#include <stdio.h>
++
+ #ifndef SOL_NETLINK
+ #define SOL_NETLINK 270
+ #endif
+@@ -141,6 +143,19 @@ int ra_init(const char *ifname, const st
+ }
+ 
+ 
++void ipv6_to_str_unexpanded(char * str, const struct in6_addr * addr) {
++   sprintf(str, "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
++                 (int)addr->s6_addr[0], (int)addr->s6_addr[1],
++                 (int)addr->s6_addr[2], (int)addr->s6_addr[3],
++                 (int)addr->s6_addr[4], (int)addr->s6_addr[5],
++                 (int)addr->s6_addr[6], (int)addr->s6_addr[7],
++                 (int)addr->s6_addr[8], (int)addr->s6_addr[9],
++                 (int)addr->s6_addr[10], (int)addr->s6_addr[11],
++                 (int)addr->s6_addr[12], (int)addr->s6_addr[13],
++                 (int)addr->s6_addr[14], (int)addr->s6_addr[15]);
++}
++
++
+ static void ra_send_rs(int signal __attribute__((unused)))
+ {
+ 	const struct sockaddr_in6 dest = {AF_INET6, 0, 0, ALL_IPV6_ROUTERS, if_index};
+@@ -293,6 +308,9 @@ bool ra_process(void)
+ 		close(sock);
+ 	}
+ 
++	uint8_t m_flag = 0;
++	uint8_t o_flag = 0;
++
+ 	while (true) {
+ 		struct sockaddr_in6 from;
+ 		struct iovec iov = {buf, sizeof(buf)};
+@@ -342,6 +360,8 @@ bool ra_process(void)
+ 		entry->length = 0;
+ 		entry->router = from.sin6_addr;
+ 		entry->priority = pref_to_priority(adv->nd_ra_flags_reserved);
++		m_flag = (adv->nd_ra_flags_reserved & ND_RA_FLAG_MANAGED) == ND_RA_FLAG_MANAGED;
++		o_flag = (adv->nd_ra_flags_reserved & ND_RA_FLAG_OTHER) == ND_RA_FLAG_OTHER;
+ 		if (entry->priority < 0)
+ 			entry->priority = pref_to_priority(0);
+ 		entry->valid = router_valid;
+@@ -386,6 +406,10 @@ bool ra_process(void)
+ 				entry->valid = ntohl(pinfo->nd_opt_pi_valid_time);
+ 				entry->preferred = ntohl(pinfo->nd_opt_pi_preferred_time);
+ 
++				char prefix_addr[40];
++				ipv6_to_str_unexpanded(prefix_addr, &pinfo->nd_opt_pi_prefix);
++				syslog(LOG_NOTICE, "Received icmpv6 with prefix: %s/%d", prefix_addr, pinfo->nd_opt_pi_prefix_len);
++
+ 				if (entry->length > 128 || IN6_IS_ADDR_LINKLOCAL(&entry->target)
+ 						|| IN6_IS_ADDR_LOOPBACK(&entry->target)
+ 						|| IN6_IS_ADDR_MULTICAST(&entry->target)
+@@ -396,12 +420,22 @@ bool ra_process(void)
+ 					changed |= odhcp6c_update_entry(STATE_RA_ROUTE, entry, 7200, true);
+ 
+ 				if (!(pinfo->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_AUTO) ||
+-						pinfo->nd_opt_pi_prefix_len != 64)
++						pinfo->nd_opt_pi_prefix_len != 64) {
++					syslog(LOG_WARNING,"Prefix length is not 64bit or Autonomous address-configuration flag(A) is missing in icmpv6 options");
+ 					continue;
++				}
++
++				odhcp6c_add_state(STATE_M_FLAG, &m_flag, sizeof(m_flag));
++				odhcp6c_add_state(STATE_O_FLAG, &o_flag, sizeof(o_flag));
++				syslog(LOG_INFO,"Saved flags M:%d O:%d", m_flag, o_flag);
+ 
+ 				entry->target.s6_addr32[2] = lladdr.s6_addr32[2];
+ 				entry->target.s6_addr32[3] = lladdr.s6_addr32[3];
+ 
++				char stateless_addr[40];
++				ipv6_to_str_unexpanded(stateless_addr, &entry->target);
++				syslog(LOG_INFO,"Prefix + Modified EUI64 address for SLAAC: %s", stateless_addr);
++
+ 				changed |= odhcp6c_update_entry(STATE_RA_PREFIX, entry, 7200, true);
+ 			} else if (opt->type == ND_OPT_RECURSIVE_DNS && opt->len > 2) {
+ 				entry->router = from.sin6_addr;
+@@ -467,3 +501,4 @@ void check_and_report_event(void)
+         syslog(LOG_CRIT, "66070314:DHCP failed - RS sent, no RA received");
+     }
+ }
++
+--- a/src/script.c
++++ b/src/script.c
+@@ -402,7 +402,19 @@ void script_call(const char *status)
+ 			entry_to_env("ADDRESSES", address, address_len, ENTRY_ADDRESS);
+ 		}
+ 
+-		entry_to_env("RA_ADDRESSES", ra_pref, ra_pref_len, ENTRY_ADDRESS);
++		size_t m_flag_len, o_flag_len;
++		void *m_flag_p = odhcp6c_get_state(STATE_M_FLAG, &m_flag_len);
++		void *o_flag_p = odhcp6c_get_state(STATE_O_FLAG, &o_flag_len);
++		if (o_flag_len != 0 && m_flag_len != 0) {
++			uint8_t o_flag = *(uint8_t*)o_flag_p;
++			uint8_t m_flag = *(uint8_t*)m_flag_p;
++			if (!m_flag && o_flag){
++				//only let stateless set the RA_ADDRESSES
++				syslog(LOG_NOTICE,"STATELESS mode set RA_ADDRESSES to env");
++				entry_to_env("RA_ADDRESSES", ra_pref, ra_pref_len, ENTRY_ADDRESS);
++			}
++		}
++
+ 		entry_to_env("RA_ROUTES", ra_route, ra_route_len, ENTRY_ROUTE);
+ 		entry_to_env("RA_DNS", ra_dns, ra_dns_len, ENTRY_HOST);
+ 		search_to_env("RA_DOMAINS", ra_search, ra_search_len);
+@@ -425,7 +437,7 @@ void script_call(const char *status)
+ 		_exit(128);
+ 	}
+ 
+-	bool is_bound = (strcmp(status, "bound") == 0);
++	bool is_bound = (strcmp(status, "bound") == 0) || (strcmp(status, "informed") == 0);
+ 	if (NULL != vendor && 0 != vendor_opts_len && is_bound) {
+ 		dhcpv6_parse_vendor_opts_data(vendor, vendor_opts_len, ipc_sock);
+ 	}
+--- a/src/dhcpv6.c
++++ b/src/dhcpv6.c
+@@ -498,6 +498,18 @@ void dhcpv6_parse_vendor_opts_data(uint8
+ 			break;
+ 		}
+ 	}
++	ipc_data.has_slaac = true;
++	ipc_data.slaac = false;
++	size_t m_flag_len, o_flag_len;
++	void *m_flag_p = odhcp6c_get_state(STATE_M_FLAG, &m_flag_len);
++	void *o_flag_p = odhcp6c_get_state(STATE_O_FLAG, &o_flag_len);
++	if (m_flag_len && o_flag_len) {
++		uint8_t m_flag = *(uint8_t*)m_flag_p;
++		uint8_t o_flag = *(uint8_t*)o_flag_p;
++		if (!m_flag && o_flag)
++			ipc_data.slaac = true;
++	}
++	syslog(LOG_NOTICE, "   slaac=%d", ipc_data.slaac);
+ 	// send parsed value to manager process
+ 	if (NULL == sock) {
+ 		syslog(LOG_NOTICE, "Socket to parent not ready, skipping sending info");
+@@ -1780,5 +1792,56 @@ int dhcpv6_promote_server_cand(void)
+ 
+ 	odhcp6c_remove_state(STATE_SERVER_CAND, 0, sizeof(*cand));
+ 
++	syslog(LOG_INFO, "Checking prefix mode from odhcpc...");
++	if (ret == DHCPV6_STATEFUL)
++		syslog(LOG_INFO,"Prefix mode is STATEFUL");
++	else if (ret == DHCPV6_STATELESS)
++		syslog(LOG_INFO,"Prefix mode is STATELESS");
++	else
++		syslog(LOG_INFO,"Prefix mode is unknown(%d)",ret);
++
++	syslog(LOG_INFO, "Checking for existence of M/O flags");
++	size_t m_flag_len, o_flag_len;
++	void *m_flag_p = odhcp6c_get_state(STATE_M_FLAG, &m_flag_len);
++	void *o_flag_p = odhcp6c_get_state(STATE_O_FLAG, &o_flag_len);
++
++	if (!m_flag_len && !o_flag_len) {
++		if(ret == DHCPV6_STATEFUL) {
++			syslog(LOG_NOTICE,"no RA recived with STATEFUL prefix, continue");
++			return ret;
++		}
++		syslog(LOG_ERR,"no RA received with STATELESS prefix, can't continue");
++		return -1;
++	}
++
++	// Log flags value and combination result
++	uint8_t m_flag = *(uint8_t*)m_flag_p;
++	uint8_t o_flag = *(uint8_t*)o_flag_p;
++	syslog(LOG_INFO, "Found flags M:%d O:%d", m_flag, o_flag);
++
++	if (m_flag)
++		syslog(LOG_INFO, "STATEFUL flag combination detected");
++	else if (!m_flag && o_flag)
++		syslog(LOG_INFO, "STATELESS flag combination detected");
++	else
++		syslog(LOG_WARNING, "flag combination not supported");
++
++	// Check and log for negative cases
++	if (ret == DHCPV6_STATELESS && m_flag) {
++		syslog(LOG_ERR,"odhcpc detects prefix is STATELESS but flags set to STATEFUL, can't continue");
++		return -1;
++	}
++	if (ret == DHCPV6_STATELESS && !o_flag) {
++		syslog(LOG_ERR,"odhcpc detects prefix is STATELESS but O flag is not set, can't continue");
++		return -1;
++	}
++	if (ret == DHCPV6_STATEFUL && !m_flag && o_flag) {
++		syslog(LOG_ERR,"odhcpc detects prefix is STATEFUL but flags set to STATELESS, can't continue");
++		return -1;
++	}
++	if (!m_flag && !o_flag) {
++		syslog(LOG_WARNING,"M/O flags all set to 0, ignore and return prefix mode from odhcpc");
++	}
++
+ 	return ret;
+ }
+--- a/src/odhcp6c.c
++++ b/src/odhcp6c.c
+@@ -336,6 +336,8 @@ int main(_unused int argc, char* const a
+ 		odhcp6c_clear_state(STATE_NTP_FQDN);
+ 		odhcp6c_clear_state(STATE_SIP_IP);
+ 		odhcp6c_clear_state(STATE_SIP_FQDN);
++		odhcp6c_clear_state(STATE_M_FLAG);
++		odhcp6c_clear_state(STATE_O_FLAG);
+ 		bound = false;
+ 
+ 		syslog(LOG_NOTICE, "(re)starting transaction on %s", ifname);
+--- a/src/odhcp6c.h
++++ b/src/odhcp6c.h
+@@ -289,6 +289,8 @@ enum odhcp6c_state {
+ 	STATE_S46_MAPE,
+ 	STATE_S46_LW,
+ 	STATE_PASSTHRU,
++	STATE_M_FLAG,
++	STATE_O_FLAG,
+ 	_STATE_MAX
+ };
+ 

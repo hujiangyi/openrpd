@@ -1,0 +1,15 @@
+This folder is an archive of Wireshark traces that 
+support OpenRPDd integration testing.
+
+------------------------------------------------------------------------------
+| File Name                       | Description                              | 
+------------------------------------------------------------------------------
+|  _2018-09-19_14-20-52.pcap.gz   |  g-zipped Wireshark trace showing a      |
+|                                 |  full initialization sequence for        |
+!                                 !  OpenRPD (using IPv4).  Last message     |
+|                                 |  shows "Initial Configuration Complete"  |
+|                                 |  from Core to OpenRPD.  Msg. # 1498 in   |
+|                                 |  trace.  Core is Vector CCS              |
+------------------------------------------------------------------------------
+
+

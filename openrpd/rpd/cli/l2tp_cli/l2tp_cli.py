@@ -379,7 +379,6 @@ class L2tpCli(object):
         pass
 
     def show_l2tp_session_link(self):
-
         """'show l2tp session' cabllback."""
 
         # get all connections

@@ -21,7 +21,6 @@ import zmq
 import rpd.provision.proto.provision_pb2 as ppb2
 import rpd.provision.proto.process_agent_pb2 as pb2
 from rpd.provision.process_agent.agent.agent import ProcessAgent
-from rpd.common.utils import SysTools
 
 
 @unittest.skip("skip the test temperately")
@@ -90,14 +89,14 @@ class TestProcessAgent(unittest.TestCase):
         sock.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_IPSEC]['api'])
 
         sock2 = context.socket(zmq.PULL)
-        sock2.bind("ipc:///tmp/sock4.scok")
+        sock2.bind("ipc:///tmp/sock4.sock")
 
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
         reg.id = "abcd"
         reg.action = pb2.msg_manager_register.REG
-        # reg.path_info = "ipc:///tmp/sock4.scok"
+        # reg.path_info = "ipc:///tmp/sock4.sock"
         reg.path_info = ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_IPSEC]['api']
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()

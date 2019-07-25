@@ -1,9 +1,9 @@
 #!/bin/sh
 do_rotate_clean()
 {
-   # more than 10 rotation file,should do some  rotate clean
+   # more than 100 rotation file,should do some  rotate clean
    lognum=`ls $1/rpd_*.tar.gz|wc -l`
-   while [[ $lognum -gt 10 ]]
+   while [[ $lognum -gt 100 ]]
    do
        logger -p local7.info "Clean Log Rotate: delete one oldest $1 one archive"
        ls -rt $1/rpd_*.tar.gz|head -n 1|xargs rm -rf

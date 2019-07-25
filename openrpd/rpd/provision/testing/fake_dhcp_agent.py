@@ -25,6 +25,7 @@ class Dhcp(FakeAgent):
     def __init__(self):
         super(Dhcp, self).__init__(agent.ProcessAgent.AGENTTYPE_DHCP)
 
+
 if __name__ == "__main__":
     setup_logging("PROVISION", filename="provision_dhcp.log")
     pagent = Dhcp()

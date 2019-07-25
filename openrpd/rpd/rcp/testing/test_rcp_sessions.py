@@ -18,8 +18,9 @@
 import unittest
 import threading
 import errno
+import os
 from os import EX_DATAERR
-from rpd.rcp.rcp_sessions import RCPSlaveSession, RCPMasterCapabilities,RCPMasterDescriptor, RCPMaster
+from rpd.rcp.rcp_sessions import RCPSlaveSession, CcapCoreIdentification, RCPMasterDescriptor, RCPMaster
 from rpd.dispatcher.dispatcher import Dispatcher
 from rpd.rcp.rcp_lib import rcp_tlv_def, rcp
 from rpd.rcp.rcp_packet_director import RCPMasterScenario
@@ -30,14 +31,25 @@ from rpd.gpb.rcp_pb2 import t_RcpMessage
 from rpd.gpb.provisionapi_pb2 import t_PrivisionApiMessage as t_CliMessage
 from rpd.provision.proto import GcpMsgType
 from rpd.rcp.gcp.gcp_sessions import GCPSlaveDescriptor, GCPSession
+from rpd.confdb.testing.test_rpd_redis_db import create_db_conf,\
+    start_redis, stop_redis
+from rpd.confdb.rpd_redis_db import RCPDB
+
+CONF_FILE = '/tmp/rcp_db.conf'
+SOCKET_PATH = '/tmp/testRedis.sock'
+
 
 def fake_cb(data):
     print "fake cb handled"
 
 
 class RcpSessionTest(unittest.TestCase):
+
     @classmethod
     def setUpClass(cls):
+        create_db_conf()
+        start_redis()
+        RCPDB.DB_CFG_FILE = CONF_FILE
         cls.dispatcher = Dispatcher()
         cls.desc = GCPSlaveDescriptor(addr_master='localhost', interface_local='local')
         cls.session = RCPSlaveSession(cls.desc, cls.dispatcher,
@@ -45,6 +57,8 @@ class RcpSessionTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        stop_redis()
+        os.remove(CONF_FILE)
         cls.session.close()
 
     def setUp(self):
@@ -58,7 +72,7 @@ class RcpSessionTest(unittest.TestCase):
 
         try:
             RCPSlaveSession(self.desc, None,
-                        fake_cb, fake_cb, fake_cb)
+                            fake_cb, fake_cb, fake_cb)
         except Exception as e:
             self.assertIsInstance(e, AttributeError)
 
@@ -73,7 +87,6 @@ class RcpSessionTest(unittest.TestCase):
                             None, fake_cb, fake_cb)
         except Exception as e:
             self.assertIsInstance(e, AttributeError)
-
 
         self.assertIsNotNone(self.session)
 
@@ -126,7 +139,7 @@ class RcpSessionTest(unittest.TestCase):
         self.session.initiate()
         self.assertFalse(self.session.is_initiated())
 
-        self.session.session_state =GCPSession.SESSION_STATE_INPROCESS
+        self.session.session_state = GCPSession.SESSION_STATE_INPROCESS
         self.session.initiate()
         self.assertFalse(self.session.is_initiated())
 
@@ -136,7 +149,7 @@ class RcpSessionTest(unittest.TestCase):
         self.session.close()
 
         self.session.initiate_timer = self.dispatcher.timer_register(
-                self.session.CORE_CONNECT_TIMEOUT, self.session.connecting_timeout_cb, arg=self)
+            self.session.CORE_CONNECT_TIMEOUT, self.session.connecting_timeout_cb, arg=self)
         self.session.timeout_timer = self.dispatcher.timer_register(
             self.session.CORE_CONNECT_TIMEOUT, self.session.connecting_timeout_cb, arg=self)
         self.session.close()
@@ -146,18 +159,18 @@ class RcpSessionTest(unittest.TestCase):
         self.session.close()
         self.session.dispatcher = self.dispatcher
 
-    def test_RCPMasterCapabilities(self):
+    def test_CcapCoreIdentification(self):
         try:
-            ret = RCPMasterCapabilities(index =None)
+            ret = CcapCoreIdentification(index=None)
         except Exception as e:
             self.assertIsInstance(e, AttributeError)
-        ret  = RCPMasterCapabilities(index=1,core_id="CORE_12312ds",
-                              core_ip_addr="1.1.1.1",
-                              is_principal=True,
-                              core_name="CBR",
-                              vendor_id=9,
-                              is_active=True)
-        self.assertIsInstance(ret, RCPMasterCapabilities)
+        ret = CcapCoreIdentification(index=1, core_id="CORE_12312ds",
+                                     core_ip_addr="1.1.1.1",
+                                     is_principal=True,
+                                     core_name="CBR",
+                                     vendor_id=9,
+                                     core_mode=True)
+        self.assertIsInstance(ret, CcapCoreIdentification)
 
     def test_RCPMasterDescriptor(self):
         try:
@@ -165,20 +178,20 @@ class RcpSessionTest(unittest.TestCase):
         except Exception as e:
             self.assertIsInstance(e, TypeError)
 
-        cap = RCPMasterCapabilities(index=1, core_id="CORE_12312ds",
-                                    core_ip_addr="1.1.1.1",
-                                    is_principal=True,
-                                    core_name="CBR",
-                                    vendor_id=9,
-                                    is_active=True)
+        cap = CcapCoreIdentification(index=1, core_id="CORE_12312ds",
+                                     core_ip_addr="1.1.1.1",
+                                     is_principal=True,
+                                     core_name="CBR",
+                                     vendor_id=9,
+                                     core_mode=True)
         test = "test"
         try:
-            ret = RCPMasterDescriptor(capabilities=cap,addr=None, scenario=test)
+            ret = RCPMasterDescriptor(capabilities=cap, addr=None, scenario=test)
         except Exception as e:
             self.assertIsInstance(e, TypeError)
 
-        ret = RCPMasterDescriptor(capabilities=cap,addr="1.1.1.1")
-        self.assertIsInstance(ret,RCPMasterDescriptor)
+        ret = RCPMasterDescriptor(capabilities=cap, addr="1.1.1.1")
+        self.assertIsInstance(ret, RCPMasterDescriptor)
 
     def test_RCPMasterConnectionContext(self):
         ctx = RCPMaster.RCPMasterConnectionContext(socket=None)
@@ -193,20 +206,20 @@ class RcpSessionTest(unittest.TestCase):
         self.assertEqual(ret, 2)
 
         ret = ctx.get_responses_list()
-        self.assertEqual(ret,ctx._responses_list)
+        self.assertEqual(ret, ctx._responses_list)
 
         ret = ctx.get_last_response()
         self.assertIsNone(ret)
 
         test = "test"
         ctx.add_response(test)
-        self.assertEqual(0,ctx.get_responses_count())
+        self.assertEqual(0, ctx.get_responses_count())
 
         pkt = rcp.RCPPacket()
         pkt_1 = rcp.RCPPacket()
         ctx.add_response(pkt)
-        self.assertEqual(1,ctx.get_responses_count())
-        for i in range(0,ctx.max_rsp_list_size):
+        self.assertEqual(1, ctx.get_responses_count())
+        for i in range(0, ctx.max_rsp_list_size):
             ctx.add_response(pkt_1)
         self.assertEqual(ctx.get_responses_count(), ctx.max_rsp_list_size)
         ret = ctx.get_last_response()
@@ -233,13 +246,12 @@ class RcpSessionTest(unittest.TestCase):
         except Exception as e:
             self.assertIsInstance(e, TypeError)
 
-
-        cap = RCPMasterCapabilities(index=1, core_id="CORE_12312ds",
-                                    core_ip_addr="1.1.1.1",
-                                    is_principal=True,
-                                    core_name="CBR",
-                                    vendor_id=9,
-                                    is_active=True)
+        cap = CcapCoreIdentification(index=1, core_id="CORE_12312ds",
+                                     core_ip_addr="1.1.1.1",
+                                     is_principal=True,
+                                     core_name="CBR",
+                                     vendor_id=9,
+                                     core_mode=True)
         scena = RCPMasterScenario()
 
         desc = RCPMasterDescriptor(capabilities=cap, addr="localhost", scenario=scena)
@@ -258,14 +270,14 @@ class RcpSessionTest(unittest.TestCase):
         self.assertIsNotNone(rsp_list)
 
         test = "test"
-        master.add_response(pkt=test,fd=fd)
-        self.assertEqual(0,master.get_responses_count(fd=fd))
+        master.add_response(pkt=test, fd=fd)
+        self.assertEqual(0, master.get_responses_count(fd=fd))
 
         pkt = rcp.RCPPacket()
         master.add_response(pkt=pkt, fd=fd)
-        self.assertEqual(1,master.get_responses_count(fd=fd))
+        self.assertEqual(1, master.get_responses_count(fd=fd))
         ret_pkt = master.get_last_response(fd)
-        self.assertEqual(pkt,ret_pkt)
+        self.assertEqual(pkt, ret_pkt)
 
         master.close()
         master.remove_connection(fd)
@@ -278,6 +290,6 @@ class RcpSessionTest(unittest.TestCase):
         master.remove_connection(fd=fd)
         master.close()
 
+
 if __name__ == '__main__':
     unittest.main()
-

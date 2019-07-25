@@ -23,7 +23,6 @@ from docsisAVPs.src.L2tpv3CableLabsAvps import LocalMTUCableLabs, DepiResourceAl
     DepiL2SpecificSublayerSubtype, DepiMulticastCapability, DepiRemoteMulticastJoin,\
     DepiRemoteMulticastLeave, DepiResourceAllocReq, UpstreamFlow
 
-from l2tpv3.src.L2tpv3GlobalSettings import L2tpv3GlobalSettings
 import l2tpv3.src.L2tpv3ControlPacket as L2tpv3ControlPacket
 from rpd.dispatcher.dispatcher import Dispatcher
 from l2tpv3.src.L2tpv3Hal import L2tpHalClient
@@ -40,12 +39,15 @@ import docsisAVPs.src.L2tpv3CableLabsAvps as L2tpv3CableLabsAvps
 from l2tpv3.src.L2tpv3Dispatcher import L2tpv3Dispatcher
 from l2tpv3.src.L2tpv3GlobalSettings import L2tpv3GlobalSettings
 from rpd.common.rpd_logging import AddLoggerToClass
+from rpd.confdb.testing.test_rpd_redis_db import setup_test_redis, stop_test_redis
 
 
 class testL2tpv3CableLabsAVP(unittest.TestCase):
+
     @classmethod
     def setUpClass(cls):
         cls.conn_address = '127.0.0.1'
+        setup_test_redis()
         global_dispatcher = Dispatcher()
         dispatcher = L2tpv3Dispatcher(global_dispatcher, cls.conn_address, False, None)
         L2tpv3GlobalSettings.Dispatcher = dispatcher
@@ -59,6 +61,7 @@ class testL2tpv3CableLabsAVP(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        stop_test_redis()
         L2tpv3GlobalSettings.Dispatcher.request_unregister(
             {"unregType": "localaddress", "value": cls.conn_address})
         pass
@@ -109,7 +112,7 @@ class testL2tpv3CableLabsAVP(unittest.TestCase):
         print avp1
 
     def test_ResourceAllocReq(self):
-        avp1 = DepiResourceAllocReq(value=((0, 1),(2, 3)))
+        avp1 = DepiResourceAllocReq(value=((0, 1), (2, 3)))
         print avp1
         buf = avp1.encode()
         print len(buf)
@@ -123,7 +126,7 @@ class testL2tpv3CableLabsAVP(unittest.TestCase):
         ret = avp1.handleAvp(pkt=None, retPak=pkt)
         self.assertTrue(ret)
         self.assertIsInstance(pkt.avps[0], DepiResourceAllocReplyCableLabs)
-        self.assertEqual(pkt.avps[0].allocas, ((0, 1),(2, 3)))
+        self.assertEqual(pkt.avps[0].allocas, ((0, 1), (2, 3)))
 
     def test_DepiPseudowireSubtypeCapList(self):
         avp1 = DepiPseudowireSubtypeCapList(value=(1, 2, 3, 4))
@@ -176,16 +179,16 @@ class testL2tpv3CableLabsAVP(unittest.TestCase):
         self.assertEqual(pkt.avps[0].mcast_capable, mcast_cap)
 
     def test_DepiRemoteMulticastJoin(self):
-        data = DepiRemoteMulticastJoin.decode(struct.pack("!34B",0x00,0x00,
-                                                   0x1, 0x1, 0x2, 0x1,
-                                                   0x00, 0x00, 0x00, 0x00,
-                                                   0x00, 0x00, 0x00, 0x00,
-                                                   0x00, 0x00, 0x00, 0x00,
-                                                   0x1, 0x1, 0x1, 0x1,
-                                                   0x00, 0x00, 0x00, 0x00,
-                                                   0x00, 0x00, 0x00, 0x00,
-                                                   0x00, 0x00, 0x00, 0x00
-                                                   ))
+        data = DepiRemoteMulticastJoin.decode(struct.pack("!34B", 0x00, 0x00,
+                                                          0x1, 0x1, 0x2, 0x1,
+                                                          0x00, 0x00, 0x00, 0x00,
+                                                          0x00, 0x00, 0x00, 0x00,
+                                                          0x00, 0x00, 0x00, 0x00,
+                                                          0x1, 0x1, 0x1, 0x1,
+                                                          0x00, 0x00, 0x00, 0x00,
+                                                          0x00, 0x00, 0x00, 0x00,
+                                                          0x00, 0x00, 0x00, 0x00
+                                                          ))
         self.assertIsInstance(data, DepiRemoteMulticastJoin)
         self.assertEqual(data.src_ip, "1.1.2.1")
         self.assertEqual(data.group_ip, "1.1.1.1")
@@ -222,30 +225,30 @@ class testL2tpv3CableLabsAVP(unittest.TestCase):
 
     def test_DepiRemoteMulticastLeave(self):
 
-        data = DepiRemoteMulticastLeave.decode(struct.pack("!34B",0x00,0x00,
-                                                   0x1, 0x1, 0x2, 0x1,
-                                                   0x00, 0x00, 0x00, 0x00,
-                                                   0x00, 0x00, 0x00, 0x00,
-                                                   0x00, 0x00, 0x00, 0x00,
-                                                   0x1, 0x1, 0x1, 0x1,
-                                                   0x00, 0x00, 0x00, 0x00,
-                                                   0x00, 0x00, 0x00, 0x00,
-                                                   0x00, 0x00, 0x00, 0x00
-                                                   ))
+        data = DepiRemoteMulticastLeave.decode(struct.pack("!34B", 0x00, 0x00,
+                                                           0x1, 0x1, 0x2, 0x1,
+                                                           0x00, 0x00, 0x00, 0x00,
+                                                           0x00, 0x00, 0x00, 0x00,
+                                                           0x00, 0x00, 0x00, 0x00,
+                                                           0x1, 0x1, 0x1, 0x1,
+                                                           0x00, 0x00, 0x00, 0x00,
+                                                           0x00, 0x00, 0x00, 0x00,
+                                                           0x00, 0x00, 0x00, 0x00
+                                                           ))
         self.assertIsInstance(data, DepiRemoteMulticastLeave)
         self.assertEqual(data.src_ip, "1.1.2.1")
         self.assertEqual(data.group_ip, "1.1.1.1")
 
         data = DepiRemoteMulticastLeave.decode(struct.pack("!34B", 0x00, 0x00,
-                                                          0x11, 0x11, 0x11, 0x11,
-                                                          0x11, 0x11, 0x11, 0x11,
-                                                          0x11, 0x11, 0x11, 0x11,
-                                                          0x11, 0x11, 0x11, 0x11,
-                                                          0x11, 0x11, 0x11, 0x11,
-                                                          0x11, 0x11, 0x11, 0x11,
-                                                          0x11, 0x11, 0x11, 0x12,
-                                                          0x11, 0x11, 0x11, 0x11
-                                                          ))
+                                                           0x11, 0x11, 0x11, 0x11,
+                                                           0x11, 0x11, 0x11, 0x11,
+                                                           0x11, 0x11, 0x11, 0x11,
+                                                           0x11, 0x11, 0x11, 0x11,
+                                                           0x11, 0x11, 0x11, 0x11,
+                                                           0x11, 0x11, 0x11, 0x11,
+                                                           0x11, 0x11, 0x11, 0x12,
+                                                           0x11, 0x11, 0x11, 0x11
+                                                           ))
 
         self.assertIsInstance(data, DepiRemoteMulticastLeave)
         avp1 = DepiRemoteMulticastLeave(value=("5.5.5.1", "223.222.222.255"))
@@ -288,27 +291,28 @@ class testL2tpv3CableLabsAVP(unittest.TestCase):
         try:
             DepiPseudowireSubtypeCapList("1234")
         except l2tpv3AVPerror as e:
-                self.assertEqual(str(e), "parameter type error")
+            self.assertEqual(str(e), "parameter type error")
         try:
             DepiPseudowireSubtype(value=23)
         except l2tpv3AVPerror as e:
-                self.assertEqual(str(e), "parameter type error")
+            self.assertEqual(str(e), "parameter type error")
         try:
             DepiL2SpecificSublayerSubtype(value=23)
         except l2tpv3AVPerror as e:
-                self.assertEqual(str(e), "parameter type error")
+            self.assertEqual(str(e), "parameter type error")
         try:
             DepiMulticastCapability(value=5)
         except l2tpv3AVPerror as e:
-                self.assertEqual(str(e), "parameter type error")
+            self.assertEqual(str(e), "parameter type error")
         try:
             DepiRemoteMulticastJoin(value=5)
         except l2tpv3AVPerror as e:
-                self.assertEqual(str(e), "parameter type error")
+            self.assertEqual(str(e), "parameter type error")
         try:
             DepiRemoteMulticastLeave(value=5)
         except l2tpv3AVPerror as e:
-                self.assertEqual(str(e), "parameter type error")
+            self.assertEqual(str(e), "parameter type error")
+
 
 if __name__ == "__main__":
     unittest.main()

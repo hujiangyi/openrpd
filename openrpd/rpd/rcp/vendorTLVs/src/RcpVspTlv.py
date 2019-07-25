@@ -44,20 +44,19 @@ from rpd.rcp.rcp_lib.rcp import Message, RCPSequence, RCPMessage,\
 #
 
 # Vendor's own assigned ID
-DEFAULT_VENDOR_ID     = 5555
+DEFAULT_VENDOR_ID = 5555
+
 
 class RcpVendorTlv(object):
     """
 
     This is a generic class for Vendor to modify their own TLVs.
-    
+
     """
 
     __metaclass__ = AddLoggerToClass
 
-
     def __init__(self, vendorID=DEFAULT_VENDOR_ID):
-
         """
 
         This functions create RcpVendorTlv object which holds vendor ID
@@ -71,7 +70,7 @@ class RcpVendorTlv(object):
     def create_vendor_tlvs_sequence(self, gcp_message_id, rcp_message_id, operation):
         """ This functions create a RCPSequence object, and set t_VendorSpecificExtension()
         with appropriate values.
-        
+
         : param gcp_message_id: GCP Message ID
         : param rcp_message_id: RCP Message ID
         : param operation: TLV Operation of this RCP Sequence
@@ -81,8 +80,8 @@ class RcpVendorTlv(object):
         """
 
         seq = RCPSequence(gcp_message_id=gcp_message_id,
-                            rcp_message_id=rcp_message_id,
-                              operation=operation)
+                          rcp_message_id=rcp_message_id,
+                          operation=operation)
 
         if None is seq:
             return None
@@ -125,7 +124,6 @@ class RcpVendorTlv(object):
             DsScQamChannelConfig.Modulation.set_val(t_VendorSpecificExtension.t_RfChannel.t_DsScQamChannelConfig.MODULATION_57__4_QAM256)
             DsScQamChannelConfig.InterleaverDepth.set_val(t_VendorSpecificExtension.t_RfChannel.t_DsScQamChannelConfig.INTERLEAVER_DEPTH_4_TAPS16INCREMENT8)
 
-            
             DsScQamChannelConfig.Annex.set_val(t_VendorSpecificExtension.t_RfChannel.t_DsScQamChannelConfig.ANNEX_3_ANNEX_A)
             DsScQamChannelConfig.SyncInterval.set_val(0xa5)
             #DsScQamChannelConfig.SyncMacAddress = ("\x00\x01\x02\x03\x04\x05")
@@ -140,7 +138,7 @@ class RcpVendorTlv(object):
             VspTlv.HWVersion.set_val(0x0)
         return seq
 
-    def setDriverMsgCode(self, vid, value = None):
+    def setDriverMsgCode(self, vid, value=None):
         """
         Vendor could check for a matching vid here, and parse
         the content to see what driver message code to use, etc.
@@ -160,5 +158,3 @@ class RcpVendorTlv(object):
             return pass_to_drv, HalConfigMsg.MsgTypeRcpVendorSpecific
         else:
             return 0, 0
-
-

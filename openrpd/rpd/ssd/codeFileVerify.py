@@ -25,6 +25,7 @@ from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 
 
 class Asn1Decoder(object):
+
     @classmethod
     def __asn1_read_length(cls, der, ix):
         """Get a ASN1 node.
@@ -67,19 +68,19 @@ class Asn1Decoder(object):
         :return:
 
         """
-        return cls.__asn1_read_length(der,0)
+        return cls.__asn1_read_length(der, 0)
 
     @classmethod
-    def asn1_node_next(cls, der, (ixs,ixf,ixl)):
+    def asn1_node_next(cls, der, (ixs, ixf, ixl)):
         """Gets the next ASN1 structure following (ixs,ixf,ixl).
 
         :return:
 
         """
-        return cls.__asn1_read_length(der,ixl+1)
+        return cls.__asn1_read_length(der, ixl + 1)
 
     @classmethod
-    def asn1_node_first_child(cls, der, (ixs,ixf,ixl)):
+    def asn1_node_first_child(cls, der, (ixs, ixf, ixl)):
         """Get returns the first child ASN1 inside der.
 
         :return:
@@ -87,8 +88,8 @@ class Asn1Decoder(object):
         """
         if ord(der[ixs]) & 0x20 != 0x20:
             raise ValueError('Error: can only open constructed types. '
-                    +'Found type: 0x'+der[ixs].encode("hex"))
-        return cls.__asn1_read_length(der,ixf)
+                             + 'Found type: 0x' + der[ixs].encode("hex"))
+        return cls.__asn1_read_length(der, ixf)
 
 
 class SsdVerifyResult(object):
@@ -130,6 +131,7 @@ class SsdVerifyResult(object):
     ERROR_FILE_CO_MISMATCH_WITH_GCP = 50
 
     ERROR_MISS_ROOT_CA = 51
+    ERROR_SW_FILE_CORRUPTION = 52
 
     WARN_SAME_IMAGE = 90
 
@@ -208,6 +210,8 @@ class SsdVerifyResult(object):
             "The co-signer info doesn't exist in GCP, yet exist in codefile",
         ERROR_MISS_ROOT_CA:
             "No Root CA found",
+        ERROR_SW_FILE_CORRUPTION:
+            "The SW file is corrupted, hash digest is not same with signature",
         WARN_SAME_IMAGE:
             "Skip the same image file upgrade",
     }
@@ -268,7 +272,8 @@ class CodeFileVerify(object):
         self.co_signed_gcp = False
         self.co_signed_codefile = False
 
-        self.signedContent = None
+        self.signedContentOffset = 0
+        self.limit_block = 1024 * 1024
 
         self.root_cert = None
 
@@ -498,12 +503,12 @@ class CodeFileVerify(object):
             self.new_mfr_cvcAccessStart = notBefore
             cur_codeAccessStart = self.__parse_datetime(self.mfr_codeAccessStart)
             if datetime_notBefore > cur_codeAccessStart:
-                self.new_mfr_codeAccessStart = notBefore;
+                self.new_mfr_codeAccessStart = notBefore
         else:
             self.new_mso_cvcAccessStart = notBefore
             cur_codeAccessStart = self.__parse_datetime(self.mso_codeAccessStart)
             if datetime_notBefore > cur_codeAccessStart:
-                self.new_mso_codeAccessStart = notBefore;
+                self.new_mso_codeAccessStart = notBefore
 
         return True
 
@@ -519,7 +524,7 @@ class CodeFileVerify(object):
         # Points to the last value Byte which is the last Byte of the chunk.
         cvc_length = cvc_node[2]
 
-        child_cvc = cvc[0:cvc_length + 1] #double check this later!!!!!!
+        child_cvc = cvc[0:cvc_length + 1]  # double check this later!!!!!!
         cvc_ca = None
         if len(cvc) > cvc_length + 1:
             cvc_ca = cvc[cvc_length + 1:]
@@ -550,7 +555,7 @@ class CodeFileVerify(object):
                     self.verify_result = SsdVerifyResult.ERROR_GCP_MISS_ISSUER_CVC
                     return (False, self.verify_result)
 
-                self.mfr_cvc_ca = c.load_certificate(c.FILETYPE_ASN1,cvc_ca)
+                self.mfr_cvc_ca = c.load_certificate(c.FILETYPE_ASN1, cvc_ca)
             else:
                 period_error = SsdVerifyResult.ERROR_GCP_INVALIDITY_PERIOD_CO_CVC
                 self.mso_cvc = c.load_certificate(c.FILETYPE_ASN1, child_cvc)
@@ -642,7 +647,7 @@ class CodeFileVerify(object):
             self.logger.error("No signing time found in certificate!")
             return False
 
-        signing_time= self.__get_generalized_time(signing_time)
+        signing_time = self.__get_generalized_time(signing_time)
 
         if is_mfr == True:
             self.mfr_signing_time = signing_time
@@ -659,7 +664,7 @@ class CodeFileVerify(object):
             self.logger.error("No certificate found when verifying signing time!")
             return False
 
-        #print "\nTry to parse datetime:%s" % str(signing_time)
+        # print "\nTry to parse datetime:%s" % str(signing_time)
         datetime_signing = self.__parse_datetime(signing_time)
 
         notBefore = cert.get_notBefore()
@@ -667,6 +672,16 @@ class CodeFileVerify(object):
 
         datetime_notBefore = self.__parse_datetime(notBefore)
         datetime_notAfter = self.__parse_datetime(notAfter)
+
+        # Bypass signing time check due to downgrade mis-functioned.
+
+        # Normally if we need support downgrade, we would assign
+        # the codefile signing time to cvc start time.
+        # But if we assin the signing time to cvc start time, then the
+        # signing time become meaningless, since SSD also check the cvc
+        # validity. So we just skip checking the signing time validity.
+
+        return True
 
         # The value of signingTime is equal to or greater than the manufacturer codeAccessStart value currently held in the RPD;
         # The value of signingTime is equal to or greater than the manufacturer CVC validity start time;
@@ -698,9 +713,9 @@ class CodeFileVerify(object):
             sign_node = Asn1Decoder.asn1_node_next(signedData, sign_node)  # DisgestAlgorithmIdentifier
             sign_node = Asn1Decoder.asn1_node_next(signedData, sign_node)  # ContentInfo header
             sign_node = Asn1Decoder.asn1_node_next(signedData, sign_node)  # Certificates
-            CVCs = signedData[sign_node[0] + 4 : sign_node[2] + 1]  # Get the real CVCs
+            CVCs = signedData[sign_node[0] + 4: sign_node[2] + 1]  # Get the real CVCs
             sign_node = Asn1Decoder.asn1_node_next(signedData, sign_node)  # SignerInfo
-            signerInfos = signedData[sign_node[0] + 4 : sign_node[2] + 1]  # Get the real signerInfos
+            signerInfos = signedData[sign_node[0] + 4: sign_node[2] + 1]  # Get the real signerInfos
 
             # Get the CVCs
             try:
@@ -781,7 +796,7 @@ class CodeFileVerify(object):
                 sign_length = sign_node[2]
                 f.seek(0, 0)
                 sign_data = f.read(sign_length + 1)
-                self.signedContent = f.read()
+                self.signedContentOffset = sign_length + 1
 
             decoded, rest = decode(sign_data, asn1Spec=rfc2315.ContentInfo())
             signedData_der = decoded['content']
@@ -799,13 +814,14 @@ class CodeFileVerify(object):
 
         return
 
-    def __verify_codefile_signature(self, is_mfr):
+    def __verify_codefile_signature(self, is_mfr, codefile):
         """Verify the signature in codefile.
 
         :is_mfr:
         :return: SUCCESS or ERROR list
 
         """
+        digest_verified_failed = False
         if is_mfr == True:
             signerInfo = self.mfr_signerInfo
             cert = self.mfr_cvc
@@ -819,18 +835,18 @@ class CodeFileVerify(object):
 
         if signerInfo == None or attrs == None:
             self.logger.error("No signer info or attributes in codefile when try to verify signature!")
-            return False
+            return False, digest_verified_failed
 
         try:
             # Get the encrypted digest
             encryptedDigest = str(signerInfo['encryptedDigest'])
 
-            #Get the digest type, sha1, sha256...
-            hash_algo =  str(signerInfo['digestAlgorithm']['algorithm'])
+            # Get the digest type, sha1, sha256...
+            hash_algo = str(signerInfo['digestAlgorithm']['algorithm'])
             if hash_algo != self.SHA256_OID:
                 # Only sha256 is used in CM/RPD certificate/signature
                 self.logger.error("The hash algorithm in CVC is not sha256!")
-                return False
+                return False, digest_verified_failed
 
             # With the attributes in PKCS7, the encryptedDigest is for attributes (no -noattr in openssl)
             # So, here signedContent should not be used
@@ -838,23 +854,29 @@ class CodeFileVerify(object):
                 c.verify(cert, encryptedDigest, str(attrs), "sha256")
             except Exception as e:
                 self.logger.error("Failed to verify encrypted digest, reason: " + str(e))
-                return False
+                return False, digest_verified_failed
 
             # Continue to verify the message digest, sha256(signedContent) == messagedigest
             hash_sha = hashlib.sha256()
-            hash_sha.update(self.signedContent)
+            with open(codefile, 'r') as f:
+                f.seek(self.signedContentOffset, 0)
+                buf = f.read(self.limit_block)
+                while buf:
+                    hash_sha.update(buf)
+                    buf = f.read(self.limit_block)
             digest = hash_sha.hexdigest()
             if digest != message_digest.prettyPrint()[2:]:  # remove the "0x"
                 self.logger.error("Failed to verify the message digest!")
-                return False
+                digest_verified_failed = True
+                return False, digest_verified_failed
 
         except Exception, e:
             self.logger.error("Failed to verify signature, reason: " + str(e))
-            return False
+            return False, digest_verified_failed
 
-        return True
+        return True, digest_verified_failed
 
-    def __verify_code_steps(self, is_mfr):
+    def __verify_code_steps(self, is_mfr, codefile):
         """Verify the mfr or mso codefile.
 
         :is_mfr:
@@ -903,8 +925,10 @@ class CodeFileVerify(object):
             return False
 
         # Verify mfr/mso code file signature
-        if self.__verify_codefile_signature(is_mfr) == False:
-            self.verify_result = cvs_error
+        status, digest_verify_failed = self.__verify_codefile_signature(is_mfr, codefile)
+        if status is False:
+            self.verify_result = \
+                cvs_error if digest_verify_failed is False else SsdVerifyResult.ERROR_SW_FILE_CORRUPTION
             return False
 
         return True
@@ -937,8 +961,8 @@ class CodeFileVerify(object):
             return (False, self.verify_result)
 
         try:
-            ### Verify Manufacturer
-            if self.__verify_code_steps(True) == False:
+            # Verify Manufacturer
+            if self.__verify_code_steps(True, codefile) == False:
                 self.logger.error("failed to verify manufacturer's info!")
                 return (False, self.verify_result)
 
@@ -948,8 +972,8 @@ class CodeFileVerify(object):
                     self.verify_result = SsdVerifyResult.ERROR_FILE_CO_MISMATCH_WITH_GCP
                     return (False, self.verify_result)
 
-                ### Verify co-signer, i.e. MSO
-                if self.__verify_code_steps(False) == False:
+                # Verify co-signer, i.e. MSO
+                if self.__verify_code_steps(False, codefile) == False:
                     self.logger.error("failed to verify co-signer's info!")
                     return (False, self.verify_result)
         except Exception as e:
@@ -974,12 +998,12 @@ class CodeFileVerify(object):
          or None
 
         """
-        new_parameters = {"manufacturer":{"organizationName":self.mfr_org_name,
-                                          "codeAccessStart":self.new_mfr_codeAccessStart,
-                                          "cvcAccessStart":self.new_mfr_cvcAccessStart},
-                          "co-signer":{"organizationName":self.mso_org_name,
-                                       "codeAccessStart":self.new_mso_codeAccessStart,
-                                       "cvcAccessStart":self.new_mso_cvcAccessStart}}
+        new_parameters = {"manufacturer": {"organizationName": self.mfr_org_name,
+                                           "codeAccessStart": self.new_mfr_codeAccessStart,
+                                           "cvcAccessStart": self.new_mfr_cvcAccessStart},
+                          "co-signer": {"organizationName": self.mso_org_name,
+                                        "codeAccessStart": self.new_mso_codeAccessStart,
+                                        "cvcAccessStart": self.new_mso_cvcAccessStart}}
         return new_parameters
 
     def set_initcode(self, initcode):
@@ -1006,7 +1030,7 @@ class CodeFileVerify(object):
         with open(rootca, 'r') as root_cert_file:
             self.root_cert = c.load_certificate(c.FILETYPE_PEM, root_cert_file.read())
 
-    def get_image(self, path):
+    def get_image(self, path, codefile):
         """save the RPD image from code file to fixed path.
 
         return: True
@@ -1015,10 +1039,14 @@ class CodeFileVerify(object):
 
         ret = False
         try:
-            with open(path, 'w') as f:
-                f.write(self.signedContent[3:])
-                self.signedContent = None
-                ret = True
+            with open(path, 'w') as f1:
+                with open(codefile, 'r') as f2:
+                    f2.seek(self.signedContentOffset + 3, 0)
+                    buf = f2.read(self.limit_block)
+                    while buf:
+                        f1.write(buf)
+                        buf = f2.read(self.limit_block)
+                    ret = True
         except Exception as e:
             self.logger.error("save image fail:%s", str(e))
 

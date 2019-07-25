@@ -35,6 +35,7 @@ from rpd.provision.transport.transport import Transport
 from rpd.provision.manager.src.manager_ccap_core import CoreDescription
 from rpd.common.rpd_rsyslog import RSyslog
 from rpd.common.rpd_event_def import RPD_EVENT_CONNECTIVITY_SYS_REBOOT, RPD_EVENT_CONNECTIVITY_REBOOT
+from rpd.provision.manager.src.manager_fsm import CCAPFsm
 
 
 class ManagerApi(object):
@@ -58,6 +59,7 @@ class ManagerApi(object):
             provision_pb2.t_Provision.SHOW_PROVISION_MANAGER_STATE: self.get_provision_manager_state,
             provision_pb2.t_Provision.SHOW_PROVISION_MANAGER_STATE_HISTORY: self.get_provision_manager_state_history,
             provision_pb2.t_Provision.SHOW_PROVISION_CCAP_CORE: self.get_provision_ccap_core_info,
+            provision_pb2.t_Provision.SHOW_PROVISION_CCAP_CORE_ALL: self.get_ccapcore_all,
             provision_pb2.t_Provision.SHOW_PROVISION_STATE_HISTORY: self.get_provision_state_history,
             provision_pb2.t_Provision.CLEAR_PROVISION_STATE_HISTORY: self.clear_provision_state_history,
             provision_pb2.t_Provision.SHOW_PROVISION_CORE_STATISTIC: self.get_provision_core_statistics,
@@ -113,8 +115,9 @@ class ManagerApi(object):
 
         # FixMe: may need more action
         if eventmask & self.dispatcher.EV_FD_ERR:
+            # C3RPHY-104 -- bug fix: change ZMQ object "fd" to a string to print in log 
             self.logger.error(
-                "Got error event when handle the manager API request, event:%s, fd:", eventmask, fd)
+                "Got error event when handle the manager API request, event:%s, fd:%s", eventmask, str(fd))
             return
 
         if api.sock.getsockopt(zmq.EVENTS) != zmq.POLLIN:
@@ -162,14 +165,14 @@ class ManagerApi(object):
             api.sock.send(rsp_msg.SerializeToString())
 
     def get_provision_all(self, args=None):
-        """For external calling intreface, such as CLI, web, etc...
+        """For external calling interface, such as CLI, web, etc...
 
         :return:
 
         """
         provision_info = []
         for idx in CCAPCore.ccap_core_db:
-            result, value = self.get_provision_ccap_core_info(idx)
+            result, value = self.get_provision_ccap_core_info(idx, detail=False)
             if value == "skip":
                 continue
             elif not result and isinstance(value, str):
@@ -179,7 +182,25 @@ class ManagerApi(object):
 
         return True, provision_info
 
-    def get_provision_ccap_core_info(self, ccap_core_id):
+    def get_ccapcore_all(self, args=None):
+        """For external calling intreface, such as CLI, web, etc...
+
+        :return:
+
+        """
+        provision_info = []
+        for idx in CCAPCore.ccap_core_db:
+            result, value = self.get_provision_ccap_core_info(idx, detail=True)
+            if value == "skip":
+                continue
+            elif not result and isinstance(value, str):
+                return result, value
+            else:
+                provision_info.append(value)
+
+        return True, provision_info
+
+    def get_provision_ccap_core_info(self, ccap_core_id, detail=True):
         """Get specific ccap core information.
 
         :param ccap_core_id:
@@ -192,7 +213,13 @@ class ManagerApi(object):
 
         try:
             ccap_core = CCAPCore.ccap_core_db[ccap_core_id]
-            state = ccap_core.fsm.fsm.current
+            state = ccap_core.fsm.current
+            if not detail:
+                if isinstance(ccap_core.fsm, CCAPFsm):
+                    if ccap_core.fsm.current in ccap_core.fsm.STATE_GCP_ALL:
+                        state = ccap_core.fsm.STATE_GCP
+                    if ccap_core.fsm.current in ccap_core.fsm.STATE_ALL_OPERATIONAL:
+                        state = ccap_core.fsm.STATE_ONLINE
             is_principal = CoreDescription.role_str(ccap_core.is_principal)
             is_active = CoreDescription.mode_str(ccap_core.is_active)
             initiated_by = ccap_core.initiated_by
@@ -210,15 +237,29 @@ class ManagerApi(object):
                 if len(agent_para) == 1:
                     return False, "skip"
                 core_ip = agent_para[-1]
-            return True, {
-                'Core-id': ccap_core_id, 'Core-ip': core_ip, 'Current-State': state,
-                'Core-Role': is_principal, 'HA-Mode': is_active, 'Initiated-By': initiated_by,
-                'Core-StartTime': start_time, 'parameter': para,
-                'remote_id':remote_id,
-                'core_name':core_name,
-                'vendor_id':vendor_id,
-                'Interface': agent_para[0],
-            }
+            agent_status = ccap_core.agent_status
+
+            if not detail:
+                return True, {
+                    'Core-id': ccap_core_id, 'Core-ip': core_ip, 'Current-State': state,
+                    'Core-Role': is_principal, 'HA-Mode': is_active, 'Initiated-By': initiated_by,
+                    'Core-StartTime': start_time, 'parameter': para,
+                    'remote_id': remote_id,
+                    'core_name': core_name,
+                    'vendor_id': vendor_id,
+                    'Interface': agent_para[0],
+                }
+            else:
+                return True, {
+                    'Core-id': ccap_core_id, 'Core-ip': core_ip, 'Current-State': state,
+                    'Core-Role': is_principal, 'HA-Mode': is_active, 'Initiated-By': initiated_by,
+                    'Core-StartTime': start_time, 'parameter': para,
+                    'remote_id': remote_id,
+                    'core_name': core_name,
+                    'vendor_id': vendor_id,
+                    'Interface': agent_para[0],
+                    'agent_status': agent_status
+                }
         except Exception as e:
             return False, str(e)
 
@@ -236,7 +277,7 @@ class ManagerApi(object):
 
     def get_provision_manager_state_history(self, _):
         """get provision state machine history record.
-     
+
         :param _:
         """
 
@@ -270,7 +311,6 @@ class ManagerApi(object):
         except Exception as e:
             return False, str(e)
 
-
     def get_provision_core_statistics(self, ccap_core_id):
         """get ccap core statistics per state.
 
@@ -292,10 +332,12 @@ class ManagerApi(object):
         try:
             self.rsyslog = RSyslog()
             self.rsyslog.config_rsyslog_loglevel(int(level))
-
             return True, 'success'
-        except (ValueError, TypeError) as e:
+        except (ValueError) as e:
             return False, str(e)
+        except (TypeError) as e:
+            # C3RPHY-104 -- simple 'str(e)' fails, return string name of type
+            return False, e.__class__.__name__
 
     def show_pc_reboot_hold(self, args=None):
         """Set PC_REBOOT_HOLD, block the system from reboot."""
@@ -330,7 +372,7 @@ class ManagerApi(object):
         """Reboot system."""
         if None is not args:
             self.clear_pc_reboot_hold()
-            SysTools.notify.info(RPD_EVENT_CONNECTIVITY_REBOOT[0], 'cold start', "by " + "RPD CLI Force" , "")
+            SysTools.notify.info(RPD_EVENT_CONNECTIVITY_REBOOT[0], 'cold start', "by " + "RPD CLI Force", "")
             self.dispatcher.timer_register(
                 self.REBOOT_WAITING, SysTools.external_reboot, arg=("cold start", 'RPD CLI Force'))
             return True, 'Rebooting in 10 seconds'
@@ -339,7 +381,7 @@ class ManagerApi(object):
             if os.path.exists(skip_reboot_file):
                 return True, 'Reboot blocked by reboot hold, please clear it'
         else:
-            SysTools.notify.info(RPD_EVENT_CONNECTIVITY_REBOOT[0], 'cold start', "by " + "RPD CLI" , "")
+            SysTools.notify.info(RPD_EVENT_CONNECTIVITY_REBOOT[0], 'cold start', "by " + "RPD CLI", "")
             self.dispatcher.timer_register(
                 self.REBOOT_WAITING, SysTools.external_reboot, arg=('cold start', 'RPD CLI'))
             return True, 'Rebooting in 10 seconds'
@@ -391,7 +433,15 @@ class ManagerApi(object):
                 local_ip = SysTools.get_ip_address(str(intf), family=family)
                 value = {"Interface": intf, 'IP-Address': local_ip, "Subnet-Mask": netmask}
                 dhcp_info['Interface'].append(value)
-                dhcp_info['Details'].append((intf, self.mgr.dhcp_parameter[intf]))
+                addr_type = "IPv4"
+                if is_ipv6:
+                    if self.mgr.dhcp_parameter[intf]['Slaac']:
+                        addr_type = "IPv6<Stateless>"
+                    else:
+                        addr_type = "IPv6<Stateful>"
+                intf_dhcp_parameter = self.mgr.dhcp_parameter[intf]
+                intf_dhcp_parameter["AddrType"] = addr_type
+                dhcp_info['Details'].append((intf, intf_dhcp_parameter))
 
             return True, dhcp_info
         except Exception as e:
@@ -414,7 +464,7 @@ class ManagerApi(object):
                 family = (socket.AF_INET, socket.AF_INET6)[is_ipv6]
                 if agent_id in para and ';' in para[agent_id]:
                     intf, core_ip = para[agent_id].split(';')
-                    local_ip = SysTools.get_ip_address(str(intf), family = family)
+                    local_ip = SysTools.get_ip_address(str(intf), family=family)
                     value = {
                         "Core-ID": ccap_core_id, "Core-IP": core_ip, "Local-IP": local_ip,
                         "Principal": 'Yes' if principal == CoreDescription.CORE_ROLE_PRINCIPAL else 'No',
@@ -439,7 +489,7 @@ class ManagerApi(object):
                 intf = ccap_core.parameters[agent_id]
                 is_ipv6 = Convert.is_valid_ipv6_address(ccap_core.ccap_core_network_address)
                 family = (socket.AF_INET, socket.AF_INET6)[is_ipv6]
-                local_ip = SysTools.get_ip_address(str(intf),family = family)
+                local_ip = SysTools.get_ip_address(str(intf), family=family)
                 value = {"Registered-Cores": ccap_core_id, "Interface": intf, "IP": local_ip, 'Status': status}
 
                 ret_info.append(value)

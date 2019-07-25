@@ -19,6 +19,8 @@ import unittest
 from rpd.mcast.src.mcast import Mcast, McastException
 from rpd.common.rpd_logging import AddLoggerToClass
 from rpd.common.rpd_logging import setup_logging
+from rpd.confdb.testing.test_rpd_redis_db import setup_test_redis, \
+    stop_test_redis
 
 
 class test_Mcast(unittest.TestCase):
@@ -26,16 +28,18 @@ class test_Mcast(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         setup_logging('MCAST', filename="Mcast.log")
+        setup_test_redis()
         for key in Mcast.McastDb.keys():
             Mcast.McastDb[key].close()
 
     @classmethod
     def tearDownClass(cls):
+        stop_test_redis()
         for key in Mcast.McastDb.keys():
             Mcast.McastDb[key].close()
 
     def test_join(self):
-        session = ("127.0.0.1", "127.0.0.1", 1233,12323)
+        session = ("127.0.0.1", "127.0.0.1", 1233, 12323)
         mcast = Mcast(address=("127.0.0.1", "5.5.5.1", "229.1.1.255", 0))
         self.assertIn(("127.0.0.1", "5.5.5.1", "229.1.1.255", 0), Mcast.McastDb.keys())
         self.assertIn(mcast, Mcast.McastDb.values())
@@ -54,7 +58,7 @@ class test_Mcast(unittest.TestCase):
         except Exception as e:
             self.assertIsInstance(e, McastException)
         try:
-            mcast  = Mcast(None)
+            mcast = Mcast(None)
         except Exception as e:
             self.assertIsInstance(e, McastException)
         try:
@@ -154,11 +158,11 @@ class test_Mcast(unittest.TestCase):
         self.assertIn(session_2, mcast.sessionList)
         mcast.leave(session_1)
         time.sleep(0.1)
-        self.assertNotIn(session_1,mcast.sessionList)
+        self.assertNotIn(session_1, mcast.sessionList)
         self.assertIn(session_2, mcast.sessionList)
         self.assertEqual(mcast.status, Mcast.JOINED)
         mcast.leave(session_3)
-        self.assertNotIn(session_1,mcast.sessionList)
+        self.assertNotIn(session_1, mcast.sessionList)
         self.assertIn(session_2, mcast.sessionList)
         self.assertEqual(mcast.status, Mcast.JOINED)
         mcast.leave(session_2)
@@ -199,17 +203,18 @@ class test_Mcast(unittest.TestCase):
         self.assertIn(session_2, mcast.sessionList)
         mcast.leave(session_1)
         time.sleep(0.1)
-        self.assertNotIn(session_1,mcast.sessionList)
+        self.assertNotIn(session_1, mcast.sessionList)
         self.assertIn(session_2, mcast.sessionList)
         self.assertEqual(mcast.status, Mcast.JOINED)
         mcast.leave(session_3)
-        self.assertNotIn(session_1,mcast.sessionList)
+        self.assertNotIn(session_1, mcast.sessionList)
         self.assertIn(session_2, mcast.sessionList)
         self.assertEqual(mcast.status, Mcast.JOINED)
         mcast.leave(session_2)
         time.sleep(0.1)
         self.assertEqual(0, len(mcast.sessionList))
         self.assertEqual(mcast.status, Mcast.LEAVED)
+
 
 if __name__ == "__main__":
     unittest.main()

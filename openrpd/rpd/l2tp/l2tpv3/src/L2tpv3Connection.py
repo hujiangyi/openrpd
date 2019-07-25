@@ -32,10 +32,10 @@ from l2tpv3.src.L2tpv3RFC3931AVPs import ReceiveWinSize
 class L2tpConnection(object):
     CREATED = 1
     CLOSED = 2
-    ADD_LCCE    = 1
-    DEL_LCCE    = 2
+    ADD_LCCE = 1
+    DEL_LCCE = 2
     UPDATE_LCCE = 3
-    READ_LCCE   = 4
+    READ_LCCE = 4
     HalReqOperationSet = {
         ADD_LCCE: "ADD_LCCE",
         DEL_LCCE: "DEL_LCCE",
@@ -91,7 +91,7 @@ class L2tpConnection(object):
                         "Found a unique connection ID.")
                     break
 
-        #RFC4951
+        # RFC4951
         self.failoverCapofCC = False
         self.failoverCapofDC = False
         self.recoveryTime = 0
@@ -406,7 +406,7 @@ class L2tpConnection(object):
             + ((RfChannelIndex << L2tpConnection.CHANNEL_INDEX_BIT) & L2tpConnection.CHANNEL_INDEX_MASK)
 
         self.logger.debug("Allocate sessionid:%x for RemoteEndID(%x,%x,%x)",
-                sessionid, RfPortIndex, sublayer_type, RfChannelIndex)
+                          sessionid, RfPortIndex, sublayer_type, RfChannelIndex)
 
         return sessionid
 
@@ -460,7 +460,7 @@ class L2tpConnection(object):
             elif isinstance(avp, L2tpv3RFC3931AVPs.RemoteSessionID):
                 localSessId = avp.sessionID
 
-        if not remoteSessid  and not localSessId:
+        if not remoteSessid and not localSessId:
             self.logger.warn("Got a packet but no local/remote session ID is set, we cannot send "
                              "rsp since we don't know the session ID")
             return None
@@ -555,6 +555,7 @@ class L2tpConnection(object):
         self.sessionsByRemoteSessionId[session.remoteSessionId] = session
 
     def removeSession(self, session):
+        session.deleteSessionRecord()   # remove l2tpsessinfo db record
         if session.localSessionId in self.sessions:
             self.sessions.pop(session.localSessionId)
 
@@ -686,24 +687,24 @@ class L2tpConnection(object):
             if recoverConn is not None:
                 recoverConn.resetTransport()
                 recoverConn.isInRecovery = False
-            #tear down the recovery tunnel
+            # tear down the recovery tunnel
             pkt.Connection.StopConnection()
 
             if recoverConn is not None:
-                #silently clear sessions not in an established state
+                # silently clear sessions not in an established state
                 recoverConn.closeUnEstSessions()
-                #Query the sessions that might have been in inconsistent states
-                #based on data channel inactivity
+                # Query the sessions that might have been in inconsistent states
+                # based on data channel inactivity
                 recoverConn.queryInactSessions()
         ackpkt = L2tpv3ControlPacket.L2tpv3ACK(connID=self.remoteConnID)
         return ackpkt
 
     def resetTransport(self):
         if self.transport is not None:
-            #flush the transmit/receive windows
+            # flush the transmit/receive windows
             self.transport.sendList = list()
             self.transport.receiveWindow.clear()
-            #reset control channel sequence numbers
+            # reset control channel sequence numbers
             self.transport.ackNr = 0
             self.transport.ns = 0
 
@@ -774,10 +775,10 @@ class L2tpConnection(object):
             self.logger.info(
                 "L2Tp LCCE[%d, %d] send [%s] Hal message",
                 self.localConnID, self.remoteConnID, self.HalReqOperationSet[msg_type])
-            if(msg_type in (L2tpConnection.ADD_LCCE, L2tpConnection.DEL_LCCE, 
+            if(msg_type in (L2tpConnection.ADD_LCCE, L2tpConnection.DEL_LCCE,
                             L2tpConnection.UPDATE_LCCE, L2tpConnection.READ_LCCE)):
                 hal_client.send_l2tp_lcce_assignment_msg(lcce=self,
-                                                 msg_type=msg_type)
+                                                         msg_type=msg_type)
 
     def fsmEventLocalRequest(self, event):
         # "onlocalRequest: receive the event:" + e.src + " " + e.dst + "  " + e.event
@@ -788,8 +789,8 @@ class L2tpConnection(object):
         self.logger.info(
             "Connection[%d, %d] received event:" + event.src + " " + event.dst + "  " + event.event,
             self.localConnID, self.remoteConnID)
-        self.notify.info(rpd_event_def.RPD_EVENT_L2TP_INFO[0], "Good SCCRQ received " + str(hex(self.localConnID)) ,
-                          rpd_event_def.RpdEventTag.ccap_ip(self.remoteAddr))
+        self.notify.info(rpd_event_def.RPD_EVENT_L2TP_INFO[0], "Good SCCRQ received " + str(hex(self.localConnID)),
+                         rpd_event_def.RpdEventTag.ccap_ip(self.remoteAddr))
         if event.dst == L2tpv3Fsm.L2tpv3ConnectionFsm.StateWaitCtlConn:
             pass  # we should send a SCCRP here
         else:  # for the dst state is Idle
@@ -837,7 +838,7 @@ class L2tpConnection(object):
         """State transition to idle for this event will send a StopCCN
         and close the connection"""
         pass
-        
+
     def fsmStateIdle(self, event):
         """Callback function will called when fsm changed to this state.
         CDN will be sent to remote and remove the session.
@@ -902,7 +903,7 @@ class L2tpConnection(object):
         for sessionId in keys:
             session = self.sessions[sessionId]
             if session.local_circuit_status != L2tpv3Session.L2tpv3Session.CIRCUIT_STATUS_UP:
-                self.logger.debug("query for inactive session [%d, %d]" %(session.localSessionId, session.remoteSessionId))
+                self.logger.debug("query for inactive session [%d, %d]" % (session.localSessionId, session.remoteSessionId))
                 inActiveSessions.append(session)
 
         if inActiveSessions:
@@ -913,7 +914,7 @@ class L2tpConnection(object):
                 fss = L2tpv3RFC3931AVPs.FailoverSessionState(ses.localSessionId, ses.remoteSessionId)
                 fssAvps = fssAvps + (fss,)
             fsq = L2tpv3ControlPacket.L2tpv3ControlPacket(
-                self.remoteConnID, 0, 0, (fsqAvp,)+fssAvps)
+                self.remoteConnID, 0, 0, (fsqAvp,) + fssAvps)
             self.transport.SendPacket(fsq)
 
     def queryStaleSessions(self):
@@ -922,7 +923,7 @@ class L2tpConnection(object):
         for sessionId in keys:
             session = self.sessions[sessionId]
             if session.stale:
-                self.logger.debug("query for stale session [%d, %d]" %(session.localSessionId, session.remoteSessionId))
+                self.logger.debug("query for stale session [%d, %d]" % (session.localSessionId, session.remoteSessionId))
                 staleSessions.append(session)
 
         if staleSessions:
@@ -933,5 +934,5 @@ class L2tpConnection(object):
                 fss = L2tpv3RFC3931AVPs.FailoverSessionState(ses.localSessionId, ses.remoteSessionId)
                 fssAvps = fssAvps + (fss,)
             fsq = L2tpv3ControlPacket.L2tpv3ControlPacket(
-                self.remoteConnID, 0, 0, (fsqAvp,)+fssAvps)
+                self.remoteConnID, 0, 0, (fsqAvp,) + fssAvps)
             self.transport.SendPacket(fsq)

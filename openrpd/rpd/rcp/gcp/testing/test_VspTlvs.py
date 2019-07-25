@@ -24,7 +24,7 @@ from rpd.rcp.gcp.gcp_lib import gcp_packet
 from rpd.rcp.rcp_lib import rcp_tlv_def
 from rpd.rcp.rcp_lib.rcp import Message, RCPSequence, RCPMessage,\
     RCP_SEQUENCE_MIN_LEN
-    
+
 import subprocess
 import threading
 from rpd.rcp.rcp_hal import RcpHalIpc, RcpHalClientError, RcpMessageRecord, RcpMessageRecordElem, DataObj
@@ -60,10 +60,12 @@ Global variables:
 drv_logger = None
 threads_list = []
 
+
 class RcpGlobalSettings(object):
     hal_ipc = None
     gDispatcher = None
     rcpProcess = None
+
 
 timeStampSock = "/tmp/testRcpToHalRedis" + \
     time.strftime("%d%H%M%S", time.localtime()) + ".sock"
@@ -112,6 +114,8 @@ def setupDB():
 """
 demoHalmain: Bring HAL layer up as single thread.  All logs go to hal.log
 """
+
+
 def demoHalmain():
     print "demoHalmain thread start!"
     HalGlobal.StopHal = False
@@ -131,42 +135,45 @@ def demoHalmain():
     HalGlobal.StopHal = False
     print "demoHalmain thread done!"
 
+
 """
 demoDrvmain: Bring OpenRpdDriver driver up as single thread.  All logs go to hal.log
 """
+
+
 def demoDrvmain():
     print "demoDrvmain thread start!"
-    setup_logging('HAL', filename="hal.log",logging_level=logging.DEBUG)
+    setup_logging('HAL', filename="hal.log", logging_level=logging.DEBUG)
     drv_logger = logging.getLogger("DrvMain")
     drv_logger.info("hello demo DrvMain Log")
     driver = OpenRpdDriver("openrpd_generic_driver", "This is a Generic OpenRPD Driver", "1.0.0",
-                             (0,MsgTypeRcpVendorSpecific), (2, 3, 4))
+                           (0, MsgTypeRcpVendorSpecific), (2, 3, 4))
     driver.start()
     print "demoDrvmain thread done!"
 
+
 def demoRCP():
     print "demoRCP thread start!"
-    setup_logging('HAL', filename="hal.log",logging_level=logging.DEBUG)
+    setup_logging('HAL', filename="hal.log", logging_level=logging.DEBUG)
     drv_logger = logging.getLogger("demoRCP")
     drv_logger.info("hello demoRCP Log")
     RcpGlobalSettings.gDispatcher = Dispatcher()
     rcpProcess = RcpHalProcess("ipc:///tmp/_test_rcp_to_hal.tmp", RcpGlobalSettings.gDispatcher)
 
     RcpGlobalSettings.hal_ipc = RcpHalIpc("RCP-HalClient", "This is a RCP test application",
-                                 "1.9.0", (1, 100, 102), rcpProcess,
-                                 "../hal/conf/ClientLogging.conf", shadowLayerConf=TMP_CFG_PATH)
+                                          "1.9.0", (1, 100, 102), rcpProcess,
+                                          "../hal/conf/ClientLogging.conf", shadowLayerConf=TMP_CFG_PATH)
 
     try:
         if None is not RcpGlobalSettings.hal_ipc:
             RcpGlobalSettings.hal_ipc.start(rcpProcess.orchestrator.config_operation_rsp_cb,
-                                rcpProcess.orchestrator.notification_process_cb)
+                                            rcpProcess.orchestrator.notification_process_cb)
             RcpGlobalSettings.rcpProcess = rcpProcess
             RcpGlobalSettings.gDispatcher.loop()
         else:
             print ("demoRCP: hal_ipc is NONE")
     except Exception:
         print ("socket is destroyed, demoRCP terminated")
-    
 
     print "demoRCP thread done!"
 
@@ -196,7 +203,7 @@ class RcpVspTlvTest(unittest.TestCase):
         t = threading.Thread(target=demoDrvmain)
         t.daemon = True
         t.start()
-        threads_list.append(t)        
+        threads_list.append(t)
         time.sleep(2)
 
         cls.hal_ipc = RcpGlobalSettings.hal_ipc
@@ -223,7 +230,7 @@ class RcpVspTlvTest(unittest.TestCase):
         HalGlobal.StopHal = True
 
         #os.system("ps ax |grep python|awk '{print $1}'|xargs kill -9")
-        #time.sleep(2)
+        # time.sleep(2)
         subprocess.call(["killall", "redis-server"])
         time.sleep(4)
         for t in threads_list:
@@ -231,23 +238,24 @@ class RcpVspTlvTest(unittest.TestCase):
                 t.join(2)
 
     def fake_cb(self, cb):
-        print "fake cb handled" 
+        print "fake cb handled"
 
-    #@unittest.skip('skip test_send_vsp_tlv_to_drv')
+    # GANG OF FIVE SKIP
+    @unittest.skip('skip test_send_vsp_tlv_to_drv')
     def test_send_vsp_tlv_to_drv(self):
         """
         Send 2 RCP Sequences: 1 with READ, 1 with WRITE
         """
         print "test_send_vsp_tlv_to_drv\n"
-        
+
         timeOut = time.time() + 5
         while self.hal_ipc is not None and self.hal_ipc.disconnected and time.time() < timeOut:
             pass
 
         desc = GCPSlaveDescriptor(
-                         "127.0.0.1", port_master=9999, addr_local="127.0.0.1",
-                         interface_local="lo",
-                         addr_family=socket.AF_INET)
+            "127.0.0.1", port_master=9999, addr_local="127.0.0.1",
+            interface_local="lo",
+            addr_family=socket.AF_INET)
         dummy_session = RCPSlaveSession(desc, self.dispatcher,
                                         self.fake_cb,
                                         self.fake_cb,
@@ -258,13 +266,13 @@ class RcpVspTlvTest(unittest.TestCase):
             'req_packet': "dummy-packet",
             'gcp_msg': "dummy-message",
             'req_data': [self.vsp_tlv_seq.create_vendor_tlvs_sequence(
-                                    gcp_msg_def.NotifyREQ,
-                                    rcp_tlv_def.RCP_MSG_TYPE_NTF,
-                                    rcp_tlv_def.RCP_OPERATION_TYPE_READ), 
-                         self.vsp_tlv_seq.create_vendor_tlvs_sequence(
-                                    gcp_msg_def.NotifyREQ,
-                                    rcp_tlv_def.RCP_MSG_TYPE_NTF,
-                                    rcp_tlv_def.RCP_OPERATION_TYPE_WRITE), ],
+                gcp_msg_def.NotifyREQ,
+                rcp_tlv_def.RCP_MSG_TYPE_NTF,
+                rcp_tlv_def.RCP_OPERATION_TYPE_READ),
+                self.vsp_tlv_seq.create_vendor_tlvs_sequence(
+                gcp_msg_def.NotifyREQ,
+                rcp_tlv_def.RCP_MSG_TYPE_NTF,
+                rcp_tlv_def.RCP_OPERATION_TYPE_WRITE), ],
         }
         if None is not self.hal_ipc:
             self.hal_ipc.rcp_cfg_req(ipc_msg)
@@ -276,26 +284,27 @@ class RcpVspTlvTest(unittest.TestCase):
         # since the seq contains matched vendor id, so all RCP sequences should be sent to driver
         self.assertTrue(pkt_db_len == 0)
 
-    #@unittest.skip('skip test_send_vsp_tlv_unmatched_vid_to_drv')
+    # GANG OF FIVE SKIP
+    @unittest.skip('skip test_send_vsp_tlv_unmatched_vid_to_drv')
     def test_send_vsp_tlv_unmatched_vid_to_drv(self):
         print "test_send_vsp_tlv_unmatched_vid_to_drv\n"
-        
+
         timeOut = time.time() + 5
         while self.hal_ipc is not None and self.hal_ipc.disconnected and time.time() < timeOut:
             pass
 
         desc = GCPSlaveDescriptor(
-                         "127.0.0.1", port_master=9999, addr_local="127.0.0.1",
-                         interface_local="lo",
-                         addr_family=socket.AF_INET)
+            "127.0.0.1", port_master=9999, addr_local="127.0.0.1",
+            interface_local="lo",
+            addr_family=socket.AF_INET)
         dummy_session = RCPSlaveSession(desc, self.dispatcher,
                                         self.fake_cb,
                                         self.fake_cb,
                                         self.fake_cb)
         seq = self.vsp_tlv_seq_unmatched_vid.create_vendor_tlvs_sequence(
-                                    gcp_msg_def.NotifyREQ,
-                                    rcp_tlv_def.RCP_MSG_TYPE_NTF,
-                                    rcp_tlv_def.RCP_OPERATION_TYPE_WRITE)
+            gcp_msg_def.NotifyREQ,
+            rcp_tlv_def.RCP_MSG_TYPE_NTF,
+            rcp_tlv_def.RCP_OPERATION_TYPE_WRITE)
         ipc_msg = {
             'session': dummy_session,
             'req_packet': "dummy-packet",
@@ -317,21 +326,20 @@ class RcpVspTlvTest(unittest.TestCase):
     def test_create_vendor_tlv_seq(self):
         print "test_create_vendor_tlv_seq"
         seq = self.vsp_tlv_seq.create_vendor_tlvs_sequence(
-                                    gcp_msg_def.NotifyREQ,
-                                    rcp_tlv_def.RCP_MSG_TYPE_NTF,
-                                    rcp_tlv_def.RCP_OPERATION_TYPE_DELETE)
+            gcp_msg_def.NotifyREQ,
+            rcp_tlv_def.RCP_MSG_TYPE_NTF,
+            rcp_tlv_def.RCP_OPERATION_TYPE_DELETE)
 
         buf = seq.encode()
         self.assertIsNotNone(buf)
-        #print str(buf) + ", len %d" %len(buf)
-
+        # print str(buf) + ", len %d" %len(buf)
 
         seq_dec = self.vsp_tlv_seq.create_vendor_tlvs_sequence(
-                                    gcp_msg_def.NotifyREQ,
-                                    rcp_tlv_def.RCP_MSG_TYPE_NTF,
-                                    rcp_tlv_def.RCP_OPERATION_TYPE_DELETE)
+            gcp_msg_def.NotifyREQ,
+            rcp_tlv_def.RCP_MSG_TYPE_NTF,
+            rcp_tlv_def.RCP_OPERATION_TYPE_DELETE)
 
-        self.assertEqual(seq_dec.decode(buf, offset=0, buf_data_len=len(buf)),seq_dec.DECODE_DONE)
+        self.assertEqual(seq_dec.decode(buf, offset=0, buf_data_len=len(buf)), seq_dec.DECODE_DONE)
         time.sleep(2)
         pass
 
@@ -345,25 +353,24 @@ class RcpVspTlvTest(unittest.TestCase):
         msg.msg_fields.Mode.set_val(0b10000000)
         msg.msg_fields.Status.set_val(2)
 
-
         seq = self.vsp_tlv_seq.create_vendor_tlvs_sequence(
-                                    gcp_msg_def.NotifyREQ,
-                                    rcp_tlv_def.RCP_MSG_TYPE_NTF,
-                                    rcp_tlv_def.RCP_OPERATION_TYPE_WRITE)
-                                    
+            gcp_msg_def.NotifyREQ,
+            rcp_tlv_def.RCP_MSG_TYPE_NTF,
+            rcp_tlv_def.RCP_OPERATION_TYPE_WRITE)
+
         rcp_msg = RCPMessage(gcp_msg_def.NotifyREQ,
                              rcp_tlv_def.RCP_MSG_TYPE_NTF)
 
         msg.tlv_data.rcp_msgs.append(rcp_msg)
         rcp_msg.sequences.append(seq)
-        
+
         buf = msg.encode()
         self.assertIsNotNone(buf)
 
         msg_dec = Message(gcp_msg_def.NotifyREQ)
         self.assertEqual(msg_dec.decode(buf, offset=0, buf_data_len=len(buf)),
                          msg_dec.DECODE_DONE)
-        #self.assertTrue(msg._ut_compare(msg_dec))
+        # self.assertTrue(msg._ut_compare(msg_dec))
         time.sleep(2)
 
     def test_msg_with_op_aw(self):
@@ -376,9 +383,9 @@ class RcpVspTlvTest(unittest.TestCase):
         msg.msg_fields.Status.set_val(2)
 
         seq = self.vsp_tlv_seq.create_vendor_tlvs_sequence(
-                                    gcp_msg_def.NotifyREQ,
-                                    rcp_tlv_def.RCP_MSG_TYPE_IRA,
-                                    rcp_tlv_def.RCP_OPERATION_TYPE_ALLOCATE_WRITE)
+            gcp_msg_def.NotifyREQ,
+            rcp_tlv_def.RCP_MSG_TYPE_IRA,
+            rcp_tlv_def.RCP_OPERATION_TYPE_ALLOCATE_WRITE)
 
         rcp_msg = RCPMessage(gcp_msg_def.NotifyREQ,
                              rcp_tlv_def.RCP_MSG_TYPE_NTF)

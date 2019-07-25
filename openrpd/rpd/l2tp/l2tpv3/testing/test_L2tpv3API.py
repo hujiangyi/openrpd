@@ -30,10 +30,11 @@ from random import randint
 from rpd.dispatcher.dispatcher import Dispatcher
 from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 from rpd.mcast.src.mcast import Mcast
+from rpd.confdb.testing.test_rpd_redis_db import setup_test_redis, stop_test_redis
 
 
 class L2tpMcastList(object):
-    HEADER =["Interface", "LocalIp", "Grp", "Src", "Status", "Refcnt", "Last Chg"]
+    HEADER = ["Interface", "LocalIp", "Grp", "Src", "Status", "Refcnt", "Last Chg"]
     HEADER_SESSION = ["Interface", "LocalIp", "Grp", "Src", "Status", "SESSIONS"]
 
     def __init__(self):
@@ -44,12 +45,14 @@ class L2tpMcastList(object):
         self.Session = []
         self.last_change_time = time.time()
 
+
 class testL2tpv3API(unittest.TestCase):
     __metaclass__ = AddLoggerToClass
 
     @classmethod
     def setUpClass(cls):
         setup_logging("L2TP")
+        setup_test_redis()
 
         # Construct the API transport path
         ApiPath = L2tpv3GlobalSettings.L2tpv3GlobalSettings.APITransportPath
@@ -60,6 +63,7 @@ class testL2tpv3API(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        stop_test_redis()
         cls.api.transport.socket.unbind(cls.api.transport.path)
         for key in Mcast.McastDb.keys():
             if isinstance(Mcast.McastDb[key], Mcast):
@@ -591,13 +595,13 @@ class testL2tpv3API(unittest.TestCase):
         dispatcher.stats.error = 1
         # setup the halclient
         hal_client = L2tpHalClient("L2TP_HAL_CLIENT",
-                                       "the HAL client of L2TP feature",
-                                       "1.0", (3078,), global_dispatcher)
+                                   "the HAL client of L2TP feature",
+                                   "1.0", (3078,), global_dispatcher)
         L2tpv3GlobalSettings.L2tpv3GlobalSettings.l2tp_hal_client = hal_client
         hal_client.stats.exception = 10
         msg = self.api._handleMsg(cmd)
         print msg
-        hal_client.stats= None
+        hal_client.stats = None
 
     def test_handleClearStatsQuery(self):
         L2tpv3GlobalSettings.L2tpv3GlobalSettings.Dispatcher = None
@@ -614,8 +618,8 @@ class testL2tpv3API(unittest.TestCase):
         dispatcher.stats.error = 1
         # setup the halclient
         hal_client = L2tpHalClient("L2TP_HAL_CLIENT",
-                                       "the HAL client of L2TP feature",
-                                       "1.0", (3078,), global_dispatcher)
+                                   "the HAL client of L2TP feature",
+                                   "1.0", (3078,), global_dispatcher)
         L2tpv3GlobalSettings.L2tpv3GlobalSettings.l2tp_hal_client = hal_client
         hal_client.stats.exception = 10
         msg = self.api._handleMsg(cmd)
@@ -678,7 +682,7 @@ class testL2tpv3API(unittest.TestCase):
                 mcast_line.Session.append(session)
             print mcast_line.Grp, mcast_line.Src, mcast_line.LocalIp, mcast_line.LocalIp, mcast_line.interface,\
                 mcast_line.status, mcast_line.last_change_time, len(mcast_line.Session)
-            item = (mcast_line.interface, mcast_line.LocalIp, mcast_line.Grp,mcast_line.Src,
+            item = (mcast_line.interface, mcast_line.LocalIp, mcast_line.Grp, mcast_line.Src,
                     mcast_line.status, str(len(mcast_line.Session)), mcast_line.last_change_time)
             data.append(item)
             del mcast_line
@@ -693,11 +697,14 @@ class testL2tpv3API(unittest.TestCase):
         for key in Mcast.McastDb.keys():
             Mcast.McastDb[key].close()
 
+
 class fake_conn(object):
+
     def __init__(self):
         self.remoteAddr = "1.1.1.1"
         self.localAddr = "1.1.1.1"
         self.connectionID = 1234
+
 
 class ThreadingAPI(object):
     """ Threading example class
@@ -726,8 +733,10 @@ class ThreadingAPI(object):
             self.api.recvAndProcess()
             time.sleep(self.interval)
 
+
 class testL2tpv3APIClient(unittest.TestCase):
     __metaclass__ = AddLoggerToClass
+
     @classmethod
     def setUpClass(cls):
         setup_logging("L2TP")
@@ -738,13 +747,12 @@ class testL2tpv3APIClient(unittest.TestCase):
     def tearDownClass(cls):
         pass
 
-
     def test_L2tpv3APIClient(self):
         con = fake_conn()
         client_error = L2tpv3APIClient()
         self.assertIsInstance(client_error, L2tpv3APIClient)
 
-        ret = client_error.requestSessInfo(conn=con, sess=3,timeout=1)
+        ret = client_error.requestSessInfo(conn=con, sess=3, timeout=1)
         self.assertIsNone(ret)
         del(client_error)
 
@@ -776,6 +784,7 @@ class testL2tpv3APIClient(unittest.TestCase):
         self.assertIsNotNone(ret)
         api.run_flag = False
         api.thread.join()
+
 
 if __name__ == "__main__":
     unittest.main()

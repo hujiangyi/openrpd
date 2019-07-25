@@ -22,6 +22,7 @@ enum HalStatus {
     FAILED = 2;
     NOTSUPPORTED = 3;
     TIMEOUT = 4;
+    SUCCESS_IGNORE_RESULT = 5;
 }
 
 // the rsp common part 

@@ -15,7 +15,6 @@
 # limitations under the License.
 #
 
-from time import time
 from psutil import net_if_stats
 import zmq
 import json
@@ -36,9 +35,6 @@ class InterfaceStatus(agent.ProcessAgent):
     EVENT_UP_TO_DOWN = 2
 
     CHECK_INTERFACE_STATUS_PERIOD = 1
-    INTERFACE_STATUS_DOWN_LASTED = 120
-    # to align with I07 6.11 definition
-    # CIN_LINK_TIMEOUT 120 second
 
     SCAN_INTERFACE_PERIOD = 5
     __metaclass__ = AddLoggerToClass
@@ -97,12 +93,12 @@ class InterfaceStatus(agent.ProcessAgent):
                 # create a interface in self interfaces
                 self.interfaces[parameter] = {
                     "status": self.DOWN,
-                    "requester": [ccap_core_id,],
+                    "requester": [ccap_core_id, ],
                     "flappingTimer": None,
                 }
                 # check interface status when first time created
                 stats = net_if_stats()
-                if parameter in stats and stats[parameter].isup:
+                if parameter in stats and SysTools.is_if_oper_up(parameter):
                     self.interfaces[parameter]['status'] = self.UP
 
             self._send_event_notification(
@@ -172,16 +168,16 @@ class InterfaceStatus(agent.ProcessAgent):
         for interface in self.interfaces:
             if interface not in stats:
                 self.logger.error(
-                    "Cannot find the interface[%s] in current system configuration."% interface)
+                    "Cannot find the interface[%s] in current system configuration." % interface)
                 continue
-            stat = stats[interface]
-            current_stat = self.UP if stat.isup else self.DOWN
+
+            current_stat = self.UP if SysTools.is_if_oper_up(interface) else self.DOWN
             self.logger.debug("Check the interface[%s] status, original %s now %s ...",
                               interface, self.interfaces[interface]['status'], current_stat)
 
             status_changed = False
             # CHeck if there is an status change:
-            if stat.isup:
+            if SysTools.is_if_oper_up(interface):
                 if None is not self.interfaces[interface]["flappingTimer"]:
                     self.dispatcher.timer_unregister(self.interfaces[interface]["flappingTimer"])
                     self.interfaces[interface]["flappingTimer"] = None
@@ -192,14 +188,9 @@ class InterfaceStatus(agent.ProcessAgent):
                     self.interfaces[interface]["status"] = self.UP
                     status_changed = True
 
-            elif (not stat.isup) and self.interfaces[interface]["status"] != self.DOWN:
-                # interface flapped status need to last 15s, then changed to Down
-                if None is self.interfaces[interface]["flappingTimer"]:
-                    self.interfaces[interface]["flappingTimer"] = self.dispatcher.timer_register(
-                        self.INTERFACE_STATUS_DOWN_LASTED, self.interface_flapping_down_handler,
-                        arg=interface)
-                    self.logger.info(
-                        "Start interface[%s] flappingTimer." % interface)
+            elif (not SysTools.is_if_oper_up(interface)) and self.interfaces[interface]["status"] != self.DOWN:
+                self.interfaces[interface]["status"] = self.DOWN
+                status_changed = True
             else:
                 pass
 
@@ -279,9 +270,8 @@ class InterfaceStatus(agent.ProcessAgent):
         interface_up = list()
         stats = net_if_stats()
         for interface in stats.keys():
-            stat = stats[interface]
             if interface != 'lo':
-                if stat.isup:
+                if SysTools.is_if_oper_up(interface):
                     interface_up.append(interface)
 
         # need to check redefined interface proto is provision or not for RPD
@@ -303,6 +293,7 @@ class InterfaceStatus(agent.ProcessAgent):
                     event_request_rsp.SerializeToString(), flags=zmq.NOBLOCK)
             except zmq.ZMQError as ex:
                 self.logger.error("failed to send to manager: %s" % str(ex))
+
 
 if __name__ == "__main__":
     setup_logging("PROVISION", filename="provision_interface_status.log")

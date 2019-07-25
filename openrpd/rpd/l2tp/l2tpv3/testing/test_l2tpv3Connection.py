@@ -32,13 +32,18 @@ from l2tpv3.src.L2tpv3Session import L2tpv3Session
 import l2tpv3.src.L2tpv3Hal_pb2 as L2tpv3Hal_pb2
 import struct
 import l2tpv3.src.L2tpv3Fsm as L2tpv3Fsm
+from rpd.confdb.testing.test_rpd_redis_db import setup_test_redis, \
+    stop_test_redis
+
 
 class fake_hal(object):
+
     def __init__(self):
         pass
 
     def send_l2tp_lcce_assignment_msg(self, lcce=None, msg_type=None):
         return
+
 
 class testL2tpConnection(unittest.TestCase):
 
@@ -80,11 +85,13 @@ class testL2tpConnection(unittest.TestCase):
                                    0xc, 8, 0x11, 0x8b,
                                    0x0, 0x4, 0x7, 0xD0,
                                    )
+        setup_test_redis()
 
     @classmethod
     def tearDownClass(cls):
         for conn in L2tpConnection.ConnectionDb.values():
             conn.CloseConnection()
+        stop_test_redis()
 
     def testConnection_init(self):
         conn_address = '127.11.2.1'
@@ -382,7 +389,7 @@ class testL2tpConnection(unittest.TestCase):
         self.assertIsNotNone(ret)
         self.assertIsInstance(ret, L2tpv3ACK)
 
-        #Recovery tunnel receive SCCCN
+        # Recovery tunnel receive SCCCN
         recover_conn = L2tpConnection(100, 100, conn_address, local_addr)
         recover_conn.isInRecovery = True
         conn.recoverConnection = recover_conn
@@ -942,10 +949,10 @@ class testL2tpConnection(unittest.TestCase):
         avps = [avp]
         hello = L2tpv3ControlPacket(0, 0, 1, avps)
         conn.transport.sendList.append({
-                "time": 1,
-                "pkt": hello,
-                "sendTimes": 0,
-            })
+            "time": 1,
+            "pkt": hello,
+            "sendTimes": 0,
+        })
         conn.transport.receiveWindow.add(hello)
         conn.transport.ackNr = 105
         conn.transport.ns = 56
@@ -980,6 +987,7 @@ class testL2tpConnection(unittest.TestCase):
                          L2tpv3ConnectionFsm.StateWaitCtlConn)
         conn.StopConnection()
         self.assertNotIn(reocverconn, L2tpConnection.ConnectionDb.values())
+
 
 if __name__ == "__main__":
     unittest.main()

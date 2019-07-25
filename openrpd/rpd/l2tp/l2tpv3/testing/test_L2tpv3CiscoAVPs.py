@@ -26,16 +26,23 @@ from l2tpv3.src import L2tpv3Connection
 
 import unittest
 
+
 class fake_con():
+
     def __init__(self):
         self.localConnID = 123
 
+
 class fake_pkt():
+
     def __init__(self):
         self.Connection = fake_con()
         self.avps = []
         self.Session = None
+
+
 class fake_sess():
+
     def __init__(self):
         self.localSessionId = 12
 
@@ -157,7 +164,6 @@ class TestL2tpv3CiscoAVPs(unittest.TestCase):
         print avp2[0]
         print avp1
 
-
         ret = avp1.handleAvp(pkt=None, retPak=None)
         self.assertTrue(ret)
         pkt = fake_pkt()
@@ -258,7 +264,6 @@ class TestL2tpv3CiscoAVPs(unittest.TestCase):
         avp2 = l2tpv3AVP.decodeAll(buf)
         print avp2[0]
         print avp1
-
 
         ret = avp1.handleAvp(pkt=None, retPak=None)
         self.assertTrue(ret)

@@ -19,6 +19,7 @@ import struct
 import socket
 from Queue import LifoQueue
 
+
 class Connection(Thread):
     MAX_PACKET_LEN = 65535
     MIN_PACKET_LEN = 7

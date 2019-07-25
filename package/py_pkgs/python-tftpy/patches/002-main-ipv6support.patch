@@ -148,67 +148,12 @@ Index: tftpy-0.6.2/tftpy/TftpStates.py
 ===================================================================
 --- tftpy-0.6.2.orig/tftpy/TftpStates.py	2017-12-02 22:42:56.638606666 +0800
 +++ tftpy-0.6.2/tftpy/TftpStates.py	2017-12-03 12:34:52.387796750 +0800
-@@ -97,8 +97,7 @@
-         dat.blocknumber = blocknumber
-         self.context.metrics.bytes += len(dat.data)
-         log.debug("Sending DAT packet %d", dat.blocknumber)
--        self.context.sock.sendto(dat.encode().buffer,
--                                 (self.context.host, self.context.tidport))
-+        self.context.sock.sendto(dat.encode().buffer, self.context.sockaddr)
-         if self.context.packethook:
-             self.context.packethook(dat)
-         self.context.last_pkt = dat
-@@ -114,9 +113,7 @@
-         log.info("Sending ack to block %d" % blocknumber)
-         ackpkt = TftpPacketACK()
-         ackpkt.blocknumber = blocknumber
--        self.context.sock.sendto(ackpkt.encode().buffer,
--                                 (self.context.host,
--                                  self.context.tidport))
-+        self.context.sock.sendto(ackpkt.encode().buffer, self.context.sockaddr)
-         self.context.last_pkt = ackpkt
- 
-     def sendError(self, errorcode):
-@@ -125,9 +122,7 @@
-         log.debug("In sendError, being asked to send error %d", errorcode)
-         errpkt = TftpPacketERR()
-         errpkt.errorcode = errorcode
--        self.context.sock.sendto(errpkt.encode().buffer,
--                                 (self.context.host,
--                                  self.context.tidport))
-+        self.context.sock.sendto(errpkt.encode().buffer, self.context.sockaddr)
-         self.context.last_pkt = errpkt
- 
-     def sendOACK(self):
-@@ -136,9 +131,7 @@
-         log.debug("In sendOACK with options %s", self.context.options)
-         pkt = TftpPacketOACK()
-         pkt.options = self.context.options
--        self.context.sock.sendto(pkt.encode().buffer,
--                                 (self.context.host,
--                                  self.context.tidport))
-+        self.context.sock.sendto(pkt.encode().buffer, self.context.sockaddr)
-         self.context.last_pkt = pkt
- 
-     def resendLast(self):
-@@ -154,7 +147,7 @@
-             # there.
-             sendto_port = self.context.port
-         self.context.sock.sendto(self.context.last_pkt.encode().buffer,
--                                 (self.context.host, sendto_port))
-+                                 self.context.sockaddr)
-         if self.context.packethook:
-             self.context.packethook(self.context.last_pkt)
- 
-@@ -532,9 +525,10 @@
-         """Handle the packet in response to an RRQ to the server."""
-         if not self.context.tidport:
-             self.context.tidport = rport
-+            self.context.sockaddr = (self.context.sockaddr[0], rport)
-             log.info("Set remote port for session to %s" % rport)
-         if self.context.host != raddress:
--            self.context.host = raddress
-+            self.context.sockaddr = (raddress, self.context.sockaddr[1])
-             log.info("Set remote host for session to %s" % raddress)
- 
-         # Now check the packet type and dispatch it properly.
+@@ -412,7 +412,7 @@ class TftpStateExpectACK(TftpState):
+     def handle(self, pkt, raddress, rport):
+         "Handle a packet, hopefully an ACK since we just sent a DAT."
+         if isinstance(pkt, TftpPacketACK):
+-            log.info("Received ACK for packet %d" % pkt.blocknumber)
++            #log.info("Received ACK for packet %d" % pkt.blocknumber)
+             # Is this an ack to the one we just sent?
+             if self.context.next_block == pkt.blocknumber:
+                 if self.context.pending_complete:

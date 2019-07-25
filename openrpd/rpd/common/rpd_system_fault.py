@@ -138,6 +138,7 @@ class SystemMonitorFault():
 
         return
 
+
 if __name__ == "__main__":  # pragma: no cover
     setup_logging("CLI", filename="cli.log")
     driver = SystemMonitorFault()

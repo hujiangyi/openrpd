@@ -22,14 +22,18 @@ from rpd.rcp.rcp_orchestrator import log_measured_values
 from rpd.rcp import rcp_master_orchestrator
 from rpd.dispatcher import dispatcher
 from rpd.rcp.gcp import gcp_sessions
-from rpd.rcp.rcp_sessions import RCPMasterCapabilities
+from rpd.rcp.rcp_sessions import CcapCoreIdentification
 from rpd.rcp.rcp_lib import rcp_tlv_def
 import zmq
 from rpd.gpb import master_sim_pb2 as master_sim_def
 from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 from rpd.common.utils import Convert
+from rpd.confdb.rpd_redis_db import RCPDB
+from rpd.hal.simulator.start_hal import start_redis
+from rpd.rcp.rcp_process import set_test_res_db
 import json
 import os
+import time
 
 
 # IPv4 session description
@@ -108,10 +112,15 @@ class MasterAPI(object):
             MasterAPI.logger.error("")
             print "Error happnens when handle message:" + str(e)
 
+
 if __name__ == "__main__":
 
     # setup logging, will search the config files
     setup_logging("MasterSim", filename="rcp_master_sim.log")
+    set_test_res_db()
+    redis = start_redis()
+    time.sleep(2)
+
     scale_test_packets = 1
     send_no_wait = False
 
@@ -180,19 +189,19 @@ if __name__ == "__main__":
         ccap_core_identification = json.load(core_identification)
     with open(os.path.dirname(os.path.abspath(__file__)) + i07_file) as i07data:
         customize_data = json.load(i07data)
-    caps = RCPMasterCapabilities(index=ccap_core_identification["index"],
-                                 core_id=ccap_core_identification["core_id"],
-                                 core_ip_addr=ccap_core_identification["core_ip_addr"],
-                                 is_principal=ccap_core_identification["is_principal"] == str(True),
-                                 core_name=ccap_core_identification["core_name"],
-                                 vendor_id=ccap_core_identification["vendor_id"],
-                                 is_active=ccap_core_identification["core_mode"] == 1,
-                                 initial_configuration_complete=ccap_core_identification["initial_configuration_complete"] == str(True),
-                                 move_to_operational=ccap_core_identification["move_to_operational"] == str(True),
-                                 core_function=ccap_core_identification["core_function"],
-                                 resource_set_index=ccap_core_identification["resource_set_index"],
-                                 data=customize_data
-                                 )
+    caps = CcapCoreIdentification(index=ccap_core_identification["index"],
+                                  core_id=ccap_core_identification["core_id"],
+                                  core_ip_addr=ccap_core_identification["core_ip_addr"],
+                                  is_principal=ccap_core_identification["is_principal"] == str(True),
+                                  core_name=ccap_core_identification["core_name"],
+                                  vendor_id=ccap_core_identification["vendor_id"],
+                                  core_mode=ccap_core_identification["core_mode"],
+                                  initial_configuration_complete=ccap_core_identification["initial_configuration_complete"] == str(True),
+                                  move_to_operational=ccap_core_identification["move_to_operational"] == str(True),
+                                  core_function=ccap_core_identification["core_function"],
+                                  resource_set_index=ccap_core_identification["resource_set_index"],
+                                  data=customize_data
+                                  )
 
     desc = RCPMasterDescriptor(
         caps,

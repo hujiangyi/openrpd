@@ -1198,5 +1198,6 @@ class ConfigFilterSidQosTest(unittest.TestCase):
         print msg2
         print '*' * 40 + 'msg end' + '*' * 40
 
+
 if __name__ == '__main__':
     unittest.main()

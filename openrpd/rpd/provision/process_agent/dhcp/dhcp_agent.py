@@ -16,11 +16,13 @@
 #
 
 from time import time
+import os
+import re
 import json
 import argparse
 import signal
 import sys
-
+import ipaddress
 from psutil import net_if_stats
 import zmq
 import rpd.provision.process_agent.agent.agent as agent
@@ -34,6 +36,7 @@ from rpd.confdb.cfg_db_adapter import CfgDbAdapter
 from rpd.common.utils import SysTools, Convert
 from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 from rpd.common import rpd_event_def
+from rpd.common.rpdinfo_utils import RpdInfoUtils
 
 
 class DhcpAgent(agent.ProcessAgent):
@@ -186,6 +189,7 @@ class DhcpAgent(agent.ProcessAgent):
                     "lastChangeTime": time(),
                     "transport": self.process_transport,
                     "initiated_by": ccap_core_id,
+                    "initiated": False,
                 }
 
             self._send_event_notification(
@@ -211,6 +215,12 @@ class DhcpAgent(agent.ProcessAgent):
                 ccap_core_id, protoDef.msg_core_event_notification.FAIL,
                 reason="Cannot stop event since can not find it.")
             return
+
+    def _dhcp_timer_unregister(self, interface):
+        timer = self.processes[interface]["timer"]
+        if timer:
+            self.dispatcher.timer_unregister(timer)
+            self.processes[interface]["timer"] = None
 
     def dhcp_msg_cb(self, fd, eventmask):
         """Callback function for received zmq msg.
@@ -277,9 +287,14 @@ class DhcpAgent(agent.ProcessAgent):
                     return
 
                 self.dhcp_data = dhcp_msg.DHCPData
+                CreatedTime = RpdInfoUtils.getSysUpTime()
                 if self.dhcp[interface]['status'] != self.UP:
                     status_changed = True
                     self.dhcp[interface]['status'] = self.UP
+                self.dhcp[interface]['initiated'] = True
+                # when dhcpv6 process change to state UP, check if any duplicated ipv6 address event need to be reported
+                if self.processes[interface]['name'] == 'dhcpv6':
+                    self.check_and_report_ipv6_event(interface)
                 self.delete_dhcp_data()
                 self.verify_dhcp_data()
 
@@ -305,36 +320,36 @@ class DhcpAgent(agent.ProcessAgent):
                             {'CCAPCores': [ccap for ccap in data.CCAPCores],
                              'TimeServers': [ts for ts in data.TimeServers],
                              'TimeOffset': data.TimeOffset,
+                             'CreatedTime': CreatedTime,
                              'LogServers': [ls for ls in data.LogServers],
                              'initiated_by': self.dhcp[interface]['initiated_by'],
-                             'Interface': interface})
+                             'Interface': interface,
+                             'Slaac': data.Slaac})
                     self.mgrs[idx]['transport'].sock.send(
                         event_request_rsp.SerializeToString(),
                         flags=zmq.NOBLOCK)
                     self.logger.debug("Send status change to id %s, msg:%s" %
                                       (idx, event_request_rsp))
-
+                    self._dhcp_timer_unregister(interface)
             elif dhcp_msg.Status == dhcp_msg.FAILED:
+                self._dhcp_timer_unregister(interface)
                 ret = self._dhcp_no_lease(interface)
                 if not ret and self.dhcp[interface]['status'] != self.DOWN:
                     status_changed = True
                     self.dhcp[interface]['status'] = self.DOWN
             else:
                 self.logger.error("Unexpected status received from DHCP")
+                self._dhcp_timer_unregister(interface)
                 return
 
             # Find out from which DHCP process is running (who sent it)
             dhcp_proc = self.processes[interface]["process"]
-            timer = self.processes[interface]["timer"]
             # dhcpv6 process can be started atomically
             if not dhcp_proc:
                 self.logger.debug("DHCP client process is terminated")
                 if self.dhcp[interface]['status'] != self.DOWN:
                     status_changed = True
                     self.dhcp[interface]['status'] = self.DOWN
-            if timer:
-                self.dispatcher.timer_unregister(timer)
-                self.processes[interface]["timer"] = None
 
             # send the status change to the requester
             if not status_changed:
@@ -366,10 +381,10 @@ class DhcpAgent(agent.ProcessAgent):
                     # Remove all invalid values
                     if not Convert.is_valid_ip_address(ip_addr):
                         self.logger.warn("Unexpected format of value: "
-                                 "%s = %s", descr.name, ip_addr)
+                                         "%s = %s", descr.name, ip_addr)
                         value.remove(ip_addr)
 
-            elif descr.name == 'TimeOffset':
+            elif descr.name in ['TimeOffset', 'Slaac']:
                 # Nothing to be checked (int32)
                 pass
             else:
@@ -377,7 +392,7 @@ class DhcpAgent(agent.ProcessAgent):
                     "Unknown DHCP option found: %s, ignore it.", descr.name)
 
         self.store_dhcp_data()
-        
+
     def delete_dhcp_data(self):
         """Delete DHCP data structure from DB and also clear cached copy of it."""
         self.db_adapter.del_leaf(self.dhcp_data_path)
@@ -406,7 +421,8 @@ class DhcpAgent(agent.ProcessAgent):
          * If DHCPv6 failed -> try DHCPv4
          * If DHCPv4 failed -> reboot
 
-        :return:
+        :return: False to represent DHCP fail, True if do not want to report 
+                  this fail
 
         """
         if interface not in self.processes:
@@ -414,17 +430,22 @@ class DhcpAgent(agent.ProcessAgent):
             return False
 
         stats = net_if_stats()
-        if interface in stats and not stats[interface].isup:
+        if interface in stats and not SysTools.is_if_oper_up(interface):
             self.logger.info("Ignore this message caused by link down...")
-            return True
+            return False
+
+        if interface in stats and self.dhcp[interface]['initiated']:
+            self.logger.info("Ignore failure for %s previous up", self.processes[interface]['name'])
+            return False
 
         name = self.processes[interface]['name']
         if self.processes[interface]['process']:
             if name == "dhcpv6":
-                SysTools.set_protocol(interface)
+                # when dhcpv6 process failed, check if any duplicated ipv6 address event need to be reported
+                self.check_and_report_ipv6_event(interface)
                 self.logger.info("Starting DHCPv4 client ...")
                 self.start_dhcpv4(interface)
-                return True
+                return False
             elif name == "dhcpv4":
                 self.logger.warn("DHCPv4 failure...")
                 SysTools.set_protocol(interface)
@@ -456,6 +477,58 @@ class DhcpAgent(agent.ProcessAgent):
                 self.processes[interface]["process"] = False
                 self.processes.pop(interface)
 
+    @staticmethod
+    def get_all_ipv6_duplicate_msg():
+        cmd = 'dmesg | grep \"IPv6 duplicate address\"'
+        results = os.popen(cmd).read()
+        lines = results.split('\n')
+        return lines
+
+    def check_and_report_ipv6_event(self, interface):
+        self.logger.debug("Check dmesg for ipv6 address duplication ")
+        try:
+            lines = self.get_all_ipv6_duplicate_msg()
+            for line in lines:
+                self.report_ipv6_duplicate_event(interface, line)
+        except Exception as e:
+            self.logger.warn("Exception happened when check and report ipv6 duplication msg: %s", str(e))
+
+    def report_ipv6_duplicate_event(self, interface, msg):
+        """
+
+        :param interface:
+        :param msg: only 1 line of msg  which is the print info in dmsg format.
+                    [  100.395512] IPv6: eth1: IPv6 duplicate address fe80::a833:11ff:fe66:0 detected!
+        :return:
+        """
+        try:
+            self.logger.debug("Checking interface[%s] in msg[%s]", interface, msg)
+            if not len(msg):
+                return False, "None msg"
+            msgs = msg.split(" ")
+            ipv6_index = 0
+            for value in msgs:
+                if value == 'IPv6:':
+                    msg_interface = msgs[ipv6_index + 1]
+                    dup_ip = msgs[ipv6_index + 5]
+                    if msg_interface == (interface + ':'):
+                        if not isinstance(dup_ip, unicode):
+                            dup_ip = unicode(dup_ip, 'utf-8')
+                        if ipaddress.ip_address(dup_ip).is_link_local:
+                            self.notify.critical(rpd_event_def.RPD_EVENT_DHCPV6_DAD_LOCAL[0], interface)
+                            return True, "Local"
+                        else:
+                            self.notify.critical(rpd_event_def.RPD_EVENT_DHCPV6_DAD_LEASE[0], interface)
+                            return True, "Global"
+                    break
+                else:
+                    ipv6_index += 1
+            return False, "Not match"
+
+        except Exception as e:
+            self.logger.warn("Exception happened when report ipv6 duplication msg: %s", str(e))
+            return False, "Exception"
+
 
 if __name__ == "__main__":  # pragma: no cover
     parser = argparse.ArgumentParser(description="dhcp agent")
@@ -468,4 +541,3 @@ if __name__ == "__main__":  # pragma: no cover
     pagent = DhcpAgent(simulate_mode=arg.simulator)
     signal.signal(signal.SIGINT, pagent.interrupt_handler)
     pagent.start()
-

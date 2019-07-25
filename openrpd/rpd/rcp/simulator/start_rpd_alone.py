@@ -32,10 +32,12 @@ REDIS_WITH_UNIX_FILE_PATTERN = "*:0"
 REDIS_CONF_NAME = "/tmp/.rpd-test-start-rpd-alone.conf"
 REDIS_SEARCH_DIRECTORY = "/usr/bin/"
 RPD_RCP_IPC_SOCK = "ipc:///tmp/rpd-test-rcp-process-ipc.sock"
-RPD_CORE_ADDRESS = ["lo;127.0.0.1",]
+RPD_CORE_ADDRESS = ["lo;127.0.0.1", ]
 # RPD_CORE_ADDRESS1 = ["lo:0;127.0.0.2",]
 
 # Start the Redis
+
+
 def check_process_is_running(process_name):
     for process in psutil.process_iter():
         if process.is_running() and len(process.cmdline()):
@@ -170,7 +172,7 @@ def get_rcp_process_dir():
 
 
 def start_rcp_process():
-    rcp_cmdline = "python " + get_rcp_process_dir() + 'rcp_process.py --ipc-address ' + RPD_RCP_IPC_SOCK
+    rcp_cmdline = "python " + get_rcp_process_dir() + 'rcp_process.py --ipc-address ' + RPD_RCP_IPC_SOCK + " -t"
 
     process = check_process_is_running(SEARCH_STR_RCP)
     if process:
@@ -187,7 +189,6 @@ def create_core():
     context = zmq.Context.instance()
     ipc_sock = context.socket(zmq.PAIR)
     ipc_sock.bind(RPD_RCP_IPC_SOCK)
-
 
     rcp_msg = t_RcpMessage()
     rcp_msg.RcpMessageType = rcp_msg.ADD_CCAP_CORES

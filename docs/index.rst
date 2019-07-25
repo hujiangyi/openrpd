@@ -17,6 +17,9 @@ Contents:
    building_documentation
    source/modules
    wiki/interops
+   wiki/virtualbox
+   building_manually
+   wiki/versioning
 
 Indices and tables
 ==================

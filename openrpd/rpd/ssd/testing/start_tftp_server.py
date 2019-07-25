@@ -17,6 +17,7 @@
 import tftpy
 import argparse
 
+
 def setup_tftp_server(rootpath=None, server=None, port=None):
     if rootpath is None or not isinstance(rootpath, str):
         rootpath = '/tmp'
@@ -30,6 +31,7 @@ def setup_tftp_server(rootpath=None, server=None, port=None):
     print "=" * 40 + 'port:' + str(port) + "=" * 40
     s = tftpy.TftpServer(rootpath)
     s.listen(server, int(port))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("tftp server args parser")

@@ -23,13 +23,28 @@ from rpd.common.rpd_system_fault import SystemMonitorFault
 from rpd.gpb.rcp_pb2 import t_RcpMessage
 from rpd.rcp.rcp_lib import rcp_tlv_def
 from rpd.gpb.cfg_pb2 import config
-from rpd.hal.src.HalConfigMsg import MsgTypeRpdGlobal, MsgTypetEventNotification
+from rpd.hal.src.HalConfigMsg import MsgTypeFaultManagement, MsgTypeRpdGlobal, MsgTypetEventNotification, MsgTypeRpdCtrl
 from rpd.hal.src.msg.HalMessage import HalMessage
 from rpd.gpb.monitor_pb2 import t_LED
 from rpd.provision.proto.MonitorMsgType import MsgTypeSetLed
+from rpd.hal.src.msg import HalCommon_pb2
 
 
 class TestFaultManager(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        currentPath = os.path.dirname(os.path.realpath(__file__))
+        dirs = currentPath.split("/")
+        rpd_index = dirs.index("testing") - 2
+        cls.rootpath = "/".join(dirs[:rpd_index])
+
+    @classmethod
+    def tearDownClass(cls):
+        if os.path.exists(cls.rootpath + 'test_fault_local.txt'):
+            os.remove(cls.rootpath + 'test_fault_local.txt')
+        if os.path.exists(cls.rootpath + 'test_fault_pending.txt'):
+            os.remove(cls.rootpath + 'test_fault_pending.txt')
 
     def setUp(self):
 
@@ -51,6 +66,12 @@ class TestFaultManager(unittest.TestCase):
         if os.path.exists('/tmp/fm_sock'):
             os.remove('/tmp/fm_sock')
         self.clear_buffer_file()
+
+    def create_pending_anbd_local_file(self):
+        fp = open(self.rootpath + "test_fault_local.txt", 'w')
+        fp.close()
+        fp = open(self.rootpath + "test_fault_pending.txt", 'w')
+        fp.close()
 
     def clear_buffer_file(self):
         if os.path.exists(EventCommonOperation.BUFFERED_TYPE[EventCommonOperation.BUFFERED_LOCAL]):
@@ -216,7 +237,8 @@ class TestFaultManager(unittest.TestCase):
         rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
         evcfg = config()
         # test PendingOrLocalLog 0
-        evcfg.EventNotification.PendingOrLocalLog = 0
+        notify_req = evcfg.EventNotification.add()
+        notify_req.PendingOrLocalLog = 0
         rcp_msg.RpdDataMessage.RpdData.CopyFrom(evcfg)
         rcp_msg.RpdDataMessage.RpdDataOperation = 2
         payload = rcp_msg.SerializeToString()
@@ -229,7 +251,7 @@ class TestFaultManager(unittest.TestCase):
 
         self.fm.fault_ipc.read_notification_handler(ntMsg)
         # test PendingOrLocalLog 1
-        evcfg.EventNotification.PendingOrLocalLog = 1
+        notify_req.PendingOrLocalLog = 1
         rcp_msg.RpdDataMessage.RpdData.CopyFrom(evcfg)
         rcp_msg.RpdDataMessage.RpdDataOperation = 2
         payload = rcp_msg.SerializeToString()
@@ -382,6 +404,127 @@ class TestFaultManager(unittest.TestCase):
         RpdEventConfig.GLOBAL_CONFIG['Throttle'] = rcp_tlv_def.RPD_EVENT_THROTTLE_STOP[0]
         self.fm.clear_msg_cnt(None)
         self.assertEqual(self.fm.msg_cnt_in_interval, 5)
+
+    def test_reset_rpd_log(self):
+        print '*' * 80
+        print 'test reset rpd log'
+        print '*' * 80
+        self.fm.fault_ipc.event_buffered_local_file = self.rootpath + 'test_fault_local.txt'
+        self.fm.fault_ipc.event_buffered_pending_file = self.rootpath + 'test_fault_pending.txt'
+        rcp_msg = t_RcpMessage()
+        rcp_msg.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
+        rcp_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION
+
+        # test payload does not have RpdCtrl field
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdCtrl,
+                         CfgMsgPayload=payload)
+        return_str = self.fm.fault_ipc.reset_rpd_log(msg)
+        self.assertEquals(str(return_str), "{'Status': %d, 'ErrorDescription': 'Rcp Msg Do Not Have RpdCtrl Field'}" %
+                          HalCommon_pb2.SUCCESS_IGNORE_RESULT)
+
+        # test payload operation is RPD_CFG_READ
+        rpdlogcfg = config()
+        rpdlogcfg.RpdCtrl.LogCtrl.ResetLog = 0
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(rpdlogcfg)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 2
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdCtrl,
+                         CfgMsgPayload=payload)
+        return_str = self.fm.fault_ipc.reset_rpd_log(msg)
+        self.assertEquals(str(return_str), "{'Status': %d, 'ErrorDescription': "
+                                           "'Operation 2 for Rpd Log Control Can Be Ignored'}" %
+                          HalCommon_pb2.SUCCESS_IGNORE_RESULT)
+
+        # test payload operation neither read nor write
+        rpdlogcfg = config()
+        rpdlogcfg.RpdCtrl.LogCtrl.ResetLog = 0
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(rpdlogcfg)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 3
+        payload = rcp_msg.SerializeToString()
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdCtrl,
+                         CfgMsgPayload=payload)
+        return_str = self.fm.fault_ipc.reset_rpd_log(msg)
+        self.assertEquals(str(return_str), "{'Status': %d, 'ErrorDescription': "
+                                           "'Operation 3 for LogCtrl is not supported'}" % HalCommon_pb2.FAILED)
+
+        # test pending and local files not exist
+        self.assertFalse(os.path.exists(self.rootpath + 'test_fault_pending.txt'))
+        self.assertFalse(os.path.exists(self.rootpath + 'test_fault_local.txt'))
+        rpdlogcfg = config()
+        rpdlogcfg.RpdCtrl.LogCtrl.ResetLog = 0
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(rpdlogcfg)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 1
+        payload = rcp_msg.SerializeToString()
+
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdCtrl,
+                         CfgMsgPayload=payload)
+        self.fm.fault_ipc.reset_rpd_log(msg)
+
+        # create pending and local files
+        self.create_pending_anbd_local_file()
+        self.assertTrue(os.path.exists(self.rootpath + 'test_fault_pending.txt'))
+        self.assertTrue(os.path.exists(self.rootpath + 'test_fault_local.txt'))
+
+        # test ResetLog pendinglog
+        rpdlogcfg = config()
+        rpdlogcfg.RpdCtrl.LogCtrl.ResetLog = 1
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(rpdlogcfg)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 1
+        payload = rcp_msg.SerializeToString()
+
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdCtrl,
+                         CfgMsgPayload=payload)
+        self.fm.fault_ipc.reset_rpd_log(msg)
+
+        is_local_file_exist = True
+        is_pending_file_exist = True
+        if not (os.path.exists(self.rootpath + 'test_fault_pending.txt')):
+            is_pending_file_exist = False
+        if not (os.path.exists(self.rootpath + 'test_fault_local.txt')):
+            is_local_file_exist = False
+        self.assertFalse(is_pending_file_exist)
+        self.assertTrue(is_local_file_exist)
+
+        # test ResetLog locallog
+        rpdlogcfg.RpdCtrl.LogCtrl.ResetLog = 2
+        rcp_msg.RpdDataMessage.RpdData.CopyFrom(rpdlogcfg)
+        rcp_msg.RpdDataMessage.RpdDataOperation = 1
+        payload = rcp_msg.SerializeToString()
+        fp = open(self.rootpath + 'test_fault_pending.txt', 'w')
+        fp.close()
+
+        msg = HalMessage("HalConfig",
+                         SrcClientID="testRpdFM",
+                         SeqNum=322,
+                         CfgMsgType=MsgTypeRpdCtrl,
+                         CfgMsgPayload=payload)
+        self.fm.fault_ipc.reset_rpd_log(msg)
+
+        is_local_file_exist = True
+        is_pending_file_exist = True
+        if not (os.path.exists(self.rootpath + 'test_fault_local.txt')):
+            is_local_file_exist = False
+        if not (os.path.exists(self.rootpath + 'test_fault_pending.txt')):
+            is_pending_file_exist = False
+        self.assertFalse(is_local_file_exist)
+        self.assertTrue(is_pending_file_exist)
+
 
 if __name__ == "__main__":
     unittest.main()

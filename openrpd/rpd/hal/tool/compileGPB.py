@@ -26,6 +26,7 @@ def checkIfPtotocInstalled():
     else:
         return False
 
+
 """
     protoc -I ./idl/ --python_out ./src/msg/ ./idl/HalCommon.proto
 """

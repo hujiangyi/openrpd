@@ -23,7 +23,9 @@ from rpd.rcp.rcp_lib import rcp
 from rpd.rcp.rcp_lib import rcp_tlv_def
 from rpd.rcp.gcp.gcp_lib import gcp_object
 
+
 class RCPMasterSequence(rcp.RCPSequence):
+
     """Implements RCP sequences and their encoding and decoding methods."""
     __metaclass__ = AddLoggerToClass
 
@@ -135,7 +137,7 @@ class RCPMasterSequence(rcp.RCPSequence):
             raise rcp.RCPSequenceDecodeError("Unknown RCP operation: {}".format(
                 self.operation))
 
-        #check ResponseCode
+        # check ResponseCode
         val = struct.unpack_from("!B", self.buffer, self.offset)
         if val[0] == 19:
             self.offset += 4
@@ -168,6 +170,7 @@ class RCPMasterMessage(rcp.RCPMessage):
     def __init__(self, gcp_message_id,
                  rcp_message_id=rcp_tlv_def.RCP_MSG_TYPE_NONE):
         super(RCPMasterMessage, self).__init__(gcp_message_id, rcp_message_id)
+
 
 class RCP_MasterTLVData(rcp.RCP_TLVData):
 

@@ -91,22 +91,22 @@ class TestL2tpv3RFC3931AVPs(unittest.TestCase):
 
         self.CircuitStatus = CircuitStatus(
             active=True, new=True, mustAvp=False, hiddenAvp=False, attrValue=None)
-        
+
         self.SbfdDiscriminator = SbfdDiscriminator(value=0, mustAvp=True, attrValue=None)
-        
+
         self.SbfdVccv = SbfdVccv(value=0, mustAvp=True, attrValue=None)
 
         self.FailoverCapability = FailoverCapability(
             failoverCapofCC=True, failoverCapofDC=False, recoveryTime=0, hiddenAvp=False, attrValue=None)
 
         self.TunnelRecovery = TunnelRecovery(
-            recoverTunnelID = 1, recoverRemoteTunnelID = 2, attrValue=None)
+            recoverTunnelID=1, recoverRemoteTunnelID=2, attrValue=None)
 
         self.SuggestedControlSequence = SuggestedControlSequence(
-            suggestedNs = 0, suggestedNr = 0, hiddenAvp=False, attrValue=None)
+            suggestedNs=0, suggestedNr=0, hiddenAvp=False, attrValue=None)
 
         self.FailoverSessionState = FailoverSessionState(
-            sessionID = 1, remoteSessionID = 2, hiddenAvp=False, attrValue=None)
+            sessionID=1, remoteSessionID=2, hiddenAvp=False, attrValue=None)
 
     def tearDown(self):
         pass
@@ -900,7 +900,6 @@ class TestL2tpv3RFC3931AVPs(unittest.TestCase):
         self.L2SpecificSublayer = L2SpecificSublayer(value=3, attrValue="show")
         self.assertEqual(self.L2SpecificSublayer.attrValue, "show")
 
-
     def test_L2SpecificSublayer_handleAvp(self):
         # retPak is None
         self.L2SpecificSublayer.handleAvp(pkt="lkjh", retPak=None)
@@ -1025,7 +1024,6 @@ class TestL2tpv3RFC3931AVPs(unittest.TestCase):
         self.assertEqual(self.CircuitStatus.ValidateFlags(
             mustAvp=True, hiddenAvp=False), True)
 
-
     def test_SbfdDiscriminator(self):
         # not isinstance(mustAvp, bool)
         try:
@@ -1062,7 +1060,6 @@ class TestL2tpv3RFC3931AVPs(unittest.TestCase):
         self.SbfdDiscriminator.ValidateFlags(mustAvp=True, hiddenAvp=False)
         self.assertEqual(self.SbfdDiscriminator.ValidateFlags(
             mustAvp=True, hiddenAvp=False), True)
-
 
     def test_SbfdVccv(self):
         # not isinstance(mustAvp, bool)
@@ -1104,19 +1101,19 @@ class TestL2tpv3RFC3931AVPs(unittest.TestCase):
     def test_FailoverCapability(self):
         try:
             self.FailoverCapability = FailoverCapability(failoverCapofCC=123,
-                failoverCapofDC=456, recoveryTime=0, hiddenAvp=666, attrValue=None)
+                                                         failoverCapofDC=456, recoveryTime=0, hiddenAvp=666, attrValue=None)
         except Exception as e:
             self.assertEqual(str(e), "parameter type error")
 
         try:
             self.FailoverCapability = FailoverCapability(failoverCapofCC=False,
-                failoverCapofDC=False, recoveryTime=0, hiddenAvp=False, attrValue=None)
+                                                         failoverCapofDC=False, recoveryTime=0, hiddenAvp=False, attrValue=None)
         except Exception as e:
             self.assertEqual(str(e), "failoverCapofCC and failoverCapofDC can't be false at the same time")
 
         # attrValue is Not None
         self.FailoverCapability = FailoverCapability(failoverCapofCC=True,
-            failoverCapofDC=False, recoveryTime=0, hiddenAvp=False, attrValue="RFC4951")
+                                                     failoverCapofDC=False, recoveryTime=0, hiddenAvp=False, attrValue="RFC4951")
 
     def test_FailoverCapability_handleAvp(self):
         self.assertEqual(
@@ -1142,7 +1139,7 @@ class TestL2tpv3RFC3931AVPs(unittest.TestCase):
     def test_TunnelRecovery(self):
         # attrValue is Not None
         self.TunnelRecovery = TunnelRecovery(
-            recoverTunnelID = 1, recoverRemoteTunnelID = 2, attrValue="RFC4951")
+            recoverTunnelID=1, recoverRemoteTunnelID=2, attrValue="RFC4951")
 
     def test_TunnelRecovery_handleAvp(self):
         self.assertEqual(
@@ -1162,13 +1159,13 @@ class TestL2tpv3RFC3931AVPs(unittest.TestCase):
     def test_SuggestedControlSequence(self):
         try:
             self.SuggestedControlSequence = SuggestedControlSequence(
-                suggestedNs = 0, suggestedNr = 0, hiddenAvp=123, attrValue=None)
+                suggestedNs=0, suggestedNr=0, hiddenAvp=123, attrValue=None)
         except Exception as e:
             self.assertEqual(str(e), "parameter type error")
 
         # attrValue is Not None
         self.SuggestedControlSequence = SuggestedControlSequence(
-            suggestedNs = 0, suggestedNr = 0, hiddenAvp=False, attrValue="RFC4951")
+            suggestedNs=0, suggestedNr=0, hiddenAvp=False, attrValue="RFC4951")
 
     def test_SuggestedControlSequence_handleAvp(self):
         self.assertEqual(
@@ -1188,16 +1185,16 @@ class TestL2tpv3RFC3931AVPs(unittest.TestCase):
     def test_FailoverSessionState(self):
         try:
             self.FailoverSessionState = FailoverSessionState(
-                sessionID = 1, remoteSessionID = 2, hiddenAvp=123, attrValue=None)
+                sessionID=1, remoteSessionID=2, hiddenAvp=123, attrValue=None)
         except Exception as e:
             self.assertEqual(str(e), "parameter type error")
 
         # attrValue is Not None
         self.FailoverSessionState = FailoverSessionState(
-            sessionID = 1, remoteSessionID = 2, hiddenAvp=False, attrValue="RFC4951")
+            sessionID=1, remoteSessionID=2, hiddenAvp=False, attrValue="RFC4951")
 
     def test_FailoverSessionState_handleAvp(self):
-        try :
+        try:
             self.FailoverSessionState.handleAvp(pkt="RFC4951", retPak="RFC4951")
         except Exception as e:
             pass
@@ -1212,6 +1209,7 @@ class TestL2tpv3RFC3931AVPs(unittest.TestCase):
     def test_FailoverSessionState_ValidateFlags(self):
         self.assertEqual(self.FailoverSessionState.ValidateFlags(
             mustAvp=False, hiddenAvp=False), True)
+
 
 if __name__ == "__main__":
     unittest.main()

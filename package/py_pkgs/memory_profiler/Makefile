@@ -5,13 +5,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=memory_profiler
-PKG_VERSION:=0.31
+PKG_VERSION:=0.52
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
-PKG_SOURCE_URL:=git://github.com/fabianp/memory_profiler.git
+PKG_SOURCE_URL:=https://github.com/pythonprofilers/memory_profiler.git
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_VERSION:=3fa7aafb0ac9c05c83fd9726ba1ffd6a7c27ec82
+PKG_SOURCE_VERSION:=0b6e2bf0264bb845c65c8e8238760df8876a570d
 
 include $(INCLUDE_DIR)/package.mk
 

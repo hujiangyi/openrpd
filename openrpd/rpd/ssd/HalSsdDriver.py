@@ -47,6 +47,7 @@ from rpd.ssd.codeFileVerify import CodeFileVerify, SsdVerifyResult
 from tftpy.TftpShared import log as tftpLogger
 from tftpy.TftpShared import TftpTimeout, TftpException
 from zmq.utils.monitor import recv_monitor_message
+from datetime import datetime
 
 
 class SsdManager(object):  # pragma: no cover
@@ -185,6 +186,7 @@ class HalSsdDriver(HalDriverClient):
     BOOT_IMAGE_PATH = '/bootflash/imagea'
     INIT_CODE_PATH = '/bootflash/initcode'
     LOCAL_FILE_PATH = '/bootflash/codefile.local'
+    SSD_IMAGE_INFO_PATH = '/rpd/config/ssd_image_info'
     # fixme: remove when bootflash partition done
     TMP_FILE_PATH = '/tmp/ssd/codefile.tmp'
     TFTP_PORT = 69
@@ -207,10 +209,6 @@ class HalSsdDriver(HalDriverClient):
     STATUS_CVCREJECTED = 5
     STATUS_CODEFILEVERIFIED = 6
     STATUS_CODEFILEREJECTED = 7
-    STATUS_DOWNLOADING = 8
-    STATUS_DOWNLOADSUCCEED = 9
-    STATUS_DOWNLOADFAILED = 10
-    STATUS_MISSROOTCA = 11
 
     SSD_MAX_DOWNLOAD_DELAY = 3
     SSD_RETRY_TIMEOUT = 10
@@ -258,6 +256,7 @@ class HalSsdDriver(HalDriverClient):
         self.serverAddr = None
         self.transport = None
         self.fileName = None
+        self.saved_file_path = None
         self.status = self.STATUS_IDEL
         self.mfrCvcChain = None
         self.coCvcChain = None
@@ -269,6 +268,7 @@ class HalSsdDriver(HalDriverClient):
         self.rootca = rootca
 
         self.mfrInitDone = False
+        self.ssdInProgressFile = "/rpd/config/ssd_in_progress"
         self.isProcessRunning = self.TRIGGER_NONE
         self.ssdProcess = None
 
@@ -320,13 +320,54 @@ class HalSsdDriver(HalDriverClient):
                               self.ssdParam["SsdServerAddress"],
                               "")
 
-    def secure_boot(self, file_path):
+    def update_backup_image(self, output, active_image, backup_image):
+        '''
+        output: index and description.
+                1:current image is imagea
+                2:current image is imageb
+                3:current image is imageg
+                4:unknown image
+        '''
+        backup_image_info = dict()
+        index = output.split(":")[0]
+        if index == '1':
+            backup_image_info['image_name'] = active_image['active_ssd_image_name']
+            backup_image_info['image_server'] = active_image['active_ssd_server']
+            backup_image_info['update_time'] = active_image['active_ssd_time']
+        if index == '2':
+            backup_image_info['image_name'] = backup_image['backup_ssd_image_name']
+            backup_image_info['image_server'] = backup_image['backup_ssd_server']
+            backup_image_info['update_time'] = backup_image['backup_ssd_time']
+        return backup_image_info
+
+    def rpd_upgrade(self, file_path):
+        try:
+            upgrade_output = subprocess.check_output('rpd_upgrade.sh ' + file_path, shell=True).strip()
+        except subprocess.CalledProcessError as e:
+            upgrade_output = e.output
+            ret_code = e.returncode
+        return upgrade_output
+
+    def secure_boot(self, file_path, dt_str, active_image, backup_image):
         if SysTools.is_vrpd():
             self.logger.info("SSD:secure_boot not implemented in vRPD")
         else:  # pragma: no cover
             try:
                 if os.path.exists(file_path):
-                    os.system('rpd_upgrade.sh ' + file_path)
+                    output = self.rpd_upgrade(file_path)
+                    backup_image_info = self.update_backup_image(output, active_image, backup_image)
+                    if len(backup_image_info) != 0:
+                        with open(self.SSD_IMAGE_INFO_PATH, 'a') as ft:
+                            ft.write("BackupSwImageName=" + backup_image_info['image_name'] + '\n')
+                            ft.write("BackupSwImageServerAddress=" + backup_image_info['image_server'] + '\n')
+                            ft.write("BackupSwImageLastUpdate=" + backup_image_info['update_time'] + '\n')
+                    else:
+                        with open(self.SSD_IMAGE_INFO_PATH, 'a') as ft:
+                            ft.write("BackupSwImageName=" +
+                                     os.path.basename(str(self.ssdParam["SsdFilename"])) + '\n')
+                            ft.write("BackupSwImageServerAddress=" +
+                                     str(self.ssdParam["SsdServerAddress"]) + '\n')
+                            ft.write("BackupSwImageLastUpdate=" + dt_str + '\n')
                     SysTools.reboot('software upgrade')
             except Exception as e:
                 self.logger.error("SSD:secure_boot error:" + str(e))
@@ -372,6 +413,16 @@ class HalSsdDriver(HalDriverClient):
         self.register(self.drvID)
         self.logger.info("End of register...")
 
+        if os.path.exists(self.ssdInProgressFile):
+            if SysTools.is_last_reset_by_power_off():
+                local_ssdParam = {}
+                local_ssdParam.setdefault("SsdFilename", "")
+                local_ssdParam.setdefault("SsdServerAddress", "")
+                with open(self.ssdInProgressFile, "r") as fd:
+                    local_ssdParam = json.load(fd)
+                self.notify.error(rpd_event_def.RPD_EVENT_SSD_INTERRUPT_BY_POWER_FAILURE[0],
+                                  local_ssdParam["SsdFilename"],
+                                  local_ssdParam["SsdServerAddress"], "")
         lastTimeout = time.time()
         simulate_cnt = 0
         while True:
@@ -735,14 +786,39 @@ class HalSsdDriver(HalDriverClient):
 
         if None is image:
             return False
-        newimg = os.path.basename(str(image)).strip().split('.')[0]
+        newimg = os.path.basename(str(image)).strip()
         if os.path.islink(self.BOOT_IMAGE_PATH):
             oldimg = subprocess.check_output("readlink " + self.BOOT_IMAGE_PATH,
                                              shell=True).strip()
-            oldimg = os.path.basename(oldimg).split('.')[0]
-            if newimg == oldimg:
-                return True
+            oldimg = os.path.basename(oldimg)
+            if oldimg.endswith('.act'):
+                target_img = newimg + '.act'
+                if target_img == oldimg:
+                    return True
         return False
+
+    def save_ssd_image_info(self):
+        tmp_active_image = dict()
+        tmp_backup_image = dict()
+        tmp_active_image = tmp_active_image.fromkeys(('active_ssd_image_name',
+                                                      'active_ssd_server', 'active_ssd_time'), '')
+        tmp_backup_image = tmp_backup_image.fromkeys(('backup_ssd_image_name',
+                                                      'backup_ssd_server', 'backup_ssd_time'), '')
+        try:
+            if os.path.exists(self.SSD_IMAGE_INFO_PATH):
+                with open(self.SSD_IMAGE_INFO_PATH) as f:
+                    output = f.readlines()
+                if len(output) >= 3:
+                    tmp_active_image['active_ssd_image_name'] = output[0].split('=')[1].strip()
+                    tmp_active_image['active_ssd_server'] = output[1].split('=')[1].strip()
+                    tmp_active_image['active_ssd_time'] = output[2].split('=')[1].strip()
+                    if len(output) > 3 and output[3].split('=')[0].strip() == "BackupSwImageName":
+                        tmp_backup_image['backup_ssd_image_name'] = output[3].split('=')[1].strip()
+                        tmp_backup_image['backup_ssd_server'] = output[4].split('=')[1].strip()
+                        tmp_backup_image['backup_ssd_time'] = output[5].split('=')[1].strip()
+            return tmp_active_image, tmp_backup_image
+        except Exception as e:
+            self.logger.warning("Save ssd image info fails, reason:%s" % str(e))
 
     def _reporthook(self, block_read, block_size, total_size):
         """Hook to watch the downloading process.
@@ -814,10 +890,17 @@ class HalSsdDriver(HalDriverClient):
                     client.download(file, self.TMP_FILE_PATH, timeout=self.SSD_RETRY_TIMEOUT)
                     retFile = self.TMP_FILE_PATH
                 except TftpTimeout:  # pragma: no cover
-                    self.notify.error(rpd_event_def.RPD_EVENT_SSD_DOWNLOAD_FAIL_SERVER_NOT_PRESENT[0],
-                                      self.ssdParam["SsdFilename"],
-                                      self.ssdParam["SsdServerAddress"],
-                                      "")
+                    if SysTools.check_ping_result(server):
+                        self.notify.error(rpd_event_def.RPD_EVENT_SSD_DOWNLOAD_FAIL_TFTP_MAX_RETRY[0],
+                                          self.ssdParam["SsdFilename"],
+                                          self.ssdParam["SsdServerAddress"],
+                                          "")
+                    else:
+                        self.notify.error(rpd_event_def.RPD_EVENT_SSD_DOWNLOAD_FAIL_SERVER_NOT_PRESENT[0],
+                                          self.ssdParam["SsdFilename"],
+                                          self.ssdParam["SsdServerAddress"],
+                                          "")
+
                 except TftpException, err:  # pragma: no cover
                     import re
                     errMatch = re.search(r'errorcode *= *(\d)', str(err), re.I)
@@ -843,7 +926,7 @@ class HalSsdDriver(HalDriverClient):
                 else:
                     port = self.ssdParam['SsdServerPort']
                 # Per rfc2732, ipv6 URI has specific format
-                server_format = "["+str(server)+"]" if Convert.is_valid_ipv6_address(str(server)) else str(server)
+                server_format = "[" + str(server) + "]" if Convert.is_valid_ipv6_address(str(server)) else str(server)
                 imagepath = 'http://' + server_format + ':' + str(port) + '/' + str(file)
                 try:
                     # urlopen would throw exception if HTTP or URL got any error.
@@ -908,6 +991,22 @@ class HalSsdDriver(HalDriverClient):
 
         """
         if self.isProcessRunning:
+            try:
+                with open(self.ssdInProgressFile, "w") as fd:
+                    tmpSsdParam = {}
+                    for key in self.ssdParam:
+                        tmpSsdParam[key] = self.ssdParam[key]
+                    if "SsdManufCvcChain" in tmpSsdParam:
+                        b = tmpSsdParam["SsdManufCvcChain"]
+                        hex = ''.join(["%02X " % ord(x) for x in b]).strip()
+                        tmpSsdParam["SsdManufCvcChain"] = hex
+                    if "SsdCosignerCvcChain" in tmpSsdParam:
+                        b = tmpSsdParam["SsdCosignerCvcChain"]
+                        hex = ''.join(["%02X " % ord(x) for x in b]).strip()
+                        tmpSsdParam["SsdCosignerCvcChain"] = hex
+                    json.dump(tmpSsdParam, fd)
+            except IOError:
+                self.logger.info("save ssd in progress file failed")
             self.dropcache()
             self.status = self.STATUS_INPROGRESS
             result = SsdVerifyResult.SUCCESS
@@ -917,7 +1016,7 @@ class HalSsdDriver(HalDriverClient):
                 # fixme: need more action? stop the process?
                 pass
             if self.codeFile.root_cert is None:
-                self.status = self.STATUS_MISSROOTCA
+                self.status = self.STATUS_IDEL
                 self.notify.error(rpd_event_def.RPD_EVENT_SSD_GENERAL_FAIL[0],
                                   "Miss root ca on node",
                                   self.ssdParam["SsdFilename"],
@@ -950,15 +1049,15 @@ class HalSsdDriver(HalDriverClient):
                             break
                 if validCVC >= 0:
                     if "SsdTransport" not in self.ssdParam or \
-                                    "SsdServerAddress" not in self.ssdParam or \
-                                    "SsdFilename" not in self.ssdParam:
+                        "SsdServerAddress" not in self.ssdParam or \
+                            "SsdFilename" not in self.ssdParam:
                         self.logger.error("miss required parameters, please check the ssd config!")
                         result = SsdVerifyResult.ERROR_MISS_PARAMETR
                     elif self.is_same_img(self.ssdParam["SsdFilename"]):
                         self.status = self.STATUS_IDEL
                         result = SsdVerifyResult.WARN_SAME_IMAGE
                     else:
-                        self.status = self.STATUS_DOWNLOADING
+                        self.status = self.STATUS_INPROGRESS
                         if self.isProcessRunning == self.TRIGGER_GCP:
                             self.notify.info(rpd_event_def.RPD_EVENT_SSD_INIT_GCP[0],
                                              self.ssdParam["SsdFilename"],
@@ -972,15 +1071,15 @@ class HalSsdDriver(HalDriverClient):
 
                         for i in range(0, 3):
                             imagepath = self.download_process(self.ssdParam["SsdTransport"],
-                                                        self.ssdParam["SsdServerAddress"],
-                                                        self.ssdParam["SsdFilename"])
+                                                              self.ssdParam["SsdServerAddress"],
+                                                              self.ssdParam["SsdFilename"])
                             if imagepath is not None:
                                 break
                             else:
                                 time.sleep(uniform(0, self.SSD_MAX_DOWNLOAD_DELAY))
 
                         if imagepath is None:
-                            self.status = self.STATUS_DOWNLOADFAILED
+                            self.status = self.STATUS_IDEL
                             self.logger.error("can not get the codefile "
                                               "via the gcp:[%s:%s]" %
                                               (self.ssdParam["SsdServerAddress"],
@@ -989,7 +1088,7 @@ class HalSsdDriver(HalDriverClient):
                             self.notify.error(rpd_event_def.RPD_EVENT_SSD_DOWNLOAD_FAILED_AFTER_RETRY[0])
 
                         else:
-                            self.status = self.STATUS_DOWNLOADSUCCEED
+                            self.status = self.STATUS_INPROGRESS
                             ret, val = self.codeFile.verify_file(imagepath)
                             if not ret:  # pragma: no cover
                                 self.status = self.STATUS_CODEFILEREJECTED
@@ -1024,13 +1123,27 @@ class HalSsdDriver(HalDriverClient):
                                                       self.ssdParam["SsdFilename"],
                                                       self.ssdParam["SsdServerAddress"],
                                                       "")
+                                elif val in [SsdVerifyResult.ERROR_SW_FILE_CORRUPTION, ]:
+                                    self.notify.error(rpd_event_def.RPD_EVENT_SSD_SW_FILE_CORRUPTION[0],
+                                                      self.ssdParam["SsdFilename"],
+                                                      self.ssdParam["SsdServerAddress"],
+                                                      "")
                                 elif val in [SsdVerifyResult.ERROR_FILE_WRONG_FORMAT, ]:
                                     self.notify.error(rpd_event_def.RPD_EVENT_SSD_IMPROPER_CODEFILE[0],
                                                       self.ssdParam["SsdFilename"],
                                                       self.ssdParam["SsdServerAddress"],
                                                       "")
+                                elif val in [SsdVerifyResult.ERROR_CVC_MFR_NAME_MISMATCH,
+                                             SsdVerifyResult.ERROR_CVC_CO_NAME_MISMATCH]:
+                                    self.notify.error(rpd_event_def.RPD_EVENT_SSD_INCOMPATIBLE_SW_FILE[0],
+                                                      self.ssdParam["SsdFilename"],
+                                                      self.ssdParam["SsdServerAddress"], "")
                             else:
                                 self.status = self.STATUS_CODEFILEVERIFIED
+                            if val == SsdVerifyResult.SUCCESS:
+                                self.saved_file_path = \
+                                    self.BOOT_ROOT_PATH + os.path.basename(str(self.ssdParam["SsdFilename"]))
+                                self.codeFile.get_image(self.saved_file_path, imagepath)
                             result = val
                         self.clean_download_file()
                 else:
@@ -1042,15 +1155,34 @@ class HalSsdDriver(HalDriverClient):
             if result == SsdVerifyResult.SUCCESS:
                 self.logger.info("code file verify success, begin to upgrade the software.")
                 self.update_init_code(self.codeFile.get_initcode())
-                file_path = self.BOOT_ROOT_PATH + os.path.basename(str(self.ssdParam["SsdFilename"]))
-                if self.codeFile.get_image(file_path):
-                    self.secure_boot(file_path)
+                if os.path.exists(self.saved_file_path):
+                    dt_str = ""
+                    active_image = dict()
+                    backup_image = dict()
+                    try:
+                        active_image, backup_image = self.save_ssd_image_info()
+                        dt = datetime.utcfromtimestamp(time.time())
+                        dt_str = str(dt)
+                        with open(self.SSD_IMAGE_INFO_PATH, 'w') as f:
+                            f.write("CurrentSwImageName=" +
+                                    os.path.basename(str(self.ssdParam["SsdFilename"])) + '\n')
+                            f.write("CurrentSwImageServerAddress=" +
+                                    str(self.ssdParam["SsdServerAddress"]) + '\n')
+                            f.write("CurrentSwImageLastUpdate=" + dt_str + '\n')
+                    except Exception as e:
+                        self.logger.warning("SSD failed to open %s, exception: %s",
+                                            self.SSD_IMAGE_INFO_PATH, str(e))
+                    self.secure_boot(self.saved_file_path, dt_str, active_image, backup_image)
+                    self.saved_file_path = None
                 else:
                     self.notify.error(rpd_event_def.RPD_EVENT_SSD_GENERAL_FAIL[0],
-                                      "save image to bootflash fail",
+                                      "no saved image in bootflash",
                                       self.ssdParam["SsdFilename"],
-                                      self.ssdParam["SsdServerAddress"],
-                                      "")
+                                      self.ssdParam["SsdServerAddress"], "")
+
+            if os.path.exists(self.ssdInProgressFile):
+                os.remove(self.ssdInProgressFile)
+                os.system("sync")
             self.lastSsdParam = self.ssdParam.copy()
             self.ssdParam.clear()
             if isinstance(self.codeFile, CodeFileVerify):

@@ -80,5 +80,6 @@ class TestDispatcher(unittest.TestCase):
         del pylint_proc
         del grep_proc
 
+
 if __name__ == '__main__':
     unittest.main()

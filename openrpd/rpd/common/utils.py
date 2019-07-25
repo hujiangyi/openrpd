@@ -24,16 +24,18 @@ import time
 import os
 import psutil
 import ctypes.util
-from subprocess import call, check_output
+from subprocess import call, check_output, CalledProcessError
 from datetime import datetime
 from struct import pack
-
+import array
 from os.path import exists
 from binascii import hexlify
 from functools import wraps
+import ipaddress
 from rpd.rcp.gcp.gcp_lib.gcp_data_description import DataDescription
 from rpd.common.rpd_logging import AddLoggerToClass
-from rpd.common.rpd_event_def import RPD_EVENT_CONNECTIVITY_SYS_REBOOT, RPD_EVENT_CONNECTIVITY_REBOOT
+from rpd.common.rpd_event_def import RPD_EVENT_CONNECTIVITY_SYS_REBOOT, RPD_EVENT_CONNECTIVITY_REBOOT, \
+    RPD_EVENT_CONNECTIVITY_DIAGNOSTIC_SELF_TEST_FAIL
 
 
 class Convert(object):
@@ -129,8 +131,8 @@ class Convert(object):
             new_value = tuple([int(item) for item in value.split('.')])
             if len(new_value) != DataDescription.B_SEQ_IPv4_LEN:
                 Convert.logger.error(
-                    "Failed, length error, string value is %s, length:",
-                    value, len(new_value))
+                    "Failed, length error, string value is '{}', "
+                    "length: '{}'".format(value, len(new_value)))
                 raise ValueError('IPv4 invalid value')
         except Exception, error_v4:
             new_value = None  # could be IPv6
@@ -145,15 +147,15 @@ class Convert(object):
                 new_value = None  # neither IPv6
 
         if None is new_value:
-            Convert.logger.error(
+            Convert.logger.warn(
                 "Failed to covert value '%s', ipv4[%s] ipv6[%s]",
                 value, error_v4, error_v6)
             return None
         for item in new_value:
             if not (0 <= item <= 255):
-                Convert.logger.error("Failed - tuple item '%s' expect range 0 "
-                                     "<= item <= 255 in value '%s'  ",
-                                     str, value)
+                Convert.logger.warn("Failed - tuple item '%s' expect range 0 "
+                                    "<= item <= 255 in value '%s'  ",
+                                    str, value)
                 return None
 
         return new_value
@@ -170,7 +172,7 @@ class Convert(object):
 
         """
         if not isinstance(value, basestring):
-            Convert.logger.error(
+            Convert.logger.warn(
                 "Failed - expect string value '%s', received type '%s'",
                 value, type(value))
             return None
@@ -324,6 +326,21 @@ class Convert(object):
 
         return False
 
+    @staticmethod
+    def compare_ip(ip1, ip2):
+        if not isinstance(ip1, unicode):
+            ip1_str = unicode(ip1, 'utf-8')
+        if not isinstance(ip2, unicode):
+            ip2_str = unicode(ip2, 'utf-8')
+        addr1 = ipaddress.ip_address(ip1_str)
+        addr2 = ipaddress.ip_address(ip2_str)
+        if addr1 > addr2:
+            return 1
+        elif addr1 < addr2:
+            return -1
+        else:
+            return 0
+
 
 class Print(object):
 
@@ -360,6 +377,7 @@ class SysTools(object):
     REBOOT_SKIP_FILES = ('/bootflash/openrpd_skip_system_reboot',
                          '/tmp/openrpd_skip_system_reboot')
     RESET_LOG_FILE = "/rpd/log/resetlog"
+    RESET_REASON_FILE = "/rpd/log/lastresetreason"
 
     RESET_LOG_FILE_SIZE = 1024 * 1024 * 1
 
@@ -398,6 +416,22 @@ class SysTools(object):
         except:
             SysTools.logger.error("Failed to get mac-address of %s", ifname)
             return "00:00:00:00:00:00"
+
+    @staticmethod
+    def is_if_oper_up(ifname):
+        """Get the physical link state of specified interface.
+
+        :param string ifname: name of network interface
+        :return: True if physical link UP, else False
+        :rtype: bool
+
+        """
+        try:
+            return open('/sys/class/net/' + ifname + '/carrier') \
+                .readline().strip() == '1'
+        except:
+            SysTools.logger.error("Failed to get carrier of %s", ifname)
+            return False
 
     @staticmethod
     def if_nametoindex(ifname):
@@ -457,6 +491,19 @@ class SysTools(object):
             SysTools.logger.error(
                 "Failed to get device hostname, use the default name:%s", default)
             return default
+
+    @staticmethod
+    def get_wan_interface_list():
+        intf_list = []
+        output = check_output(['uci', 'show', 'network'])
+        network_list = output.strip().split('\n')
+        for config in network_list:
+            cfg, option = config.split('=')
+            if cfg == 'network.wan.ifname' or cfg == 'network.wan6.ifname':
+                intf = option
+                intf = filter(str.isalnum, intf)
+                intf_list.append(intf)
+        return intf_list
 
     @staticmethod
     def get_interface():
@@ -527,7 +574,6 @@ class SysTools(object):
                 if resetlog_size > SysTools.RESET_LOG_FILE_SIZE:
                     os.system('/usr/sbin/log_rotate.sh /rpd/log/resetlog')
                     os.system('rm /rpd/log/resetlog')
-
                 os.system('cp /tmp/fault_*.json /rpd/log/')
                 os.system('dmesg >/tmp/dmesg_before_reboot.log')
                 call(["/usr/sbin/log_rotate_before_reboot.sh"])
@@ -549,6 +595,8 @@ class SysTools(object):
     def sys_failure_reboot(reason='system failure'):
         """system failure reboot"""
 
+        SysTools.notify.error(RPD_EVENT_CONNECTIVITY_DIAGNOSTIC_SELF_TEST_FAIL[0], 'System failure',
+                              'Diagnostic self test fail', 'Severity level=error')
         SysTools.notify.error(RPD_EVENT_CONNECTIVITY_SYS_REBOOT[0],
                               str(SysTools.sys_up_time() * 100),
                               SysTools.RESET_LOG_FILE, "")
@@ -557,6 +605,13 @@ class SysTools(object):
         time.sleep(8)
 
         SysTools.reboot(reason)
+
+    @staticmethod
+    def diagnostic_self_test_fail(reason='no errors found', additional_text='no errors found', severity_level='error'):
+        """Diagnostic Self Test Failure."""
+
+        SysTools.notify.error(RPD_EVENT_CONNECTIVITY_DIAGNOSTIC_SELF_TEST_FAIL[0],
+                              reason, additional_text, severity_level)
 
     @staticmethod
     def reboot_blocked(reason='manual'):  # pragma: no cover
@@ -587,6 +642,29 @@ class SysTools(object):
         """touch a file."""
         with open(path, 'a'):
             os.utime(path, None)
+
+    @staticmethod
+    def read_file(file_path):
+        """
+        File content as below can use this function to read file.
+        file content: key_info=value_info
+                      key_info_1=value_info_1
+        :param file_path: file path
+        :return:
+        """
+
+        output_dict = dict()
+        try:
+            if os.path.exists(file_path):
+                with open(file_path) as fd:
+                    output = fd.readlines()
+                for idx in range(len(output)):
+                    key_info = output[idx].split('=')[0].strip()
+                    value_info = output[idx].split('=')[1].strip()
+                    output_dict[key_info] = value_info
+                return output_dict
+        except Exception as e:
+            SysTools.logger.warning("Read file:%s failed, reason:%s" % (file_path, str(e)))
 
     @classmethod
     def set_system_time(cls, dispatcher, timestamp):  # pragma: no cover
@@ -678,6 +756,22 @@ class SysTools(object):
         cls.logger.info("cached:%s M", mem.cached / 1024 / 1024)
         cls.logger.info("shared:%s M", mem.shared / 1024 / 1024)
 
+    @classmethod
+    def is_last_reset_by_power_off(cls):
+        with open(SysTools.RESET_REASON_FILE, "a+") as f:
+            reason = f.read()
+            return True if reason == "poweroff" else False
+        return False
+
+    @classmethod
+    def check_ping_result(cls, addr):
+        try:
+            ping_cmd = "ping " + "-c 1 " + addr
+            check_output(ping_cmd, shell=True)
+        except CalledProcessError:
+            return False
+        return True
+
 
 class IPCClient(object):
     __metaclass__ = AddLoggerToClass
@@ -718,9 +812,81 @@ def singleton(cls):
     """
     instances = {}
 
+    @wraps(cls)
     def _wrapper(*args, **kwargs):
         if cls not in instances:
             instances[cls] = cls(*args, **kwargs)
         return instances[cls]
     return _wrapper
 
+
+class PingPackage(object):
+    __metaclass__ = AddLoggerToClass
+
+    ICMP_DATA_STR = 56
+    ICMP_TYPE = 8
+    ICMP_TYPE_IP6 = 128
+    ICMP_CODE = 0
+    ICMP_CHECKSUM = 0
+    ICMP_ID = 0
+    ICMP_SEQ_NR = 0
+
+    @staticmethod
+    def _get_cksum(packet):
+        """
+        Generates a checksum of a (ICMP) packet.
+        :param packet:
+        :return:
+        """
+        if len(packet) & 1:
+            packet = packet + '\0'
+        datas = array.array('h', packet)
+        sum = 0
+        for data in datas:
+            sum += (data & 0xffff)
+        hi = sum >> 16
+        lo = sum & 0xffff
+        sum = hi + lo
+        sum = sum + (sum >> 16)
+        return (~sum) & 0xffff
+
+    @staticmethod
+    def pack_package(id, size, ipv6):
+        """
+        Constructs a ICMP echo packet of variable size
+        :param id:
+        :param size:
+        :param ipv6:
+        :return:
+        """
+        if size < int(struct.calcsize("d")):
+            return
+        if ipv6:
+            header = struct.pack('BbHHh', PingPackage.ICMP_TYPE_IP6,
+                                 PingPackage.ICMP_CODE, PingPackage.ICMP_CHECKSUM,
+                                 PingPackage.ICMP_ID, PingPackage.ICMP_SEQ_NR + id)
+        else:
+            header = struct.pack('bbHHh', PingPackage.ICMP_TYPE,
+                                 PingPackage.ICMP_CODE, PingPackage.ICMP_CHECKSUM,
+                                 PingPackage.ICMP_ID, PingPackage.ICMP_SEQ_NR + id)
+        load = "-- ARP PING PACKAGE! --"
+        size -= struct.calcsize("d")
+        rest = ""
+        if size > len(load):
+            rest = load
+            size -= len(load)
+
+        rest += size * "X"
+        data = struct.pack("d", time.time()) + rest
+        packet = header + data
+        checksum = PingPackage._get_cksum(packet)
+        if ipv6:
+            header = struct.pack('BbHHh', PingPackage.ICMP_TYPE_IP6,
+                                 PingPackage.ICMP_CODE, checksum,
+                                 PingPackage.ICMP_ID, PingPackage.ICMP_SEQ_NR + id)
+        else:
+            header = struct.pack('bbHHh', PingPackage.ICMP_TYPE,
+                                 PingPackage.ICMP_CODE, checksum,
+                                 PingPackage.ICMP_ID, PingPackage.ICMP_SEQ_NR + id)
+        packet = header + data
+        return packet

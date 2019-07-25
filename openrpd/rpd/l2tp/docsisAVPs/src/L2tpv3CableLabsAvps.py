@@ -288,6 +288,7 @@ class DepiPseudowireSubtypeCapList(l2tpv3AVP):
     def ValidateFlags(mustAvp, hiddenAvp):
         return mustAvp and not hiddenAvp
 
+
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.CableLabsVendor, DepiPseudowireSubtypeCapList.AttrType)] = DepiPseudowireSubtypeCapList
 
@@ -329,6 +330,7 @@ class DepiPseudowireSubtype(l2tpv3AVP):
     @staticmethod
     def ValidateFlags(mustAvp, hiddenAvp):
         return mustAvp and not hiddenAvp
+
 
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.CableLabsVendor, DepiPseudowireSubtype.AttrType)] = DepiPseudowireSubtype
@@ -375,6 +377,7 @@ class DepiL2SpecificSublayerSubtype(l2tpv3AVP):
     @staticmethod
     def ValidateFlags(mustAvp, hiddenAvp):
         return mustAvp and not hiddenAvp
+
 
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.CableLabsVendor, DepiL2SpecificSublayerSubtype.AttrType)] = DepiL2SpecificSublayerSubtype
@@ -427,6 +430,7 @@ class DepiMulticastCapability(l2tpv3AVP):
     def ValidateFlags(mustAvp, hiddenAvp):
         return mustAvp and not hiddenAvp
 
+
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.CableLabsVendor, DepiMulticastCapability.AttrType)] = DepiMulticastCapability
 
@@ -454,7 +458,7 @@ class DepiRemoteMulticastJoin(l2tpv3AVP):
             else:
                 grp_bin = socket.inet_pton(grp_addrinfo[0], grp_addrinfo[4][0])
                 src_bin = socket.inet_pton(src_addrinfo[0], src_addrinfo[4][0])
-                retStr = struct.pack("!H",0) + src_bin + grp_bin
+                retStr = struct.pack("!H", 0) + src_bin + grp_bin
         else:
             retStr = attrValue
 
@@ -496,6 +500,7 @@ class DepiRemoteMulticastJoin(l2tpv3AVP):
     def ValidateFlags(mustAvp, hiddenAvp):
         return mustAvp and not hiddenAvp
 
+
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.CableLabsVendor, DepiRemoteMulticastJoin.AttrType)] = DepiRemoteMulticastJoin
 
@@ -523,7 +528,7 @@ class DepiRemoteMulticastLeave(l2tpv3AVP):
             else:
                 grp_bin = socket.inet_pton(grp_addrinfo[0], grp_addrinfo[4][0])
                 src_bin = socket.inet_pton(src_addrinfo[0], src_addrinfo[4][0])
-                retStr = struct.pack("!H",0) + src_bin + grp_bin
+                retStr = struct.pack("!H", 0) + src_bin + grp_bin
         else:
             retStr = attrValue
 
@@ -564,6 +569,7 @@ class DepiRemoteMulticastLeave(l2tpv3AVP):
     def ValidateFlags(mustAvp, hiddenAvp):
         return mustAvp and not hiddenAvp
 
+
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.CableLabsVendor, DepiRemoteMulticastLeave.AttrType)] = DepiRemoteMulticastLeave
 
@@ -587,8 +593,8 @@ class UpstreamFlow(l2tpv3AVP):
             retStr = attrValue
 
         super(UpstreamFlow, self).__init__(AttrType=self.AttrType,
-                                                   VendorID=l2tpv3AVP.CableLabsVendor,
-                                                   AttrValue=retStr, MustAvp=True, HidenAVP=False)
+                                           VendorID=l2tpv3AVP.CableLabsVendor,
+                                           AttrValue=retStr, MustAvp=True, HidenAVP=False)
 
     @addDebugLogToHandle
     def handleAvp(self, originPkt, retPak):

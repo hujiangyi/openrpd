@@ -15,22 +15,14 @@
 # limitations under the License.
 #
 import logging
-import sys
-#import time
-from time import time
-import rpd.python_path_resolver
 from rpd.hal.src.msg.HalMessage import HalMessage
-from rpd.hal.src.msg import HalCommon_pb2
 from rpd.gpb.rcp_pb2 import t_RcpMessage, t_RpdDataMessage
-from rpd.gpb.RpdCapabilities_pb2 import t_RpdCapabilities
 import rpd.hal.src.HalConfigMsg as HalConfigMsg
 from rpd.gpb.cfg_pb2 import config
-from rpd.common.rpd_logging import AddLoggerToClass, setup_logging
+from rpd.common.rpd_logging import setup_logging
 import l2tpv3.src.L2tpv3VspAvp_pb2 as L2tpv3VspAvp_pb2
-from rpd.hal.lib.drivers.HalDriver0 import HalDriverClientError
-from rpd.hal.lib.drivers.HalDriver0 import HalDriverClientError
 import rpd.gpb.VendorSpecificExtension_pb2 as VendorSpecificExtension_pb2
-from rpd.rcp.vendorTLVs.src.RcpVspTlv import RcpVendorTlv, DEFAULT_VENDOR_ID
+from rpd.rcp.vendorTLVs.src.RcpVspTlv import DEFAULT_VENDOR_ID
 
 default_supported_msg_types = (
     HalConfigMsg.MsgTypeRpdCapabilities,
@@ -53,6 +45,7 @@ default_supported_msg_types = (
     HalConfigMsg.MsgTypeUsOfdmaInitialRangingIuc,
     HalConfigMsg.MsgTypeUsOfdmaFineRangingIuc,
     HalConfigMsg.MsgTypeUsOfdmaDataRangingIuc,
+    HalConfigMsg.MsgTypeUsOfdmaDataIuc,
     HalConfigMsg.MsgTypeUsOfdmaSubcarrierCfgState,
     HalConfigMsg.MsgTypeUsScQamChannelPerf,
     HalConfigMsg.MsgTypeUsOfdmaChannelPerf,
@@ -80,8 +73,8 @@ default_supported_msg_types = (
     HalConfigMsg.MsgTypeL2tpv3SessionReqNdr,
 
     # Ptp related message type
-    #HalConfigMsg.MsgTypePtpClockStatus,
-    #HalConfigMsg.MsgTypeRdtiConfig
+    # HalConfigMsg.MsgTypePtpClockStatus,
+    # HalConfigMsg.MsgTypeRdtiConfig
 
     # CIN and LCCE ID assignment
     HalConfigMsg.MsgTypeL2tpv3CinIfAssignment,
@@ -92,13 +85,13 @@ default_supported_msg_types = (
 
     # RcpVendorSpecificTlv
     HalConfigMsg.MsgTypeRcpVendorSpecific,
-    )
+)
 
 
 def capabilities_get(cfg):
     logger = get_msg_handler_logger()
     logger.info("Get Capabilities srcClientID: %s, Seq num:  %d" %
-                      (cfg.msg.SrcClientID, cfg.msg.SeqNum))
+                (cfg.msg.SrcClientID, cfg.msg.SeqNum))
     global_caps = {}
     pw_caps = {}
     ptp_caps = {}
@@ -110,7 +103,7 @@ def capabilities_get(cfg):
     rpd_data_msg.RpdDataOperation = t_RpdDataMessage.RPD_CFG_READ
     payload = config()
     if True:  # check vendor driver return status
-#        payload.RpdCapabilities.NumBdirPorts.set_val(0)
+        # payload.RpdCapabilities.NumBdirPorts.set_val(0)
         payload.RpdCapabilities.NumBdirPorts = 0
         payload.RpdCapabilities.NumDsRfPorts = 1
         # Note typo bug 'Mum' that comes from RpdCapabilities.proto file
@@ -130,10 +123,10 @@ def capabilities_get(cfg):
         payload.RpdCapabilities.SupportsUdpEncap = 1
         payload.RpdCapabilities.NumDsPspFlows = 4
         payload.RpdCapabilities.NumUsPspFlows = 4
-        payload.RpdCapabilities.PilotToneCapabilities.NumCwToneGens = 5
-        payload.RpdCapabilities.PilotToneCapabilities.LowestCwToneFreq = 54000000
-        payload.RpdCapabilities.PilotToneCapabilities.HighestCwToneFreq = 999000000
-        payload.RpdCapabilities.PilotToneCapabilities.MaxPowerDedCwTone = 330
+        payload.RpdCapabilities.PilotToneCapabilities.NumCwToneGens = 4
+        payload.RpdCapabilities.PilotToneCapabilities.LowestCwToneFreq = 50000000
+        payload.RpdCapabilities.PilotToneCapabilities.HighestCwToneFreq = 1218000000
+        payload.RpdCapabilities.PilotToneCapabilities.MaxPowerDedCwTone = 100
         payload.RpdCapabilities.PilotToneCapabilities.QamAsPilot = 1
         payload.RpdCapabilities.PilotToneCapabilities.MinPowerDedCwTone = -330
         payload.RpdCapabilities.PilotToneCapabilities.MaxPowerQamCwTone = 90
@@ -143,7 +136,8 @@ def capabilities_get(cfg):
         payload.RpdCapabilities.SupportsFlowTags = 1
         payload.RpdCapabilities.SupportsFrequencyTilt = 1
         payload.RpdCapabilities.TiltRange = 10
-        #payload.RpdCapabilities.RdtiCapabilities.NumPtpPortsPerEnetPort = 1 # TODO - FIX this when support added.
+        payload.RpdCapabilities.OfdmConfigurationCapabilities.RequiresOfdmaImDurationConfig = 1
+        # payload.RpdCapabilities.RdtiCapabilities.NumPtpPortsPerEnetPort = 1 # TODO - FIX this when support added.
         payload.RpdCapabilities.RpdIdentification.VendorName = "MaxLinear"
         payload.RpdCapabilities.RpdIdentification.VendorId = "XX"   # This shouldn't be a string but a 16 bit integer
         payload.RpdCapabilities.RpdIdentification.ModelNumber = "x1"
@@ -174,115 +168,138 @@ def capabilities_get(cfg):
     cfg.msg.CfgMsgPayload = rcp_msg.SerializeToString()
     return cfg
 
+
 def config_dummy(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
+
 
 def config_ds_port(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
 
+
 def config_dsqam_channel(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
+
 
 def config_dsofdm_channel(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
 
+
 def config_dsofdm_profile(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
+
 
 def config_usatdma_channel(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
 
+
 def config_usofdma_channel(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
+
 
 def config_sid_qos(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
 
+
 def config_docsis_timer(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
+
 
 def req_dummy(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
 
+
 def req_dsqam_channel_status(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
+
 
 def req_dsofdm_channel_status(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
 
+
 def req_oob551_mod_status(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
+
 
 def req_oob552_mod_status(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
 
+
 def req_oob551_demod_status(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
+
 
 def req_oob552_demod_status(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
 
+
 def req_depi_pw(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
+
 
 def req_uepi_pw(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
 
+
 def req_ndf(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
+
 
 def req_ndr(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
 
+
 def cin_if_assign(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     pass
 
+
 def lcce_id_assign(cfg):
     logger = get_msg_handler_logger()
     logger.debug("handler called with msg: %s" % cfg)
     return cfg
+
 
 def vsp_avp_handler(ntf):
     logger = get_msg_handler_logger()
@@ -305,7 +322,6 @@ def vsp_avp_handler(ntf):
     # vsp_avp_msg.rspCode = L2tpv3VspAvp_pb2.t_l2tpVspAvpMsg().VSP_AVP_STATUS_FAILURE
     # and quit
 
-
     vsp_avp_msg = L2tpv3VspAvp_pb2.t_l2tpVspAvpMsg()
     vsp_avp_msg.rspCode = L2tpv3VspAvp_pb2.t_l2tpVspAvpMsg().VSP_AVP_STATUS_SUCCESS
 
@@ -317,14 +333,15 @@ def vsp_avp_handler(ntf):
     if ori_avp.oper == L2tpv3VspAvp_pb2.t_l2tpVspAvpMsg().VSP_AVP_OP_UPDATE:
         # This will tell L2TP layer to update the matching AVP.
         vsp_avp_msg.oper = L2tpv3VspAvp_pb2.t_l2tpVspAvpMsg().VSP_AVP_OP_UPDATE
-    else :
+    else:
         # Otherwise, L2TP layer just receive HalNotification with information of the AVP received by L2TP
         vsp_avp_msg.oper = L2tpv3VspAvp_pb2.t_l2tpVspAvpMsg().VSP_AVP_OP_INFO
         return None
     i = 0
     for avp in ori_vsp_avp_content:
         logger.info("[%d] vsp_avp_handler ClientID: %s, op: %d, vid %d, attr %d, strVal %s" %
-                      (i, ntf.msg.ClientID, vsp_avp_msg.oper, avp.vendorId, avp.attrType, avp.attrValBuf))
+                    (i, ntf.msg.ClientID, vsp_avp_msg.oper,
+                     avp.vendorId, avp.attrType, avp.attrValBuf))
 
         attrBuff = "content_of_avp_id = " + str(i)
         vspAvpContent.add(vendorId=avp.vendorId,
@@ -332,13 +349,15 @@ def vsp_avp_handler(ntf):
                           attrValBuf=attrBuff,
                           attrValLen=len(attrBuff))
         i += 1
-    
+
     ntf.msg.HalNotificationPayLoad = vsp_avp_msg.SerializeToString()
-    return ntf    
+    return ntf
+
+
 def vsp_tlv_handler(cfg):
     logger = get_msg_handler_logger()
     logger.info("Receive Vsp TLV from %s, Seq num:  %d" %
-                      (cfg.msg.SrcClientID, cfg.msg.SeqNum))
+                (cfg.msg.SrcClientID, cfg.msg.SeqNum))
 
     """
     Vendor should check for t_RcpMessage().t_RpdDataMessage().RpdDataOperation: 
@@ -353,18 +372,18 @@ def vsp_tlv_handler(cfg):
     rcp_vsp_tlv = rsp.RpdDataMessage.RpdData.VendorSpecificExtension
     dataOp = rsp.RpdDataMessage.RpdDataOperation
     logger.info("vsp_tlv_handler ClientID: %s, VSP Data %s, dataOp %d" %
-                      (cfg.msg.SrcClientID, rsp.RpdDataMessage.RpdData, dataOp))
+                (cfg.msg.SrcClientID, rsp.RpdDataMessage.RpdData, dataOp))
 
     rcp_msg = t_RcpMessage()
     rcp_msg.RcpMessageType = t_RcpMessage.RCP_MESSAGE_TYPE_NONE
     rcp_msg.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
 
     if rcp_vsp_tlv.VendorId != DEFAULT_VENDOR_ID:
-        rcp_msg.RcpDataResult = t_RcpMessage.RCP_RESULT_GENERAL_ERROR    
-        logger.info("vsp_tlv_handler: vid NOT matched. %d" %(rcp_vsp_tlv.VendorId))
+        rcp_msg.RcpDataResult = t_RcpMessage.RCP_RESULT_GENERAL_ERROR
+        logger.info("vsp_tlv_handler: vid NOT matched. %d" % (rcp_vsp_tlv.VendorId))
 
     rpd_data_msg = t_RpdDataMessage()
-    rpd_data_msg.RpdDataOperation = dataOp 
+    rpd_data_msg.RpdDataOperation = dataOp
     # If Vendor ID matched, and dataOp == READ, then fill the Values of all TLVs
     if (rcp_msg.RcpDataResult == t_RcpMessage.RCP_RESULT_OK):
         if (dataOp == t_RpdDataMessage.RPD_CFG_READ):
@@ -382,7 +401,6 @@ def vsp_tlv_handler(cfg):
             rfChannel.DsScQamChannelPerf.outDiscards = 1024
             rfChannel.DsScQamChannelPerf.outErrors = 2048
 
-
             rfChannel.DsOfdmChannelPerf.outDiscards = 1024 * 3
             rfChannel.DsOfdmChannelPerf.outErrors = 2048 * 3
             rfChannel.DsOfdmChannelPerf.DsOfdmProfilePerf.ProfileIndex = 3
@@ -396,19 +414,21 @@ def vsp_tlv_handler(cfg):
     cfg.msg.CfgMsgPayload = rcp_msg.SerializeToString()
     return cfg
 
+
 def get_msg_handler_logger():
     setup_logging('HAL', filename="hal.log")
     logger = logging.getLogger("open_rpd_drv_std_logger")
     return logger
-    
+
+
 if __name__ == "__main__":
     logger = get_msg_handler_logger()
 
     hal_msg = HalMessage("HalConfig",
-                               SrcClientID="123",
-                               SeqNum=1003,
-                               # The first cfg.msg.CfgMsgType is 1024
-                               CfgMsgType=HalConfigMsg.MsgTypeRpdCapabilities,
-                               CfgMsgPayload="test open_rpd_drv_msg_handlers")
+                         SrcClientID="123",
+                         SeqNum=1003,
+                         # The first cfg.msg.CfgMsgType is 1024
+                         CfgMsgType=HalConfigMsg.MsgTypeRpdCapabilities,
+                         CfgMsgPayload="test open_rpd_drv_msg_handlers")
     capabilities_get(hal_msg)
 #    pass

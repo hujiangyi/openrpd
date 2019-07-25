@@ -58,6 +58,17 @@ setup_interface () {
 
 	[ -n "$USERPREFIX" ] && proto_add_ipv6_prefix "$USERPREFIX"
 
+	# Merge addresses
+	for entry in $RA_ADDRESSES; do
+		local duplicate=0
+		local addr="${entry%%/*}"
+		for dentry in $ADDRESSES; do
+			local daddr="${dentry%%/*}"
+			[ "$addr" = "$daddr" ] && duplicate=1
+		done
+		[ "$duplicate" = "0" ] && ADDRESSES="$ADDRESSES $entry"
+	done
+
 	for entry in $ADDRESSES; do
 		local addr="${entry%%/*}"
 		entry="${entry#*/}"

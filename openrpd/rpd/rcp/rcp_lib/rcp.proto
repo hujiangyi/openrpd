@@ -47,6 +47,9 @@ message t_RcpMessage {
 		RPD_CONFIGURATION_DONE = 5;
 		RPD_REBOOT = 6;
 		CONNECT_CLOSE_NOTIFICATION = 7;
+		SESSION_INITIATED = 8;
+		IRA_RECEIVED = 9;
+		REX_RECEIVED = 10;
 	}
 	enum t_RcpDataResult {
 		RCP_RESULT_NONE = 0;

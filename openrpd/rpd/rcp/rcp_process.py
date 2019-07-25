@@ -19,6 +19,7 @@ import argparse
 import logging
 import signal
 import sys
+from os import path
 from os import EX_OSERR, EX_DATAERR
 from socket import AF_INET, AF_INET6
 
@@ -29,13 +30,13 @@ from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 from rpd.common.utils import Convert, SysTools
 from rpd.dispatcher.dispatcher import Dispatcher, DispatcherTimeoutError
 from rpd.gpb.rcp_pb2 import t_RcpMessage
-from rpd.hal.src.HalConfigMsg import *
+import rpd.hal.src.HalConfigMsg as HalConfigMsg
 from rpd.provision.proto import GcpMsgType
 from rpd.gpb.provisionapi_pb2 import t_PrivisionApiMessage as t_CliMessage
 from rpd.rcp.gcp.gcp_sessions import GCPSlaveDescriptor, GCPSessionDescriptor
 from rpd.rcp.rcp_hal import RcpHalIpc
 from rpd.rcp.rcp_orchestrator import RCPSlaveOrchestrator
-from rpd.common.rpd_logging import AddLoggerToClass
+from rpd.confdb.rpd_redis_db import RCPDB
 
 
 __all__ = ['RcpProcess']
@@ -95,10 +96,10 @@ gcp_module_map = {
 }
 gcp_module_map.update({
     GcpMsgType.GcpAll: gcp_module_map[GcpMsgType.GcpOther] +
-                       gcp_module_map[GcpMsgType.GcpPacketHandling] +
-                       gcp_module_map[GcpMsgType.GcpSession] +
-                       gcp_module_map[GcpMsgType.GcpGDM] +
-                       gcp_module_map[GcpMsgType.GcpTLV]
+    gcp_module_map[GcpMsgType.GcpPacketHandling] +
+    gcp_module_map[GcpMsgType.GcpSession] +
+    gcp_module_map[GcpMsgType.GcpGDM] +
+    gcp_module_map[GcpMsgType.GcpTLV]
 })
 
 
@@ -178,7 +179,6 @@ class RcpProcess(object):
             self.logger.warn('Empty IPC msg, dropping ...')
             return
         self.ipc_sock.send(msg_str)
-        self.logger.info("Data sent to manager, length[%d]", len(msg_str))
 
     def register_ipc_msg_rx_callback(self, callback):
         """Implements method from RpcIpcContext.
@@ -391,11 +391,11 @@ class RcpHalProcess(RcpProcess):
         super(RcpHalProcess, self).__init__(
             ipc_sock_addr, dispatcher=dispatcher)
         self.notify_mgr_cb = notify_mgr_cb
-        self.hal_ipc = RcpHalIpc("HalClient", "This is a RcpHal application",
-                                 "1.0.0", (MsgTypeRoutePtpStatus, MsgTypeFaultManagement,
-                                           MsgTypeRpdIpv6Info, MsgTypeRpdGroupInfo,
-                                           MsgTypeGeneralNtf, MsgTypeStaticPwStatus,
-                                           MsgTypeRpdCapabilities),
+        self.hal_ipc = RcpHalIpc("RcpHalClient", "This is a RcpHal application",
+                                 "1.0.0", (HalConfigMsg.MsgTypeRoutePtpStatus, HalConfigMsg.MsgTypeFaultManagement,
+                                           HalConfigMsg.MsgTypeRpdIpv6Info, HalConfigMsg.MsgTypeRpdGroupInfo,
+                                           HalConfigMsg.MsgTypeGeneralNtf, HalConfigMsg.MsgTypeStaticPwStatus,
+                                           HalConfigMsg.MsgTypeRpdCapabilities, HalConfigMsg.MsgTypeUcdRefreshNtf),
                                  self, "/etc/config/ClientLogging.conf")
         self.hal_ipc.start(
             self.orchestrator.config_operation_rsp_cb,
@@ -427,7 +427,6 @@ class RcpHalProcess(RcpProcess):
                     msg_name = [desc.name for desc, value in seq.ipc_msg.RpdDataMessage.RpdData.ListFields()]
                     rcp_field = filter(lambda x: x in ['RpdCapabilities', 'RedundantCoreIpAddress'], msg_name)
                     if len(rcp_field):
-                        self.logger.info("Data sent to rcp agent")
                         if None is not interface_local:
                             if 'RpdConfigurationDone' in rcp_field:
                                 seq.ipc_msg.RcpMessageType = t_RcpMessage.RPD_CONFIGURATION_DONE
@@ -505,7 +504,7 @@ class RcpHalProcess(RcpProcess):
         super(RcpHalProcess, self).add_ccap_cores(ccap_cores)
 
 
-def notification_mgr_cb(msg):  # pragma: no cover
+def notification_mgr_cb(seq, args=None):  # pragma: no cover
     pass
 
 
@@ -513,7 +512,13 @@ def main():  # pragma: no cover
     parser = argparse.ArgumentParser()
     parser.add_argument('--ipc-address', required=True,
                         help='Address for IPC communication')
+    parser.add_argument("-t", "--test_flag",
+                        action="store_true",
+                        help="run the program with test mode")
+
     args = parser.parse_args()
+    if args.test_flag:
+        set_test_res_db()
 
     rcp = RcpHalProcess(args.ipc_address, notify_mgr_cb=notification_mgr_cb)
     logger = logging.getLogger("main")
@@ -538,6 +543,17 @@ def main():  # pragma: no cover
 
 def handle_interrrupt_signal(signum, frame):  # pragma: no cover
     sys.exit(0)
+
+
+def set_test_res_db():
+    # Setting the python path
+    currentPath = path.dirname(path.realpath(__file__))
+    dirs = currentPath.split("/")
+    rpd_index = dirs.index('rpd')
+    if rpd_index == 0:
+        print "Cannot find the rpd directory, please correct it"
+        sys.exit(-1)
+    RCPDB.DB_CFG_FILE = '/'.join(dirs[:rpd_index + 1]) + '/confdb/rpd_res_db.conf'
 
 
 # register the ctrl C to handle this signal

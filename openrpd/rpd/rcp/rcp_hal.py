@@ -27,8 +27,7 @@ from rpd.dispatcher.timer import DpTimerManager
 from rpd.gpb.cfg_pb2 import config
 from rpd.gpb.rcp_pb2 import t_RcpMessage, t_RpdDataMessage
 from rpd.gpb.RpdCapabilities_pb2 import t_RpdCapabilities
-from rpd.hal.src.HalConfigMsg import *
-from rpd.hal.src.HalConfigMsg import RCP_TO_HAL_MSG_TYPE, MsgTypeInvalid
+import rpd.hal.src.HalConfigMsg as HalConfigMsg
 from rpd.hal.src.msg import HalCommon_pb2
 from rpd.hal.src.msg.HalMessage import HalMessage
 from rpd.hal.src.transport.HalTransport import HalTransport
@@ -40,6 +39,7 @@ from rpd.rcp.rcp_lib import rcp_tlv_def
 from rpd.rcp.rcp_lib import docsis_message
 from rpd.common.utils import SysTools
 from rpd.rcp.vendorTLVs.src.RcpVspTlv import RcpVendorTlv, DEFAULT_VENDOR_ID
+
 
 class DataObj(object):
 
@@ -164,6 +164,14 @@ class RcpMessageRecord(object):
         self.recv_rsp_cb = event_fire_cb
         self.unittest = unittest
 
+    def _generate_error_rsp(self, record_req_elem):
+        data_obj = record_req_elem.msg_req
+        cfg_rsp = data_obj.ipc_req_msg
+        cfg_rsp.RcpDataResult = t_RcpMessage.RCP_RESULT_GENERAL_ERROR
+        data_obj.result = DataObj.CFG_OPER_RESULT_GENERAL_ERROR
+        data_obj.rsp_data = cfg_rsp.RpdDataMessage.RpdData
+        record_req_elem.pkt["msg_rsp"].append(data_obj)
+
     def _timeout_check_cb(self, arg):
 
         # we may need some optimize method to check the timeout
@@ -176,21 +184,16 @@ class RcpMessageRecord(object):
                 self.logger.warning(
                     "Found a message timeout, fire!!, seq_number: %d, content:%s",
                     seq_num, record_req_elem)
+                self.seq_num_mapping.pop(seq_num)
                 record_req_elem.ref_count = -3  # negative value for error
-                data_obj = record_req_elem.msg_req  # reuse the req message
-                cfg_rsp = data_obj.ipc_req_msg
-                cfg_rsp.RcpDataResult = t_RcpMessage.RCP_RESULT_GENERAL_ERROR
-                data_obj.result = DataObj.CFG_OPER_RESULT_GENERAL_ERROR
-                data_obj.rsp_data = cfg_rsp.RpdDataMessage.RpdData
-
-                record_req_elem.pkt["msg_rsp"].append(data_obj)
+                self._generate_error_rsp(record_req_elem)
                 try:
                     self._check_and_fire(record_req_elem)
                 except GCPSessionQHigh as e:
                     self.logger.info("%s return to re-timeout" % str(e))
                     return
 
-        if self.unittest and self.unittest['enable']: #pragma: no cover
+        if self.unittest and self.unittest['enable']:  # pragma: no cover
             if self.unittest['runtimes'] > 0:
                 self.unittest['runtimes'] -= 1
             if self.unittest['runtimes'] <= 0:
@@ -201,18 +204,26 @@ class RcpMessageRecord(object):
             "Add a pkt into internal DB: %s, %s, %s"
             % (last_session, last_pkt, gcp_msg))
 
-        if (last_session, last_pkt, gcp_msg) in self.pkt_db:
-            return
+        if (last_session, last_pkt, gcp_msg) not in self.pkt_db:
+            self.pkt_db[(last_session, last_pkt, gcp_msg)] = {
+                "last_session": last_session,
+                "last_pkt": last_pkt,
+                "gcp_msg": gcp_msg,
+                "req_list": req_list,
+                "send_done": False,
+                "recv_done": False,
+                "msg_rsp": list(),
+            }
 
-        self.pkt_db[(last_session, last_pkt, gcp_msg)] = {
-            "last_session": last_session,
-            "last_pkt": last_pkt,
-            "gcp_msg": gcp_msg,
-            "req_list": req_list,
-            "send_done": False,
-            "recv_done": False,
-            "msg_rsp": list(),
-        }
+        return self.pkt_db[(last_session, last_pkt, gcp_msg)]
+
+    def remove_pkt_from_internal_db(self, last_session, last_pkt, gcp_msg):
+        self.logger.debug(
+            "Remove the pkt from internal DB: %s, %s, %s"
+            % (last_session, last_pkt, gcp_msg))
+
+        if (last_session, last_pkt, gcp_msg) in self.pkt_db:
+            self.pkt_db.pop((last_session, last_pkt, gcp_msg))
 
     def add_req_to_internal_db(self, last_session, last_pkt, gcp_msg, seq_num, record_req_elem):
         if (last_session, last_pkt, gcp_msg) not in self.pkt_db:
@@ -280,15 +291,7 @@ class RcpMessageRecord(object):
                 "Receive a hal fail message:%s" % hal_recv_msg.msg)
             # here -1 means there are some errors, the succeed msg should ignore this message
             record_req_elem.ref_count = -1
-            data_obj = record_req_elem.msg_req
-            cfg_rsp = data_obj.ipc_req_msg  # reuse the req message
-            cfg_rsp.RcpDataResult = t_RcpMessage.RCP_RESULT_GENERAL_ERROR
-
-            data_obj = record_req_elem.msg_req
-            data_obj.result = DataObj.CFG_OPER_RESULT_GENERAL_ERROR
-            data_obj.rsp_data = cfg_rsp.RpdDataMessage.RpdData
-
-            record_req_elem.pkt["msg_rsp"].append(data_obj)
+            self._generate_error_rsp(record_req_elem)
             self._check_and_fire(record_req_elem)
             return
 
@@ -298,12 +301,7 @@ class RcpMessageRecord(object):
             # yes we recv a error msg from driver
             self.logger.warning("Recv a driver fail message:%s" % str(cfg_rsp))
             record_req_elem.ref_count = -2
-
-            data_obj = record_req_elem.msg_req
-            data_obj.result = DataObj.CFG_OPER_RESULT_GENERAL_ERROR
-            data_obj.rsp_data = cfg_rsp.RpdDataMessage.RpdData
-
-            record_req_elem.pkt["msg_rsp"].append(data_obj)
+            self._generate_error_rsp(record_req_elem)
             self._check_and_fire(record_req_elem)
             return
 
@@ -350,18 +348,13 @@ class RcpMessageRecord(object):
                 " record_req_elem.ref_count is %s "
                 % (len(pkt["msg_rsp"]), len(pkt["req_list"]), str(record_req_elem.ref_count)))
 
-    def _check_and_fire(self, record_req_elem):
-        pkt = record_req_elem.pkt
-        self.check_recv_done(record_req_elem)
-        if pkt["recv_done"] == True and pkt["send_done"] == True:
+    def check_and_fire_pkt(self, pkt):
+        if pkt["recv_done"] and pkt["send_done"]:
             self.logger.debug(
                 "We have collect all the messages, fire!!! %s"
-                % record_req_elem)
-            # cleanup the resources and call back
-            seq_nums = record_req_elem.seq_nums
-            for seq_num_tmp in seq_nums:
-                if seq_num_tmp in self.seq_num_mapping:
-                    self.seq_num_mapping.pop(seq_num_tmp)
+                % pkt)
+
+            session = pkt['last_session']
 
             # pop from the packet db
             key = (pkt['last_session'], pkt['last_pkt'], pkt['gcp_msg'])
@@ -380,12 +373,17 @@ class RcpMessageRecord(object):
                 self.logger.warning(
                     "Cannot send the pkt [%s] since the callback is not ready!"
                     % pkt)
+            try:
+                if session.io_ctx and session.io_ctx.socket and session.io_ctx.is_tx_low_pri_queue_at_high_watermark():
+                    raise GCPSessionQHigh(
+                        "TX low priority queue reach high watermark, stop sending")
+            except AttributeError as e:
+                self.logger.warning("AttributeExcpetion happened: %s", str(e))
 
-            session = pkt['last_session']
-            if None is not session.io_ctx and None is not session.io_ctx.socket and \
-                session.io_ctx.is_tx_low_pri_queue_at_high_watermark():
-                raise GCPSessionQHigh(
-                    "TX low priority queue reach high watermark, stop sending")
+    def _check_and_fire(self, record_req_elem):
+        pkt = record_req_elem.pkt
+        self.check_recv_done(record_req_elem)
+        self.check_and_fire_pkt(pkt)
 
     def _compose_message(self, data_obj, rsp_list, result):
         req = data_obj.ipc_req_msg
@@ -468,6 +466,8 @@ class RcpHalIpc(object):
         RPD_DATA_OPER_AW: t_RpdDataMessage.RPD_CFG_ALLOCATE_WRITE,
     }
 
+    CTRL_RPD_INIT_PROV_INFO_PATH = '/rpd/config/ctrl_rpd_init_prov_info'
+
     def __init__(self, appName, appDesc, appVer, interestedNotification,
                  channel, logConfigurePath=None, shadowLayerConf=None):
         """ TODO missing params
@@ -513,11 +513,11 @@ class RcpHalIpc(object):
         }
 
         self.HalConfigMsgHandlers = {
-            MsgTypeRpdCapabilities: self.recMsgTypeRpdCapabilitiesCb,
+            HalConfigMsg.MsgTypeRpdCapabilities: self.recMsgTypeRpdCapabilitiesCb,
         }
 
         self.HalConfigMsgRspHandlers = {
-            MsgTypeRpdCapabilities: self.recMsgTypeRpdCapabilitiesRspCb,
+            HalConfigMsg.MsgTypeRpdCapabilities: self.recMsgTypeRpdCapabilitiesRspCb,
         }
 
         self.clientID = None
@@ -563,7 +563,7 @@ class RcpHalIpc(object):
             self.pullSock.monitorHandler(recv_monitor_message(sock))
             return
         if self.mgrConnection is not None and \
-                        sock == self.mgrConnection.monitor:
+                sock == self.mgrConnection.monitor:
             self.mgrConnection.monitorHandler(recv_monitor_message(sock))
             return
         while sock.getsockopt(zmq.EVENTS) and zmq.POLLIN:
@@ -576,16 +576,14 @@ class RcpHalIpc(object):
                     handler(msg)
             except zmq.ZMQError as e:
                 self.logger.debug(
-                    "Got an error when trying with non-block read:"
-                                  + str(e))
+                    "Got an error when trying with non-block read:" + str(e))
                 break
             except (GCPSessionQHigh, GCPSessionFull) as e:
                 self.logger.warning("%s return to re-schedule" % str(e))
                 return
             except Exception as e:
                 self.logger.warning(
-                    "Error happens when receiving the zmq msg, reason:%s"
-                    % str(e))
+                    "Error happens when receiving the zmq msg, reason:%s" % str(e))
                 break
 
     def connection_setup(self, disp):
@@ -594,8 +592,7 @@ class RcpHalIpc(object):
         # Create a connection to Hal driver mgr
         self.mgrConnection = HalTransport(HalTransport.HalTransportClientMgr,
                                           HalTransport.HalClientMode,
-                                          disconnectHandlerCb=
-                                          self.connectionDisconnectCb)
+                                          disconnectHandlerCb=self.connectionDisconnectCb)
 
         self.HalMsgsHandler[self.mgrConnection.socket] = self.recvRegisterMsgCb
         # create the poller
@@ -664,11 +661,13 @@ class RcpHalIpc(object):
         if self.pushSock:
             self.pushSock.send(msg)
         else:
-            self.logger.warning("Cannot send the msg since the push socket is none, msg:%s", msg)
+            # this use of unicode() removes 75 tracebacks in unit test results
+            self.logger.warning("Cannot send the msg since the push socket is none, "
+                                "msg: '{}'".format(unicode(msg, errors='ignore')))
 
     def sayHelloToHal(self):
         """Send a hello message to verify the agent path is correct."""
-        self.logger.info("Send a Hello message to Hal")
+        self.logger.info(" ".join([str(self.appName), str(self.clientID), ":Send a Hello message to Hal"]))
         try:
             helloMsg = HalMessage("HalClientHello", ClientID=self.clientID)
             self.send(helloMsg.Serialize())
@@ -687,7 +686,7 @@ class RcpHalIpc(object):
                 isinstance(notifications, tuple) and not \
                 isinstance(notifications, list):
             self.logger.warning("Cannot set an notification with wrong type, "
-                              "you can pass a tuple or list to it ")
+                                "you can pass a tuple or list to it ")
             return
         configMsg = HalMessage("HalClientInterestNotificationCfg",
                                ClientID=self.clientID,
@@ -740,7 +739,7 @@ class RcpHalIpc(object):
             cfgMsgContent = rcp_msg.SerializeToString()
             msg = HalMessage("HalConfig", SrcClientID=self.clientID,
                              SeqNum=self.seqNum,
-                             CfgMsgType=MsgTypeRpdCapabilities,
+                             CfgMsgType=HalConfigMsg.MsgTypeRpdCapabilities,
                              CfgMsgPayload=cfgMsgContent)
             self.send(msg.Serialize())
             self.seqNum += 1
@@ -769,7 +768,7 @@ class RcpHalIpc(object):
     def _set_rpd_identification(identification):
         identification.VendorName = "Cisco"
         identification.VendorId = 9
-        identification.ModelNumber ="123456"
+        identification.ModelNumber = "123456"
         identification.DeviceMacAddress = "00:00:00:00:00:00"
         identification.CurrentSwVersion = "Prototype"
         identification.DeviceDescription = 'TestingPrototypeWithHardcodedValues'
@@ -777,7 +776,29 @@ class RcpHalIpc(object):
         # the value must be '123456' in sdn side, changed it from 777
         identification.SerialNumber = "123456"
         identification.RpdRcpProtocolVersion = "1.0"
-        identification.RpdRcpSchemaVersion = "1.0.6"
+        identification.RpdRcpSchemaVersion = "1.0.8"
+
+    def _setRpdCapabilities(self, cfgMsg):
+        """
+        set AssetId, DeviceAlias, DeviceLocationDescription, GeoLocationLatitude and GeoLocationLongitude.
+        """
+        recv_rcp_msg = cfgMsg.RpdDataMessage.RpdData
+        if recv_rcp_msg.RpdCapabilities.HasField("RpdIdentification"):
+            identification = recv_rcp_msg.RpdCapabilities.RpdIdentification
+            self.rpd_cap.RpdIdentification.AssetId = identification.AssetId
+            self.rpd_cap.RpdIdentification.DeviceAlias = identification.DeviceAlias
+            with open(self.CTRL_RPD_INIT_PROV_INFO_PATH, 'w') as f:
+                f.write("Asset Id=" + identification.AssetId + '\n')
+                f.write("Device Alias=" + identification.DeviceAlias + '\n')
+        if recv_rcp_msg.RpdCapabilities.HasField("DeviceLocation"):
+            location = recv_rcp_msg.RpdCapabilities.DeviceLocation
+            self.rpd_cap.DeviceLocation.DeviceLocationDescription = location.DeviceLocationDescription
+            self.rpd_cap.DeviceLocation.GeoLocationLatitude = location.GeoLocationLatitude
+            self.rpd_cap.DeviceLocation.GeoLocationLongitude = location.GeoLocationLongitude
+            with open(self.CTRL_RPD_INIT_PROV_INFO_PATH, 'a') as f:
+                f.write("RPD Location Description=" + location.DeviceLocationDescription + '\n')
+                f.write("RPD Location Geo Latitude=" + location.GeoLocationLatitude + '\n')
+                f.write("RPD Location Geo Longitude=" + location.GeoLocationLongitude + '\n')
 
     def recMsgTypeRpdCapabilitiesCb(self, halcfgmsg):
         """
@@ -792,14 +813,22 @@ class RcpHalIpc(object):
             rcp_msg.ParseFromString(cfgMsg.CfgMsgPayload)
             rcp_rpd_cap = rcp_msg.RpdDataMessage.RpdData.RpdCapabilities
             if self.rpd_cap:
-                rcp_rpd_cap.CopyFrom(self.rpd_cap)
+                if rcp_msg.RpdDataMessage.RpdDataOperation == t_RpdDataMessage.RPD_CFG_READ:
+                    self.fill_requested_data(self.rpd_cap, rcp_rpd_cap)
+                elif rcp_msg.RpdDataMessage.RpdDataOperation == t_RpdDataMessage.RPD_CFG_WRITE:
+                    self._setRpdCapabilities(rcp_msg)
+                else:
+                    self.logger.warning("Status:%s "
+                                        "ErrorDescription: Operation %d for RpdCapabilities is not supported", HalCommon_pb2.FAILED, rcp_msg.RpdDataMessage.RpdDataOperation)
+                    return False
             else:
                 self._set_rpd_identification(rcp_rpd_cap.RpdIdentification)
+
             rcp_msg.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
             cfgMsg.CfgMsgPayload = rcp_msg.SerializeToString()
 
             rsp_msg = {"Status": HalCommon_pb2.SUCCESS,
-                "ErrorDescription": "Receive RpdCapabilities success"}
+                       "ErrorDescription": "Receive RpdCapabilities success"}
 
             msg = HalMessage("HalConfigRsp", SrcClientID=cfgMsg.SrcClientID,
                              SeqNum=cfgMsg.SeqNum, Rsp=rsp_msg,
@@ -809,7 +838,7 @@ class RcpHalIpc(object):
             self.logger.debug("Receive RpdCapabilities request from core")
             return True
         except Exception as e:
-            self.logger.warning("Cannot process the msg[%d], reason:%s", e)
+            self.logger.warning("Cannot process the msg[%d], reason:%s", halcfgmsg.msg.CfgMsgType, e)
             return False
 
     def recMsgTypeRpdCapabilitiesRspCb(self, halrspmsg):
@@ -882,7 +911,7 @@ class RcpHalIpc(object):
 
             self.connection_setup(self.channel.dispatcher)
 
-        if self.retryNr: #pragma: no cover
+        if self.retryNr:  # pragma: no cover
             self.retryNr -= 1
             self.channel.dispatcher.fd_unregister(self.mgrConnection.socket)
             self.channel.dispatcher.fd_unregister(self.mgrConnection.monitor)
@@ -918,7 +947,7 @@ class RcpHalIpc(object):
 
         if notificationType is None or not isinstance(notificationPayload, str):
             self.logger.warning("Cannot send a None or incorrect type to HAL, "
-                              "str is required for msg.")
+                                "str is required for msg.")
             return
 
         notification = HalMessage("HalNotification",
@@ -934,12 +963,12 @@ class RcpHalIpc(object):
 
         if self.disconnected:
             self.logger.warning("The client is on disconnected state,"
-                              " skip to send the message, msg type:%s", cfgMsgType)
+                                " skip to send the message, msg type:%s", cfgMsgType)
             return
 
         if cfgMsgContent is None or not isinstance(cfgMsgContent, str):
             self.logger.warning("Cannot send a None or incorrect type to HAL, "
-                              "str is required for msg.")
+                                "str is required for msg.")
             return
 
         msg = HalMessage("HalConfig", SrcClientID=self.clientID,
@@ -977,16 +1006,19 @@ class RcpHalIpc(object):
         :param op: RD, WR
 
         """
-        rcp_msg = t_RcpMessage()
-        rcp_msg.RpdDataMessage.RpdDataOperation = op
-        rcp_msg.RcpMessageType = cfg_type
-        rcp_msg.RpdDataMessage.RpdData.CopyFrom(msg)
-        payload = rcp_msg.SerializeToString()
-        seq_num = self.sendCfgMsg(msg_type, payload)
-        if seq_num is None:
-            raise RcpHalClientError("sendCfgMsg fail, please check "
-                                    "the client status or input payload")
-        return seq_num
+        try:
+            rcp_msg = t_RcpMessage()
+            rcp_msg.RpdDataMessage.RpdDataOperation = op
+            rcp_msg.RcpMessageType = cfg_type
+            rcp_msg.RpdDataMessage.RpdData.CopyFrom(msg)
+            payload = rcp_msg.SerializeToString()
+            seq_num = self.sendCfgMsg(msg_type, payload)
+            if seq_num is None:
+                raise RcpHalClientError("sendCfgMsg fail, please check "
+                                        "the client status or input payload")
+            return seq_num
+        except Exception as e:
+            raise RcpHalClientError("RpdDataMessage message error: %s" % str(e))
 
     def rcp_cfg_req(self, ipc_msg):
         """Construct HalMessage to HalMain, do configuration.
@@ -1021,7 +1053,7 @@ class RcpHalIpc(object):
             data.ipc_req_msg = seq.ipc_msg
             RfData = seq.ipc_msg.RpdDataMessage.RpdData
             for RfCh in RfData.RfChannel:
-                # Parsing Docssis msg here, convert into RfChannel or RfPort proto structure.
+                # Parsing Docsis msg here, convert into RfChannel or RfPort proto structure.
                 # If cannot parse to RfChannel or RfPort structure, store the msg type in
                 # docsisMsgType_list and send the raw msg to hal phy driver in the
                 # following send procedure.
@@ -1034,6 +1066,7 @@ class RcpHalIpc(object):
                         rcp_tlv_def.RCP_MSG_TYPE_IRA,
                         RfCh,
                         rcp_tlv_def.RCP_OPERATION_TYPE_WRITE)
+
                     if RfChMsg is None:
                         docsisMsgType_list.append(
                             {'rfch': RfCh, 'type': docsis_msg.msgtype})
@@ -1041,8 +1074,7 @@ class RcpHalIpc(object):
 
         if len(req_list) == 0:
             raise Exception("The packet contains nothing, fire !!!")
-        self.msg_record.add_pkt_to_internal_db(
-            last_session, last_pkt, gcp_msg, req_list)
+        req_pkt = self.msg_record.add_pkt_to_internal_db(last_session, last_pkt, gcp_msg, req_list)
 
         for data_obj in req_list:
             req_msg = data_obj.ipc_req_msg
@@ -1051,15 +1083,17 @@ class RcpHalIpc(object):
             record_req_elem = RcpMessageRecordElem(data_obj)
             try:
                 for desc, value in cfg_data.ListFields():
+                    if desc.name == 'ReadCount':
+                        continue
                     if desc.name == 'RfChannel':
                         for rf_channel in cfg_data.RfChannel:
                             for rf_desc, rf_value in rf_channel.ListFields():
-                                if rf_desc.name in RCP_TO_HAL_MSG_TYPE:
-                                    mst_type = RCP_TO_HAL_MSG_TYPE[rf_desc.name]
+                                if rf_desc.name in HalConfigMsg.RCP_TO_HAL_MSG_TYPE:
+                                    mst_type = HalConfigMsg.RCP_TO_HAL_MSG_TYPE[rf_desc.name]
                                 elif rf_desc.name == 'DocsisMsg':
                                     mst_type = None
                                     for dmsg in docsisMsgType_list:
-                                        # send raw Docssis msg to hal dirver.
+                                        # send raw Docsis msg to hal driver.
                                         if dmsg['rfch'] == rf_channel:
                                             mst_type = dmsg['type']
                                             break
@@ -1069,10 +1103,12 @@ class RcpHalIpc(object):
                                     continue
                                 else:
                                     self.logger.warning("Unsupported hal rf channel cfg msg type: %s",
-                                                      rf_desc.name)
-                                    mst_type = MsgTypeInvalid
+                                                        rf_desc.name)
+                                    mst_type = HalConfigMsg.MsgTypeInvalid
 
                                 data = config()
+                                if cfg_data.HasField("ReadCount"):
+                                    data.ReadCount = cfg_data.ReadCount
                                 msg = data.RfChannel.add()
                                 msg.CopyFrom(rf_channel)
                                 nexSeqNum = self.seqNum
@@ -1086,16 +1122,18 @@ class RcpHalIpc(object):
                     elif desc.name == 'RfPort':
                         for rf_port in cfg_data.RfPort:
                             for rf_desc, rf_value in rf_port.ListFields():
-                                if rf_desc.name in RCP_TO_HAL_MSG_TYPE:
-                                    mst_type = RCP_TO_HAL_MSG_TYPE[rf_desc.name]
+                                if rf_desc.name in HalConfigMsg.RCP_TO_HAL_MSG_TYPE:
+                                    mst_type = HalConfigMsg.RCP_TO_HAL_MSG_TYPE[rf_desc.name]
                                 elif rf_desc.name == 'RfPortSelector':
                                     continue
                                 else:
                                     self.logger.warning("Unsupported hal rf port cfg msg type: %s",
-                                                      rf_desc.name)
-                                    mst_type = MsgTypeInvalid
+                                                        rf_desc.name)
+                                    mst_type = HalConfigMsg.MsgTypeInvalid
 
                                 data = config()
+                                if cfg_data.HasField("ReadCount"):
+                                    data.ReadCount = cfg_data.ReadCount
                                 msg = data.RfPort.add()
                                 msg.CopyFrom(rf_port)
                                 nexSeqNum = self.seqNum
@@ -1107,9 +1145,11 @@ class RcpHalIpc(object):
                                     req_msg.RcpMessageType, op)
 
                     elif desc.name == "CcapCoreIdentification":
-                        mst_type = RCP_TO_HAL_MSG_TYPE[desc.name]
+                        mst_type = HalConfigMsg.RCP_TO_HAL_MSG_TYPE[desc.name]
                         for ccap_cfg in cfg_data.CcapCoreIdentification:
                             data = config()
+                            if cfg_data.HasField("ReadCount"):
+                                data.ReadCount = cfg_data.ReadCount
                             ccap = data.CcapCoreIdentification.add()
                             ccap.CopyFrom(ccap_cfg)
                             nexSeqNum = self.seqNum
@@ -1122,40 +1162,46 @@ class RcpHalIpc(object):
 
                     elif desc.name == "RpdCapabilities":
                         data = config()
+                        if cfg_data.HasField("ReadCount"):
+                            data.ReadCount = cfg_data.ReadCount
                         data.RpdCapabilities.CopyFrom(value)
-                        mst_type = RCP_TO_HAL_MSG_TYPE[desc.name]
+                        mst_type = HalConfigMsg.RCP_TO_HAL_MSG_TYPE[desc.name]
                         nexSeqNum = self.seqNum
                         self.msg_record.add_req_to_internal_db(
                             last_session, last_pkt, gcp_msg, nexSeqNum,
                             record_req_elem)
                         self.send_rcp_cfg_msg(data, mst_type,
-                                                        req_msg.RcpMessageType, op)
+                                              req_msg.RcpMessageType, op)
 
                     elif desc.name == "VendorSpecificExtension":
                         for vend_desc, vend_value in cfg_data.VendorSpecificExtension.ListFields():
-                            if vend_desc.name in RCP_TO_HAL_MSG_TYPE:
-                                mst_type = RCP_TO_HAL_MSG_TYPE[vend_desc.name]
+                            if vend_desc.name in HalConfigMsg.RCP_TO_HAL_MSG_TYPE:
+                                mst_type = HalConfigMsg.RCP_TO_HAL_MSG_TYPE[vend_desc.name]
                             elif vend_desc.name == "VendorId":
                                 vendorTlv = RcpVendorTlv(vendorID=DEFAULT_VENDOR_ID)
                                 status, mst_type = vendorTlv.setDriverMsgCode(vend_value, value)
                                 if (status == 1):
                                     vsp_tlv = config()
+                                    if cfg_data.HasField("ReadCount"):
+                                        data.ReadCount = cfg_data.ReadCount
                                     vsp_tlv.VendorSpecificExtension.CopyFrom(value)
                                     nexSeqNum = self.seqNum
                                     self.msg_record.add_req_to_internal_db(
                                         last_session, last_pkt, gcp_msg, nexSeqNum,
                                         record_req_elem)
                                     self.send_rcp_cfg_msg(vsp_tlv, mst_type,
-                                                                req_msg.RcpMessageType, op)
+                                                          req_msg.RcpMessageType, op)
                                     # entire VendorSpecificExtension TLV copied and sent to driver so break
                                     break
                                 else:
                                     continue
                             else:
                                 self.logger.warning("Unsupported hal vendorSpecificExtension msg type: %s",
-                                                  vend_desc.name)
-                                mst_type = MsgTypeInvalid
+                                                    vend_desc.name)
+                                mst_type = HalConfigMsg.MsgTypeInvalid
                             data = config()
+                            if cfg_data.HasField("ReadCount"):
+                                data.ReadCount = cfg_data.ReadCount
                             msg = data.VendorSpecificExtension
                             msg.CopyFrom(cfg_data.VendorSpecificExtension)
                             nexSeqNum = self.seqNum
@@ -1165,17 +1211,23 @@ class RcpHalIpc(object):
                             self.send_rcp_cfg_msg(
                                 data, mst_type,
                                 req_msg.RcpMessageType, op)
+
+                    elif desc.name == "ReadCount":
+                        continue
+
                     else:
-                        if desc.name in RCP_TO_HAL_MSG_TYPE:
-                            mst_type = RCP_TO_HAL_MSG_TYPE[desc.name]
+                        if desc.name in HalConfigMsg.RCP_TO_HAL_MSG_TYPE:
+                            mst_type = HalConfigMsg.RCP_TO_HAL_MSG_TYPE[desc.name]
                         else:
                             self.logger.warning("Unsupported hal cfg msg type %s" % (desc.name))
-                            mst_type = MsgTypeInvalid
+                            mst_type = HalConfigMsg.MsgTypeInvalid
 
                         if desc.type == desc.TYPE_MESSAGE:
                             if desc.label == desc.LABEL_REPEATED:
                                 for sub_info in value:
                                     data = config()
+                                    if cfg_data.HasField("ReadCount"):
+                                        data.ReadCount = cfg_data.ReadCount
                                     field = getattr(data, desc.name).add()
                                     field.CopyFrom(sub_info)
                                     nexSeqNum = self.seqNum
@@ -1186,6 +1238,8 @@ class RcpHalIpc(object):
                                         data, mst_type, req_msg.RcpMessageType, op)
                             else:
                                 data = config()
+                                if cfg_data.HasField("ReadCount"):
+                                    data.ReadCount = cfg_data.ReadCount
                                 getattr(data, desc.name).CopyFrom(value)
                                 nexSeqNum = self.seqNum
                                 self.msg_record.add_req_to_internal_db(
@@ -1197,6 +1251,8 @@ class RcpHalIpc(object):
                             if desc.label == desc.LABEL_REPEATED:
                                 for sub_info in value:
                                     data = config()
+                                    if cfg_data.HasField("ReadCount"):
+                                        data.ReadCount = cfg_data.ReadCount
                                     field = getattr(data, desc.name)
                                     field.extend([sub_info, ])
                                     nexSeqNum = self.seqNum
@@ -1207,6 +1263,8 @@ class RcpHalIpc(object):
                                         data, mst_type, req_msg.RcpMessageType, op)
                             else:
                                 data = config()
+                                if cfg_data.HasField("ReadCount"):
+                                    data.ReadCount = cfg_data.ReadCount
                                 setattr(data, desc.name, value)
                                 nexSeqNum = self.seqNum
                                 self.msg_record.add_req_to_internal_db(
@@ -1216,18 +1274,18 @@ class RcpHalIpc(object):
                                     data, mst_type, req_msg.RcpMessageType, op)
             except RcpHalClientError:
                 self.msg_record.remove_req_from_internal_db(self.seqNum, record_req_elem)
+                self.msg_record.remove_pkt_from_internal_db(last_session, last_pkt, gcp_msg)
                 raise
 
-            if len(cfg_data.ListFields()) == 0:
+            if not record_req_elem.pkt:
                 self.logger.warning(
-                    'the length of cfg data is :%d', len(cfg_data.ListFields()))
-                self.msg_record.add_req_to_internal_db(
-                    last_session, last_pkt, gcp_msg, 0xffff,
-                    record_req_elem)
-
-            self.msg_record.set_send_procedure_done(
-                last_session, last_pkt, gcp_msg)  # Done the message
-            self.msg_record._check_and_fire(record_req_elem)
+                    'The hal record element is not associated with any packet, attach an error rsp')
+                record_req_elem.set_pkt(req_pkt)
+                self.msg_record._generate_error_rsp(record_req_elem)
+            self.msg_record.check_recv_done(record_req_elem)
+        self.msg_record.set_send_procedure_done(
+            last_session, last_pkt, gcp_msg)  # Done the message
+        self.msg_record.check_and_fire_pkt(req_pkt)
 
     def recvRegisterMsgCb(self, cfg):
         """The callback handler for the configuration message.
@@ -1299,6 +1357,7 @@ class RcpHalIpc(object):
             # we can not register the client to Hal successfully, reboot the node
             # TODO: may we restart the rcp process instead of reboot?
             SysTools.sys_failure_reboot('rcp client register fail')
+            SysTools.diagnostic_self_test_fail('Processing error', "rcp client register fail", 'Severity level=error')
 
     def recvNotificationCb(self, msg):
         """Receive the notification from hal driver.
@@ -1312,41 +1371,46 @@ class RcpHalIpc(object):
             self.logger.warning("rcp_notification_cb not registered yet")
             return
 
-        if msg.msg.HalNotificationType == MsgTypeRoutePtpStatus and msg.msg.HalNotificationPayLoad in [self.LOS, self.SYNC]:
+        if msg.msg.HalNotificationType == HalConfigMsg.MsgTypeRoutePtpStatus and msg.msg.HalNotificationPayLoad in [self.LOS, self.SYNC]:
             self.logger.debug(
                 "send %s notification to provision",
                 msg.msg.HalNotificationPayLoad)
             self.rcp_notification_cb(
-                MsgTypeRoutePtpStatus, msg.msg.HalNotificationPayLoad)
-        elif msg.msg.HalNotificationType == MsgTypeGeneralNtf:
+                HalConfigMsg.MsgTypeRoutePtpStatus, msg.msg.HalNotificationPayLoad)
+        elif msg.msg.HalNotificationType == HalConfigMsg.MsgTypeGeneralNtf:
             self.logger.debug(
                 "send  MsgTypeGeneralNtf %s GeneralNotification to provision",
                 msg.msg.HalNotificationPayLoad)
             self.rcp_notification_cb(
-                MsgTypeGeneralNtf, msg.msg.HalNotificationPayLoad)
-        elif msg.msg.HalNotificationType == MsgTypeFaultManagement:
+                HalConfigMsg.MsgTypeGeneralNtf, msg.msg.HalNotificationPayLoad)
+        elif msg.msg.HalNotificationType == HalConfigMsg.MsgTypeFaultManagement:
             self.logger.debug(
                 "send %s notification to core", msg.msg.HalNotificationPayLoad)
             self.rcp_notification_cb(
-                MsgTypeFaultManagement, msg.msg.HalNotificationPayLoad)
-        elif msg.msg.HalNotificationType == MsgTypeRpdIpv6Info:
+                HalConfigMsg.MsgTypeFaultManagement, msg.msg.HalNotificationPayLoad)
+        elif msg.msg.HalNotificationType == HalConfigMsg.MsgTypeRpdIpv6Info:
             self.logger.debug(
                 "send %s notification to core", msg.msg.HalNotificationPayLoad)
             self.rcp_notification_cb(
-                MsgTypeRpdIpv6Info, msg.msg.HalNotificationPayLoad)
-        elif msg.msg.HalNotificationType == MsgTypeRpdGroupInfo:
+                HalConfigMsg.MsgTypeRpdIpv6Info, msg.msg.HalNotificationPayLoad)
+        elif msg.msg.HalNotificationType == HalConfigMsg.MsgTypeRpdGroupInfo:
             self.logger.debug(
                 "send %s notification to core", msg.msg.HalNotificationPayLoad)
             self.rcp_notification_cb(
-                MsgTypeRpdGroupInfo, msg.msg.HalNotificationPayLoad)
-        elif msg.msg.HalNotificationType == MsgTypeStaticPwStatus:
+                HalConfigMsg.MsgTypeRpdGroupInfo, msg.msg.HalNotificationPayLoad)
+        elif msg.msg.HalNotificationType == HalConfigMsg.MsgTypeStaticPwStatus:
             self.logger.debug(
                 "send  MsgTypeStaticPwStatus %s to GCPP core",
                 msg.msg.HalNotificationPayLoad)
             self.rcp_notification_cb(
-                MsgTypeStaticPwStatus, msg.msg.HalNotificationPayLoad)
-        elif msg.msg.HalNotificationType == MsgTypeRpdCapabilities:
+                HalConfigMsg.MsgTypeStaticPwStatus, msg.msg.HalNotificationPayLoad)
+        elif msg.msg.HalNotificationType == HalConfigMsg.MsgTypeRpdCapabilities:
             self.notification_rpd_cap(msg.msg.HalNotificationPayLoad)
+        elif msg.msg.HalNotificationType == HalConfigMsg.MsgTypeUcdRefreshNtf:
+            self.logger.debug(
+                "send  MsgTypeUcdReFreshNtf to GCCP core")
+            self.rcp_notification_cb(
+                HalConfigMsg.MsgTypeUcdRefreshNtf, msg.msg.HalNotificationPayLoad)
         else:
             self.logger.warning(
                 "recv notification unrecognized: %s",
@@ -1377,3 +1441,13 @@ class RcpHalIpc(object):
             return int(digitStr)
 
         return -1
+
+    @staticmethod
+    def fill_requested_data(src_gpb, tar_gpb):
+        request_field_list = []
+        for desc, value in tar_gpb.ListFields():
+            request_field_list.append(desc.name)
+        tar_gpb.CopyFrom(src_gpb)
+        for desc, value in tar_gpb.ListFields():
+            if desc.name not in request_field_list:
+                tar_gpb.ClearField(desc.name)

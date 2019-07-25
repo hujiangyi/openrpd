@@ -22,7 +22,7 @@ import time
 
 from rpd.rcp.rcp_process import RcpProcess, RcpHalProcess
 from rpd.rcp.gcp import gcp_sessions
-from rpd.rcp.rcp_sessions import RCPMasterCapabilities, RCPMasterDescriptor
+from rpd.rcp.rcp_sessions import CcapCoreIdentification, RCPMasterDescriptor
 from rpd.rcp.rcp_master_orchestrator import RCPMasterOrchestrator
 from rpd.gpb.it_api_msgs_pb2 import t_ItApiRpdMessage
 from rpd.it_api.manager import RpdITManager
@@ -61,6 +61,7 @@ class TestItApiMgr(unittest.TestCase):
         self.t_client = ItApiClientOpenRPD()
         time.sleep(3)
         self._client_connect(None)
+
 
 if __name__ == "__main__":
     unittest.main()

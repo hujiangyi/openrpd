@@ -86,7 +86,7 @@ class MacsecAgent(agent.ProcessAgent):
         :return:
 
         """
-        if os.path.exists('/etc/supplicant.conf') == True:
+        if os.path.exists('/etc/supplicant.conf'):
             return
 
         mac = self.get_mac_address()
@@ -178,7 +178,7 @@ class MacsecAgent(agent.ProcessAgent):
             if ifname in self.status_8021x:
                 if ccap_id not in self.status_8021x[ifname]["ccap_core_id"]:
                     self.status_8021x[ifname]["ccap_core_id"].append(ccap_id)
-   	
+
             else:
                 # create a interface in self interfaces
                 self.status_8021x[ifname] = {
@@ -223,7 +223,7 @@ class MacsecAgent(agent.ProcessAgent):
 
         if event_action == protoDef.msg_event.STOP:
             interface_exist = ifname in self.status_8021x
-            if interface_exist == True:
+            if interface_exist:
                 if ccap_id in self.status_8021x[ifname]["ccap_core_id"]:
                     self.status_8021x[ifname]["ccap_core_id"].remove(ccap_id)
             else:
@@ -233,7 +233,7 @@ class MacsecAgent(agent.ProcessAgent):
                 return
 
             if len(self.status_8021x[ifname]["ccap_core_id"]) == 0 and \
-                            self.status_8021x[ifname]['status'] == self.DOWN:
+               self.status_8021x[ifname]['status'] == self.DOWN:
                 # Remove the interface from 802.1x
                 self.status_8021x.pop(ifname)
 

@@ -112,6 +112,7 @@ class RpdITManager(object):
         """Extends testing_cleanup() with a cleanup of IT API socket."""
         self.it_api_server.cleanup()
 
+
 if __name__ == "__main__":
     setup_logging("ItManager", filename="it_mgr.log")
     try:

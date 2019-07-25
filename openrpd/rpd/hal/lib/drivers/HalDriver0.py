@@ -21,7 +21,6 @@
     2. Connection Monitor / Reconnection
 """
 
-import logging
 import re
 import zmq
 import signal
@@ -37,7 +36,11 @@ import rpd.hal.src.HalConfigMsg as HalConfiMsg
 from rpd.gpb.cfg_pb2 import config
 from rpd.common.rpd_logging import AddLoggerToClass, setup_logging
 import l2tpv3.src.L2tpv3Hal_pb2 as L2tpv3Hal_pb2
-from rpd.common.utils import SysTools
+from rpd.common.utils import Convert, SysTools
+from rpd.gpb.RpdCapabilities_pb2 import t_RpdCapabilities
+from rpd.hal.src.HalConfigMsg import MsgTypeRpdCapabilities
+from rpd.common.rpdinfo_utils import RpdInfoUtils
+
 
 class HalDriverClientError(Exception):
 
@@ -146,7 +149,6 @@ class HalDriverClient(object):
                     self.recvNtf -= 1
 
             if not socks:
-                self.logger.debug("Got a timeout event")
                 continue
             for sock in socks:
                 if self.pushSock is not None and sock == self.pushSock.monitor:
@@ -229,19 +231,21 @@ class HalDriverClient(object):
         self.logger.debug("Send the register msg to Hal...")
         self.mgrConnection.send(registerMsg.Serialize())
 
+    def send(self, msg):
+        if self.pushSock:
+            self.pushSock.send(msg)
+        else:
+            self.logger.warning(" ".join([str(self.drvname), str(self.drvID), ":Cannot send the msg since the push socket is none"]))
+
     def sayHelloToHal(self):
         """Send a hello message to verify the agent path is correct.
 
         :return:
 
         """
-        self.logger.debug("Send a Hello message to Hal")
+        self.logger.debug(" ".join([str(self.drvname), str(self.drvID), ":Send a Hello message to Hal"]))
         helloMsg = HalMessage("HalClientHello", ClientID=self.drvID)
-        if self.pushSock:
-            self.pushSock.send(helloMsg.Serialize())
-        else:
-            self.logger.error(
-                "Cannot send the msg since the push socket is None.")
+        self.send(helloMsg.Serialize())
 
     def recvHelloRspMsgCb(self, hello):
         """Call back for Hello Message.
@@ -356,7 +360,7 @@ class HalDriverClient(object):
         notfication = HalMessage(
             "HalNotification", ClientID=self.drvID, HalNotificationType=notificationType,
             HalNotificationPayLoad=notificationPayload)
-        self.pushSock.send(notfication.Serialize())
+        self.send(notfication.Serialize())
 
     def sendCfgMsg(self, cfgMsgType, cfgMsgContent):
         """The configutaion response routine, the driver implementor should
@@ -388,175 +392,26 @@ class HalDriverClient(object):
         self.seqNum += 1
         return seq
 
-    def dummy_rpd_cap(self, cap):
-        cap.NumBdirPorts = 3
-        cap.NumDsRfPorts = 1
-        cap.NumUsRfPorts = 2
-        cap.NumTenGeNsPorts = 2
-        cap.NumOneGeNsPorts = 1
-        cap.NumDsScQamChannels = 158
-        cap.NumDsOfdmChannels = 1
-        cap.NumUsScQamChannels = 24
-        cap.NumUsOfdmaChannels = 4
-        cap.NumDsOob55d1Channels = 1
-        cap.NumUsOob55d1Channels = 3
-        cap.NumOob55d2Modules = 0
-        cap.NumUsOob55d2Demodulators = 0
-        cap.NumNdfChannels = 1
-        cap.NumNdrChannels = 1
-        cap.SupportsUdpEncap = 0
-        cap.NumDsPspFlows = 8
-        cap.NumUsPspFlows = 4
-
-        cap.RpdIdentification.VendorName = "Cisco"
-        cap.RpdIdentification.VendorId = 9
-        cap.RpdIdentification.ModelNumber = "0"
-        cap.RpdIdentification.DeviceMacAddress = SysTools.get_mac_address("eth0")
-        cap.RpdIdentification.CurrentSwVersion = "dummy_cur_sw_ver"
-        cap.RpdIdentification.BootRomVersion = "dummy_boot_rom_version"
-        cap.RpdIdentification.DeviceDescription = "RPD"
-        cap.RpdIdentification.DeviceAlias = "RPD"
-        cap.RpdIdentification.SerialNumber = "NA"
-        cap.RpdIdentification.UsBurstReceiverVendorId = 4413
-        cap.RpdIdentification.UsBurstReceiverModelNumber = "NA"
-        cap.RpdIdentification.UsBurstReceiverDriverVersion = "NA"
-        cap.RpdIdentification.UsBurstReceiverSerialNumber = "00000000"
-        cap.RpdIdentification.RpdRcpProtocolVersion = "1.0"
-        cap.RpdIdentification.RpdRcpSchemaVersion = "1.0.6"
-        cap.RpdIdentification.HwRevision = "NA"
-        cap.RpdIdentification.AssetId = "NA"
-        cap.RpdIdentification.VspSelector = ""
-
-        cap.PilotToneCapabilities.NumCwToneGens = 4
-        cap.PilotToneCapabilities.LowestCwToneFreq = 48000000
-        cap.PilotToneCapabilities.HighestCwToneFreq = 999000000
-        cap.PilotToneCapabilities.MaxPowerDedCwTone = 90
-        cap.PilotToneCapabilities.QamAsPilot = True
-        cap.PilotToneCapabilities.MinPowerDedCwTone = -330
-        cap.PilotToneCapabilities.MaxPowerQamCwTone = 90
-        cap.PilotToneCapabilities.MinPowerQamCwTone = -30
-
-        cap.DeviceLocation.DeviceLocationDescription = "NA"
-        cap.DeviceLocation.GeoLocationLatitude = "+000000.0"
-        cap.DeviceLocation.GeoLocationLongitude = "+0000000.0"
-
-        cap.NumAsyncVideoChannels = 160
-        cap.SupportsFlowTags = True
-        cap.SupportsFrequencyTilt = True
-        cap.TiltRange = 0
-        cap.BufferDepthMonitorAlertSupport = 0
-        cap.BufferDepthConfigurationSupport = 0
-        cap.RpdUcdProcessingTime = 50
-        cap.RpdUcdChangeNullGrantTime = 50
-        cap.SupportMultiSectionTimingMerReporting = 0
-
-        cap.RdtiCapabilities.NumPtpPortsPerEnetPort = 11
-
-        cap.MaxDsPspSegCount = 10
-        cap.DirectDsFlowQueueMapping = 1
-        cap.DsSchedulerPhbIdList = "0 10 12 14 18 20 22 26 28 30 34 36 38 46"
-        cap.RpdPendingEvRepQueueSize = 1000
-        cap.RpdLocalEventLogSize = 1000
-        cap.SupportsOpticalNodeRf = False
-        cap.MaxDsFrequency = 1218000000
-        cap.MinDsFrequency = 5700000
-        cap.MaxBasePower = 0
-        cap.MinTiltValue = 0
-        cap.MinPowerAdjustScQam = 0
-        cap.MaxPowerAdjustScQam = 0
-        cap.MinPowerAdjustOfdm = 0
-        cap.MaxPowerAdjustOfdm = 0
-
-    def save_rsp_db(self, rsp, payload):
-        try:
-            self.logger.debug("msg content:%s", rsp)
-            with open("/tmp/fakedriver-rcp.db", "a+w") as db:
-                db.write(payload)
-                db.close()
-        except Exception as e:
-            self.logger.error("open file fakedriver-rcp.db failure")
-
-    def sendCfgRspMsg(self, cfg):
+    def sendCfgRspMsg(self, cfg, rsp=None):
         """The configuration response routine, the driver implementor should
         fill sth into this function.
 
         :param cfg: The original configuration message
+        :param rsp: respond
         :return:
 
         """
         cfgMsg = cfg.msg
-        l2tpcfgSessionmsgType = (HalConfiMsg.MsgTypeL2tpv3SessionReqDsOfdm,
-                          HalConfiMsg.MsgTypeL2tpv3SessionReqDsOfdmPlc,
-                          HalConfiMsg.MsgTypeL2tpv3SessionReqDsScqam,
-                          HalConfiMsg.MsgTypeL2tpv3SessionReqUsAtdma,
-                          HalConfiMsg.MsgTypeL2tpv3SessionReqUsOfdma,
-                          HalConfiMsg.MsgTypeL2tpv3SessionReqScte551Fwd,
-                          HalConfiMsg.MsgTypeL2tpv3SessionReqScte551Ret,
-                          HalConfiMsg.MsgTypeL2tpv3SessionReqScte552Fwd,
-                          HalConfiMsg.MsgTypeL2tpv3SessionReqScte552Ret,
-                          HalConfiMsg.MsgTypeL2tpv3SessionReqNdf,
-                          HalConfiMsg.MsgTypeL2tpv3SessionReqNdr)
-        if cfgMsg.CfgMsgType in l2tpcfgSessionmsgType:
-            rsp = L2tpv3Hal_pb2.t_l2tpSessionRsp()
-            req = L2tpv3Hal_pb2.t_l2tpSessionReq()
-            req.ParseFromString(cfgMsg.CfgMsgPayload)
-            # fill session_selector
-            rsp.session_selector.local_session_id = req.session_selector.local_session_id
-            rsp.session_selector.remote_session_id = req.session_selector.remote_session_id
-            rsp.session_selector.local_ip = req.session_selector.local_ip
-            rsp.session_selector.remote_ip = req.session_selector.remote_ip
-            rsp.session_selector.lcce_id = req.session_selector.lcce_id
-            rsp.result = True
-            rsp.req_data.CopyFrom(req.req_data)
-            payload = rsp.SerializeToString()
 
-            try:
-                self.logger.debug("msg content:%s", req)
-                with open("/tmp/fakedriver-l2tp.db", "a+w") as db:
-                    db.write(cfgMsg.CfgMsgPayload)
-                    db.close()
-            except Exception as e:
-                self.logger.error("open file fakedriver-l2tp.db failure")
+        if rsp == None:
+            rsp = {"Status": HalCommon_pb2.SUCCESS,
+                   "ErrorDescription": ""}
 
-        elif cfgMsg.CfgMsgType == HalConfiMsg.MsgTypePtpStatusGet:
-            payload = "ALIGNED"
-        elif cfgMsg.CfgMsgType == HalConfiMsg.MsgTypeL2tpv3LcceIdAssignment:
-            rsp = L2tpv3Hal_pb2.t_l2tpLcceAssignmentRsp()
-            req = L2tpv3Hal_pb2.t_l2tpLcceAssignmentReq()
-            req.ParseFromString(cfgMsg.CfgMsgPayload)
-            # fill lcce info
-            rsp.lcce_info.local_mac = req.lcce_info.local_mac
-            rsp.lcce_info.remote_mac = req.lcce_info.remote_mac
-            rsp.lcce_info.local_ip = req.lcce_info.local_ip
-            rsp.lcce_info.remote_ip = req.lcce_info.remote_ip
-            rsp.lcce_info.mtu = req.lcce_info.mtu
-            rsp.lcce_id = req.lcce_id
-            rsp.result = True
-            payload = rsp.SerializeToString()
-        elif cfgMsg.CfgMsgType == HalConfiMsg.MsgTypeRpdCapabilities:
-            rsp = t_RcpMessage()
-            rsp.ParseFromString(cfgMsg.CfgMsgPayload)
-            self.dummy_rpd_cap(rsp.RpdDataMessage.RpdData.RpdCapabilities)
-            rsp.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
-            payload = rsp.SerializeToString()
-            self.save_rsp_db(rsp, cfgMsg.CfgMsgPayload)
-        else:
-            rsp = t_RcpMessage()
-            rsp.ParseFromString(cfgMsg.CfgMsgPayload)
-            rsp.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
-            payload = rsp.SerializeToString()
-            self.save_rsp_db(rsp, cfgMsg.CfgMsgPayload)
-
-        msg = HalMessage(
-            "HalConfigRsp", SrcClientID=cfgMsg.SrcClientID, SeqNum=cfgMsg.SeqNum,
-            Rsp={
-                "Status": HalCommon_pb2.SUCCESS,
-                "ErrorDescription": ""
-            },
-            CfgMsgType=cfgMsg.CfgMsgType,
-            CfgMsgPayload=payload)
-        # time.sleep(15)
-        if self.pushSock:
+        msg = HalMessage("HalConfigRsp", SrcClientID=cfgMsg.SrcClientID,
+                         SeqNum=cfgMsg.SeqNum, Rsp=rsp,
+                         CfgMsgType=cfgMsg.CfgMsgType,
+                         CfgMsgPayload=cfgMsg.CfgMsgPayload)
+        if None is not self.pushSock:
             self.pushSock.send(msg.Serialize())
 
     def recvRegisterMsgCb(self, cfg):
@@ -628,8 +483,275 @@ class HalDriverClient(object):
             self.logger.error(
                 "Cannot send the msg since the push socket is NULL")
 
+
+class HalDriver0(HalDriverClient):
+    __metaclass__ = AddLoggerToClass
+
+    def __init__(self, drvName, drvDesc, drvVer, supportedMsgType,
+                 supportedNotificationMsgs, interestedNotification=None):
+        super(HalDriver0, self).__init__(drvName, drvDesc, drvVer, supportedMsgType,
+                                         supportedNotificationMsgs, interestedNotification)
+        self.interface_dict = {
+            'lo': 1,
+            'eth0': 2,
+        }
+
+    def sendCfgRspMsg(self, cfg, rsp=None):
+        """The configuration response routine, the driver implementor should
+        fill sth into this function.
+
+        :param cfg: The original configuration message
+        :param rsp: Reponse of the cfgmsg
+        :return:
+
+        """
+        cfgMsg = cfg.msg
+        hal_rsp = {
+            "Status": HalCommon_pb2.SUCCESS,
+            "ErrorDescription": ""
+        }
+        l2tpcfgSessionmsgType = (HalConfiMsg.MsgTypeL2tpv3SessionReqDsOfdm,
+                                 HalConfiMsg.MsgTypeL2tpv3SessionReqDsOfdmPlc,
+                                 HalConfiMsg.MsgTypeL2tpv3SessionReqDsScqam,
+                                 HalConfiMsg.MsgTypeL2tpv3SessionReqUsAtdma,
+                                 HalConfiMsg.MsgTypeL2tpv3SessionReqUsOfdma,
+                                 HalConfiMsg.MsgTypeL2tpv3SessionReqScte551Fwd,
+                                 HalConfiMsg.MsgTypeL2tpv3SessionReqScte551Ret,
+                                 HalConfiMsg.MsgTypeL2tpv3SessionReqScte552Fwd,
+                                 HalConfiMsg.MsgTypeL2tpv3SessionReqScte552Ret,
+                                 HalConfiMsg.MsgTypeL2tpv3SessionReqNdf,
+                                 HalConfiMsg.MsgTypeL2tpv3SessionReqNdr)
+        if cfgMsg.CfgMsgType in l2tpcfgSessionmsgType:
+            rsp = L2tpv3Hal_pb2.t_l2tpSessionRsp()
+            req = L2tpv3Hal_pb2.t_l2tpSessionReq()
+            req.ParseFromString(cfgMsg.CfgMsgPayload)
+            # fill session_selector
+            rsp.session_selector.local_session_id = req.session_selector.local_session_id
+            rsp.session_selector.remote_session_id = req.session_selector.remote_session_id
+            rsp.session_selector.local_ip = req.session_selector.local_ip
+            rsp.session_selector.remote_ip = req.session_selector.remote_ip
+            rsp.session_selector.lcce_id = req.session_selector.lcce_id
+            rsp.result = True
+            rsp.req_data.CopyFrom(req.req_data)
+            payload = rsp.SerializeToString()
+
+            try:
+                self.logger.debug("msg content:%s", req)
+                with open("/tmp/fakedriver-l2tp.db", "a+w") as db:
+                    db.write(cfgMsg.CfgMsgPayload)
+                    db.close()
+            except Exception:
+                self.logger.error("open file fakedriver-l2tp.db failure")
+
+        elif cfgMsg.CfgMsgType == HalConfiMsg.MsgTypePtpStatusGet:
+            payload = "ALIGNED"
+        elif cfgMsg.CfgMsgType == HalConfiMsg.MsgTypeL2tpv3LcceIdAssignment:
+            rsp = L2tpv3Hal_pb2.t_l2tpLcceAssignmentRsp()
+            req = L2tpv3Hal_pb2.t_l2tpLcceAssignmentReq()
+            req.ParseFromString(cfgMsg.CfgMsgPayload)
+            # fill lcce info
+            rsp.lcce_info.local_mac = req.lcce_info.local_mac
+            rsp.lcce_info.remote_mac = req.lcce_info.remote_mac
+            rsp.lcce_info.local_ip = req.lcce_info.local_ip
+            rsp.lcce_info.remote_ip = req.lcce_info.remote_ip
+            rsp.lcce_info.mtu = req.lcce_info.mtu
+            rsp.lcce_id = req.lcce_id
+            rsp.result = True
+            payload = rsp.SerializeToString()
+        elif cfgMsg.CfgMsgType == HalConfiMsg.MsgTypeRpdCapabilities:
+            rsp = t_RcpMessage()
+            rsp.ParseFromString(cfgMsg.CfgMsgPayload)
+            self.dummy_rpd_cap(rsp.RpdDataMessage.RpdData.RpdCapabilities)
+            rsp.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
+            payload = rsp.SerializeToString()
+            self.save_rsp_db(rsp, cfgMsg.CfgMsgPayload)
+        elif cfgMsg.CfgMsgType == HalConfiMsg.MsgTypeRpdInfo:
+            rsp = t_RcpMessage()
+            rsp.ParseFromString(cfgMsg.CfgMsgPayload)
+            hal_rsp = self.dummy_rpd_info(rsp)
+            rsp.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
+            payload = rsp.SerializeToString()
+            self.save_rsp_db(rsp, cfgMsg.CfgMsgPayload)
+        else:
+            rsp = t_RcpMessage()
+            rsp.ParseFromString(cfgMsg.CfgMsgPayload)
+            rsp.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
+            payload = rsp.SerializeToString()
+            self.save_rsp_db(rsp, cfgMsg.CfgMsgPayload)
+
+        msg = HalMessage(
+            "HalConfigRsp", SrcClientID=cfgMsg.SrcClientID, SeqNum=cfgMsg.SeqNum,
+            Rsp=hal_rsp,
+            CfgMsgType=cfgMsg.CfgMsgType,
+            CfgMsgPayload=payload)
+        # time.sleep(15)
+        self.send(msg.Serialize())
+
+    def notifyRpdCapabilites(self):
+        """
+        Notify MsgTypeRpdCapabilities to interrested Module Client.
+        """
+        rpd_cap = t_RpdCapabilities()
+        self.dummy_rpd_cap(rpd_cap)
+        self.sendNotificationMsg(HalConfiMsg.MsgTypeRpdCapabilities, rpd_cap.SerializeToString())
+        self.logger.debug("notifyRpdCapabilities to interrested module client")
+
+    def dummy_rpd_cap(self, cap):
+        cap.NumBdirPorts = 3
+        cap.NumDsRfPorts = 1
+        cap.NumUsRfPorts = 2
+        cap.NumTenGeNsPorts = 2
+        cap.NumOneGeNsPorts = 1
+        cap.NumDsScQamChannels = 158
+        cap.NumDsOfdmChannels = 1
+        cap.NumUsScQamChannels = 12
+        cap.NumUsOfdmaChannels = 4
+        cap.NumDsOob55d1Channels = 1
+        cap.NumUsOob55d1Channels = 3
+        cap.NumOob55d2Modules = 0
+        cap.NumUsOob55d2Demodulators = 0
+        cap.NumNdfChannels = 1
+        cap.NumNdrChannels = 1
+        cap.SupportsUdpEncap = 0
+        cap.NumDsPspFlows = 8
+        cap.NumUsPspFlows = 4
+
+        cap.RpdIdentification.VendorName = "Cisco"
+        cap.RpdIdentification.VendorId = 9
+        cap.RpdIdentification.ModelNumber = "0"
+        cap.RpdIdentification.DeviceMacAddress = SysTools.get_mac_address("eth0")
+        cap.RpdIdentification.CurrentSwVersion = "dummy_cur_sw_ver"
+        cap.RpdIdentification.BootRomVersion = "dummy_boot_rom_version"
+        cap.RpdIdentification.DeviceDescription = "RPD"
+        cap.RpdIdentification.DeviceAlias = "RPD"
+        cap.RpdIdentification.SerialNumber = "NA"
+        cap.RpdIdentification.UsBurstReceiverVendorId = 4413
+        cap.RpdIdentification.UsBurstReceiverModelNumber = "NA"
+        cap.RpdIdentification.UsBurstReceiverDriverVersion = "NA"
+        cap.RpdIdentification.UsBurstReceiverSerialNumber = "00000000"
+        cap.RpdIdentification.RpdRcpProtocolVersion = "1.0"
+        cap.RpdIdentification.RpdRcpSchemaVersion = "1.0.8"
+        cap.RpdIdentification.HwRevision = "NA"
+        cap.RpdIdentification.AssetId = "NA"
+        cap.RpdIdentification.VspSelector = ""
+        cap.RpdIdentification.CurrentSwImageLastUpdate = Convert.pack_timestamp_to_string(0)
+        cap.RpdIdentification.CurrentSwImageName = ""
+        cap.RpdIdentification.CurrentSwImageServer = "0.0.0.0"
+
+        cap.PilotToneCapabilities.NumCwToneGens = 4
+        cap.PilotToneCapabilities.LowestCwToneFreq = 50000000
+        cap.PilotToneCapabilities.HighestCwToneFreq = 1218000000
+        cap.PilotToneCapabilities.MaxPowerDedCwTone = 100
+        cap.PilotToneCapabilities.QamAsPilot = True
+        cap.PilotToneCapabilities.MinPowerDedCwTone = -330
+        cap.PilotToneCapabilities.MaxPowerQamCwTone = 90
+        cap.PilotToneCapabilities.MinPowerQamCwTone = -30
+
+        cap.DeviceLocation.DeviceLocationDescription = "NA"
+        cap.DeviceLocation.GeoLocationLatitude = "+000000.0"
+        cap.DeviceLocation.GeoLocationLongitude = "+0000000.0"
+
+        cap.NumAsyncVideoChannels = 160
+        cap.SupportsFlowTags = True
+        cap.SupportsFrequencyTilt = True
+        cap.TiltRange = 0
+        cap.BufferDepthMonitorAlertSupport = 0
+        cap.BufferDepthConfigurationSupport = 0
+        cap.RpdUcdProcessingTime = 50
+        cap.RpdUcdChangeNullGrantTime = 50
+        cap.SupportMultiSectionTimingMerReporting = 0
+
+        cap.RdtiCapabilities.NumPtpPortsPerEnetPort = 11
+
+        cap.MaxDsPspSegCount = 10
+        cap.DirectDsFlowQueueMapping = 1
+        cap.DsSchedulerPhbIdList = "0 10 12 14 18 20 22 26 28 30 34 36 38 46"
+        cap.RpdPendingEvRepQueueSize = 1000
+        cap.RpdLocalEventLogSize = 1000
+        cap.SupportsOpticalNodeRf = False
+        cap.MaxDsFrequency = 1218000000
+        cap.MinDsFrequency = 5700000
+        cap.MaxBasePower = 0
+        cap.MinTiltValue = 0
+        cap.MinPowerAdjustScQam = 0
+        cap.MaxPowerAdjustScQam = 0
+        cap.MinPowerAdjustOfdm = 0
+        cap.MaxPowerAdjustOfdm = 0
+        cap.OfdmConfigurationCapabilities.RequiresOfdmaImDurationConfig = True
+
+    def set_enetif(self, enetif):
+        enetif.ifIndex = self.interface_dict['eth0']
+        enetif.ifName = "eth0"
+        enetif.ifAlias = "eth0"
+        enetif.ifPhysAddress = SysTools.get_mac_address("eth0")
+        enetif.ifType = 6
+        enetif.ifMTU = 1500
+        enetif.ifAdminStatus = 1
+        enetif.ifOperStatus = 1
+
+    def set_rcp_ipaddr(self, ipaddr_info_list, ipset, rcp_ipaddr):
+        index = 0
+        for ip in ipset:
+            for ipaddr in ipaddr_info_list:
+                if ip == ipaddr.get('ip'):
+                    interface = ipaddr.get('interface', 0)
+                    ipaddr['interface'] = self.interface_dict[interface]
+                    if index != 0:
+                        rcp_ipaddr.add()
+                    RpdInfoUtils.set_ipaddr_info(ipaddr, rcp_ipaddr[index])
+                    index = index + 1
+
+    def dummy_rpd_info(self, rsp):
+        rpdinfo = rsp.RpdDataMessage.RpdData.RpdInfo
+        field_included = False
+        if len(rpdinfo.EnetIfTable) > 0:
+            field_included = True
+            rcp_enetif = rpdinfo.EnetIfTable
+            for enetif in rcp_enetif:
+                if (not enetif.HasField("ifIndex")) or enetif.ifIndex == self.interface_dict['eth0']:
+                    self.set_enetif(enetif)
+                    break
+        if len(rpdinfo.IpAddress) > 0:
+            field_included = True
+            rcp_ipaddr = rpdinfo.IpAddress
+            ipaddr_info_list = RpdInfoUtils.get_ipaddr_info()
+            for ipaddr in rcp_ipaddr:
+                ipset = set()
+                if ipaddr.HasField("AddrType") and ipaddr.HasField("IpAddress"):
+                    ipset.add(ipaddr.IpAddress)
+                elif (not ipaddr.HasField("AddrType")) and (not ipaddr.HasField("IpAddress")):
+                    for ipaddr_info in ipaddr_info_list:
+                        ipset.add(ipaddr_info.get('ip'))
+                    break
+                else:
+                    rsp.RcpDataResult = t_RcpMessage.RCP_RESULT_GENERAL_ERROR
+                    self.logger.warn("input does not meet the requirements")
+                    break
+            self.set_rcp_ipaddr(ipaddr_info_list, ipset, rcp_ipaddr)
+
+        if not field_included:
+            return {
+                "Status": HalCommon_pb2.SUCCESS_IGNORE_RESULT,
+                "ErrorDescription": "no interested field included"
+            }
+        return {
+            "Status": HalCommon_pb2.SUCCESS,
+            "ErrorDescription": ""
+        }
+
+    def save_rsp_db(self, rsp, payload):
+        try:
+            self.logger.debug("msg content:%s", rsp)
+            with open("/tmp/fakedriver-rcp.db", "a+w") as db:
+                db.write(payload)
+                db.close()
+        except Exception:
+            self.logger.error("open file fakedriver-rcp.db failure")
+
+
 def handle_interrrupt_signal(signum, frame):
     sys.exit(0)
+
 
 # register the ctrl C to handle this signal
 if __name__ == "__main__":
@@ -637,7 +759,7 @@ if __name__ == "__main__":
     # setup the logging
     setup_logging('HAL', filename="hal_driver.log")
     signal.signal(signal.SIGINT, handle_interrrupt_signal)
-    driver = HalDriverClient(
+    driver = HalDriver0(
         "driver0", "This is fake Driver for all message", "1.0.0",
         range(10000), (2, 3, 4),
         (1, 2, 100, 102))

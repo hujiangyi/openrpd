@@ -21,14 +21,9 @@ import unittest
 import subprocess
 from zmq.utils.monitor import recv_monitor_message
 from rpd.hal.src.msg import HalCommon_pb2
-from rpd.hal.src.HalGlobal import HalGlobal
-from rpd.hal.src.db.HalDatabase import HalDatabase
-from rpd.hal.src.HalDispatcher import HalDispatcher
-from rpd.hal.src.HalAgentClient import HalAgentClient
 from rpd.hal.src.msg.HalMessage import HalMessage
 from rpd.hal.src.transport.HalTransport import HalPoller
-from rpd.hal.src.HalStats import HalGlobalStats
-from rpd.hal.lib.drivers.HalDriver0 import HalDriverClient
+from rpd.hal.lib.drivers.HalDriver0 import HalDriver0
 from rpd.hal.simulator.start_hal import start_hal
 from rpd.common.rpd_logging import setup_logging
 
@@ -83,16 +78,23 @@ def setup_db():
     hal_process = start_hal(hal_cfg_file=hal_conf_file_name)
 
 
-class HalClientTest(HalDriverClient):
+class HalClientTest(HalDriver0):
 
     def connect_to_hal(self):
         self.connectionSetup()
         self.register(self.drvID)
         i = 0
-        while i < 5:
+        max_times = 10
+        expected_msgs = ["HalClientInterestNotificationCfgRsp",
+                         "HalClientHelloRsp"]
+        while expected_msgs != []:
             socks = self.poller.poll(1000)
             print socks
             i += 1
+            if i > max_times:
+                self.logger.error("break while due to reach %d times" % max_times)
+                break
+
             if not socks:
                 continue
             for sock in socks:
@@ -112,6 +114,8 @@ class HalClientTest(HalDriverClient):
                         msg = HalMessage.DeSerialize(bin)
                         print msg.msg
                         self.logger.debug("Got a zmq msg:%s" % msg.msg)
+                        if msg.msg.MsgType in expected_msgs:
+                            expected_msgs.remove(msg.msg.MsgType)
                         if msg.type in self.HalMsgsHandler:
                             handler = self.HalMsgsHandler[msg.type]
                             handler(msg)

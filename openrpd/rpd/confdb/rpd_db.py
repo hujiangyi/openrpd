@@ -40,6 +40,7 @@ class DBKeyError(KeyError):
 class DBSerializer(json.JSONEncoder):
     """JSON encoder/decoder extensions to allow serialization of GPB
     classes."""
+
     def default(self, obj):
         # All classes should be instances of GPB message
         if isinstance(obj, Message):

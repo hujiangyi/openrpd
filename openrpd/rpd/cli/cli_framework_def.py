@@ -54,7 +54,7 @@ DEF_INTRO = '\n\n        Welcome to R-PHY\n\n'
 CONF_INDENT = 2
 CLI_MODULE_NAME = 'CLI'
 
-#ipc config
+# ipc config
 PROVISION_IPC = 1
 IKEV2_IPC = 2
 L2TP_IPC = 3

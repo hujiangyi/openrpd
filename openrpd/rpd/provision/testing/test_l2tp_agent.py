@@ -16,26 +16,35 @@
 import unittest
 import os
 import zmq
-import rpd.provision.proto.process_agent_pb2 as pb2
-from rpd.provision.process_agent.agent.agent import ProcessAgent
+import time
+import socket
 import subprocess
 import signal
+import rpd.provision.proto.process_agent_pb2 as pb2
+from rpd.provision.process_agent.agent.agent import ProcessAgent
+from rpd.provision.process_agent.l2tp.l2tp_agent import L2tpAgent
+from rpd.l2tp.l2tpv3.testing.test_L2tpv3GcppSession import StaticL2tpProvision
+from rpd.confdb.testing.test_rpd_redis_db import setup_test_redis, stop_test_redis
+import rpd.gpb.StaticPwConfig_pb2 as StaticPwConfig_pb2
+import rpd.l2tp.l2tpv3.src.L2tpv3GcppConnection as L2tpv3GcppSession
 
 
 class TestL2tpAgent(unittest.TestCase):
 
     def setUp(self):
         # try to find the l2tp agent
+        setup_test_redis()
         currentPath = os.path.dirname(os.path.realpath(__file__))
         dirs = currentPath.split("/")
-        rpd_index = dirs.index("testing")-2 
+        rpd_index = dirs.index("testing") - 2
         self.rootpath = "/".join(dirs[:rpd_index])
-        self.pid = subprocess.Popen("coverage run --parallel-mode --rcfile="+self.rootpath+"/.coverage.rc "
-                                    + "/".join(dirs[:rpd_index]) +
+        self.pid = subprocess.Popen("coverage run --parallel-mode --rcfile=" + self.rootpath + "/.coverage.rc " +
+                                    "/".join(dirs[:rpd_index]) +
                                     "/rpd/provision/process_agent/l2tp/l2tp_agent.py -s",
                                     executable='bash', shell=True)
 
     def tearDown(self):
+        stop_test_redis()
         self.pid.send_signal(signal.SIGINT)
         self.pid.wait()
         self.pid = None
@@ -44,8 +53,8 @@ class TestL2tpAgent(unittest.TestCase):
 
     def start_mastersim(self):
         # try to find the l2tp agent
-        self.mastersim_pid = subprocess.Popen("coverage run --parallel-mode --rcfile="+self.rootpath+"/.coverage.rc "
-                                              + self.rootpath +
+        self.mastersim_pid = subprocess.Popen("coverage run --parallel-mode --rcfile=" + self.rootpath +
+                                              "/.coverage.rc " + self.rootpath +
                                               "/rpd/l2tp/l2tpv3/simulator/L2tpv3MasterSim.py ipv4",
                                               executable='bash',
                                               shell=True)
@@ -67,14 +76,14 @@ class TestL2tpAgent(unittest.TestCase):
         sock_api.connect(ProcessAgent.SockPathMapping[ProcessAgent.AGENTTYPE_L2TP]['api'])
 
         sock_pull = context.socket(zmq.PULL)
-        sock_pull.bind("ipc:///tmp/test_l2tp_agent.scok")
+        sock_pull.bind("ipc:///tmp/test_l2tp_agent.sock")
 
         # test the successfully register
         event_request = pb2.api_request()
         reg = pb2.msg_manager_register()
-        reg.id = "test_mgr" # use a fake ccap id
+        reg.id = "test_mgr"  # use a fake ccap id
         reg.action = pb2.msg_manager_register.REG
-        reg.path_info = "ipc:///tmp/test_l2tp_agent.scok"
+        reg.path_info = "ipc:///tmp/test_l2tp_agent.sock"
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()
 
@@ -113,7 +122,6 @@ class TestL2tpAgent(unittest.TestCase):
         event_request.action.action = pb2.msg_event.START
 
         sock_push.send(event_request.SerializeToString())
-
         self.start_mastersim()
         # we want to receive 2 notifications, 1 for check status initial, 2 for the status update
         i = 2
@@ -123,7 +131,6 @@ class TestL2tpAgent(unittest.TestCase):
             rsp.ParseFromString(data)
             print rsp
             i -= 1
-
         # test stop
         event_request = pb2.msg_event_request()
         event_request.action.id = "test_ccap_core"
@@ -161,7 +168,7 @@ class TestL2tpAgent(unittest.TestCase):
         reg = pb2.msg_manager_register()
         reg.id = "test_mgr"  # use a fake ccap id
         reg.action = pb2.msg_manager_register.UNREG
-        reg.path_info = "ipc:///tmp/test_l2tp_agent.scok"
+        reg.path_info = "ipc:///tmp/test_l2tp_agent.sock"
         event_request.mgr_reg.CopyFrom(reg)
         data = event_request.SerializeToString()
 
@@ -173,6 +180,41 @@ class TestL2tpAgent(unittest.TestCase):
         print reg_rsp
 
         self.assertEqual(reg_rsp.reg_rsp.status, reg_rsp.reg_rsp.OK)
+
+    def test_l2tp_arp_learn(self):
+        staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
+        self.fwdCfg = StaticL2tpProvision()
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 12, 0x80000001, 4,
+                                          32768, True)
+        self.fwdCfg.add_usStaticSession(staticPwCfg, 12, False)
+        session1 = L2tpv3GcppSession.StaticL2tpSession(12)
+        session1.updateRetstaticPseudowire(staticPwCfg)
+        session1.updateComStaticPseudowire(staticPwCfg)
+        session1.DestAddress = "127.0.0.1"
+        session1.write()
+
+        staticPwCfg = StaticPwConfig_pb2.t_StaticPwConfig()
+        self.fwdCfg.add_commStaticSession(staticPwCfg, 12, 0x80000002, 5,
+                                          32768, True)
+        self.fwdCfg.add_usStaticSession(staticPwCfg, 12, False)
+        session2 = L2tpv3GcppSession.StaticL2tpSession(12)
+        session2.updateRetstaticPseudowire(staticPwCfg)
+        session2.updateComStaticPseudowire(staticPwCfg)
+        session2.DestAddress = "127.0.0.2"
+        session2.write()
+
+        try:
+            os.system("reset arp")
+            time.sleep(15)
+            with open("/proc/net/arp") as f:
+                arp_table = f.read()
+                table = map(lambda x: x.split(), arp_table.split("\n"))
+                self.assertTrue(table)
+        except Exception as ex:
+            print str(ex)
+        session1.delete()
+        session2.delete()
+
 
 if __name__ == "__main__":
     unittest.main()

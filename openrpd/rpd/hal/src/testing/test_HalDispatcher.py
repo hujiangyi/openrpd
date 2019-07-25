@@ -35,7 +35,7 @@ from rpd.hal.src.HalAgent import HalAgent
 timeStampSock = "/tmp/testHalDispatcherRedis" + \
     time.strftime("%d%H%M%S", time.localtime()) + ".sock"
 
-INVALID_MSGTYPE=20600
+INVALID_MSGTYPE = 20600
 # Setup DB
 
 
@@ -243,11 +243,10 @@ class testHalDispatcher(unittest.TestCase):
         # send to itself
         if (1024 in HalGlobal.gMsgTypeClientMapping
             and isinstance(HalGlobal.gMsgTypeClientMapping[1024], list)
-            and len(HalGlobal.gMsgTypeClientMapping[1024]) >= 1):
+                and len(HalGlobal.gMsgTypeClientMapping[1024]) >= 1):
             tmpagent = HalGlobal.gMsgTypeClientMapping[1024][0]["agent"]
             self.halDispatcher.dispatchCfgMessage(
                 sendAgent=tmpagent, cfg=cfgMsgInFirst)
-
 
     def test_dispatchCfgRspMessage(self):
         """Dispatch the message from the driver clientID whether in
@@ -300,16 +299,16 @@ class testHalDispatcher(unittest.TestCase):
 
         cfgMsg2 = HalMessage("HalConfigRsp",
 
-                            # client is in HalGlobal.gClientDB(as:
-                            # ClientID=self.clientID)
-                            SrcClientID=self.clientID,
-                            SeqNum=1004,
-                            Rsp={
-                                "Status": HalCommon_pb2.FAILED,
-                                "ErrorDescription": ""
-                            },
-                            CfgMsgType=1025,
-                            CfgMsgPayload="hello")
+                             # client is in HalGlobal.gClientDB(as:
+                             # ClientID=self.clientID)
+                             SrcClientID=self.clientID,
+                             SeqNum=1004,
+                             Rsp={
+                                 "Status": HalCommon_pb2.FAILED,
+                                 "ErrorDescription": ""
+                             },
+                             CfgMsgType=1025,
+                             CfgMsgPayload="hello")
 
         # Test clientID in HalGlobal.gClientDB
         self.halDispatcher.dispatchCfgRspMessage(sendAgent, cfgMsg)
@@ -412,6 +411,7 @@ class testHalDispatcher(unittest.TestCase):
 
         # sendAgent.stats.NrDroppedMsgs != 1
         self.assertNotEqual(sendAgent.stats.NrDroppedMsgs, 1)
+
 
 if __name__ == '__main__':
     unittest.main()

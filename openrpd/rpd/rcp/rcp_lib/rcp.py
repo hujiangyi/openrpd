@@ -24,25 +24,25 @@ from rpd.common.rpd_logging import AddLoggerToClass
 from rpd.common.utils import Convert
 from rpd.gpb import rcp_pb2
 from rpd.rcp.gcp.gcp_lib import gcp_object, gcp_packet, gcp_msg_def
-from rpd.rcp.gcp.gcp_lib.gcp_tlv_def import DataDescription, EnumConstraint
+from rpd.rcp.gcp.gcp_lib.gcp_tlv_def import DataDescription
 from rpd.rcp.rcp_lib import rcp_tlv_def
 from rpd.rcp.gcp.gcp_lib.gcp_object import GCPObject
 
 
 RCP_MSG_HDR_LEN = gcp_packet.TLVData.TLV_type_len + \
-                  rcp_tlv_def.RCP_TLV_LENGTH_LEN
+    rcp_tlv_def.RCP_TLV_LENGTH_LEN
 RCP_SEQUENCE_HDR_LEN = gcp_packet.TLVData.TLV_type_len + \
-                       rcp_tlv_def.RCP_TLV_LENGTH_LEN
+    rcp_tlv_def.RCP_TLV_LENGTH_LEN
 RCP_SEQUENCE_NUMBER_LEN = gcp_packet.TLVData.TLV_type_len + \
-                          rcp_tlv_def.RCP_TLV_LENGTH_LEN + \
-                          rcp_tlv_def.C_SequenceNumber_10.get_tlv_length_val()
+    rcp_tlv_def.RCP_TLV_LENGTH_LEN + \
+    rcp_tlv_def.C_SequenceNumber_10.get_tlv_length_val()
 RCP_OPERATION_LEN = gcp_packet.TLVData.TLV_type_len + \
-                    rcp_tlv_def.RCP_TLV_LENGTH_LEN + \
-                    rcp_tlv_def.C_Operation_11.get_tlv_length_val()
+    rcp_tlv_def.RCP_TLV_LENGTH_LEN + \
+    rcp_tlv_def.C_Operation_11.get_tlv_length_val()
 
 RCP_SEQUENCE_MIN_LEN = RCP_SEQUENCE_HDR_LEN + \
-                       RCP_SEQUENCE_NUMBER_LEN + \
-                       RCP_OPERATION_LEN
+    RCP_SEQUENCE_NUMBER_LEN + \
+    RCP_OPERATION_LEN
 
 # The first TLV has to be RCP message with sequence and operation
 RCP_MSG_MIN_LEN = RCP_MSG_HDR_LEN + RCP_SEQUENCE_MIN_LEN
@@ -84,6 +84,7 @@ class RCPSequenceDecodeError(RCPDecodeError):
 
 
 class RCPSequence(gcp_packet.TLVData):
+
     """Implements RCP sequences and their encoding and decoding methods."""
     __metaclass__ = AddLoggerToClass
 
@@ -154,7 +155,7 @@ class RCPSequence(gcp_packet.TLVData):
     def _decode_process(self):
         """Implements decoding of RCP sequences.
 
-	:raises RCPSequenceDecodeError:
+        :raises RCPSequenceDecodeError:
 
         """
         if self.get_max_len() < RCP_SEQUENCE_MIN_LEN:
@@ -274,6 +275,12 @@ class RCPSequence(gcp_packet.TLVData):
         return gcp_object.GCPObject.DECODE_DONE
 
     def _fast_decode(self, parent_fmt, parent_gpb, offset, length, intent, tl_format="!BH", tl_offset=3):
+        """The Decode function trampoline.
+        Uses _fast_decode2 instead of _old_fast_decode.
+        """
+        return self._fast_decode2(parent_fmt, parent_gpb, offset, length, intent, tl_format=tl_format, tl_offset=tl_offset)
+
+    def _old_fast_decode(self, parent_fmt, parent_gpb, offset, length, intent, tl_format="!BH", tl_offset=3):
         """Decode function designed for performance.
 
         A simple and quick method is used to decode the msg. The decode time
@@ -301,11 +308,11 @@ class RCPSequence(gcp_packet.TLVData):
             if tlv_type in parent_fmt.child_dict_by_id:
                 fmt = parent_fmt.child_dict_by_id[tlv_type]
 
-                #self.logger.debug(intent_str + "fast decode: get the format from the DB, name: %s, format str:%s, desc:%d",
+                # self.logger.debug(intent_str + "fast decode: get the format from the DB, name: %s, format str:%s, desc:%d",
                 #                  fmt.name, fmt.format_str, fmt.desc_type)
                 # Also forward a step for the gpb
                 if fmt.desc_type == DataDescription.TYPE_REPEATED:
-                    #self.logger.debug(intent_str + "fast decode: decode a repeated fields, will enter the recursive loop.")
+                    # self.logger.debug(intent_str + "fast decode: decode a repeated fields, will enter the recursive loop.")
                     gpb = getattr(parent_gpb, fmt.name).add()
                     if self._fast_decode(fmt, gpb, offset + tl_offset, tlv_len, intent + 4,
                                          tl_format=tl_format, tl_offset=tl_offset) == gcp_object.GCPObject.DECODE_FAILED:
@@ -316,7 +323,7 @@ class RCPSequence(gcp_packet.TLVData):
                         return gcp_object.GCPObject.DECODE_FAILED
 
                 elif fmt.desc_type == DataDescription.TYPE_REPEATED_FIELDS:
-                    #self.logger.debug(intent_str + "fast decode: decode a repeated leaf.")
+                    # self.logger.debug(intent_str + "fast decode: decode a repeated leaf.")
                     # For the repeated fields, it's the leaf, we should decode it asap
                     if fmt.format_str not in DataDescription.WELL_KNOWN_LEN:
                         self.logger.error(
@@ -342,12 +349,12 @@ class RCPSequence(gcp_packet.TLVData):
                         val = struct.unpack_from(fmt_str, self.buffer, offset + tl_offset)
                         val = val[0]
 
-                    #self.logger.debug(intent_str + "fast decode: get the value {} for repeated leaf.".format(val))
+                    # self.logger.debug(intent_str + "fast decode: get the value {} for repeated leaf.".format(val))
                     # append the values
                     getattr(parent_gpb, fmt.name).append(val)
 
                 elif fmt.desc_type == DataDescription.TYPE_PARENT:
-                    #self.logger.debug(intent_str + "fast decode: decode a parent.")
+                    # self.logger.debug(intent_str + "fast decode: decode a parent.")
                     gpb = getattr(parent_gpb, fmt.name)
                     if tlv_len != 0:
                         if self._fast_decode(fmt, gpb, offset + tl_offset, tlv_len, intent + 4,
@@ -361,21 +368,9 @@ class RCPSequence(gcp_packet.TLVData):
 
                 else:  # For leaf case
                     if tlv_len == 0:
-                        if fmt.format_str in DataDescription.DEFAULT_READ_VALUE:
-                            if None is not fmt.constraint and isinstance(fmt.constraint, EnumConstraint):
-                                val = fmt.constraint.allowed_values.keys()[0]
-                            else:
-                                val = DataDescription.DEFAULT_READ_VALUE[fmt.format_str]
-                            if fmt.value_is_mac():
-                                val = Convert.bytes_to_mac_str(val)
-                            if fmt.value_is_ip_addr():
-                                val = Convert.bytes_to_ip_addr(val)
-                            setattr(parent_gpb, fmt.name, val)
-                        else:
-                            self.logger.error(
-                                "Cannot decode the Read TLV %s, len:%d, offset:%d.",
-                                fmt.name, tlv_len, offset + tl_offset)
-                            return gcp_object.GCPObject.DECODE_FAILED
+                        # set the default value
+                        val = getattr(parent_gpb, fmt.name)
+                        setattr(parent_gpb, fmt.name, val)
                     else:
                         # For the variable len
                         if fmt.value_is_mac():
@@ -398,8 +393,24 @@ class RCPSequence(gcp_packet.TLVData):
                             val = struct.unpack_from(
                                 fmt_str, self.buffer, offset + tl_offset)
                             val = val[0]
+                            val_len = fmt.get_tlv_length_val(val)
+                            if val_len != tlv_len:
+                                self.logger.warn("%s: excepted format %s, fmt len %d, actual len is%d",
+                                                 fmt.name, fmt.format_str, val_len, tlv_len)
 
-                        setattr(parent_gpb, fmt.name, val)
+                        try:
+                            #
+                            # Set value to protobuf property
+                            # It might raise exception...,
+                            # i.e. in case enum is wrong
+                            #
+                            setattr(parent_gpb, fmt.name, val)
+                        except Exception as ex:
+                            # ...but just log exception
+                            self.logger.error(
+                                "Cannot set value %s.%s the tlv type %d.%d - %s",
+                                parent_fmt.name,  fmt.name, parent_fmt.id, tlv_type, ex)
+                            pass
             else:
                 self.logger.error(
                     "Cannot find the tlv type %d in tlv format %s",
@@ -411,6 +422,157 @@ class RCPSequence(gcp_packet.TLVData):
             length -= tlv_len
 
             # self.logger.debug(intent_str + "fast decode: the length %d, offset;%d", length, offset)
+
+        return gcp_object.GCPObject.DECODE_DONE
+
+    def _fast_decode2(self, parent_fmt, parent_gpb, offset, length, intent, tl_format="!BH", tl_offset=3):
+        """The Decode function designed for performance with safety.
+
+        A simple and quick method is used to decode the msg with respect to data boundary.
+        It shall not raise exception, unless the parent_gpb (or one of nested types)
+        does not match the parent_fmt definition - which should mean it was called incorrectly.
+        In practice it means tlv definition has name of attribute not existing in the parent_gpb object.
+
+        :param parent_fmt: This is the TLV define DB, which is TLvDesc, we will use the child_dict_by_id top find the TLV definition
+        :param parent_gpb: This the process result, we will set the corresponding value in gpb.
+        :param offset:     the buffer offset, relative to beginning of the buffer.
+        :param length:     the TLV set length.
+        :return:           gcp_object.GCPObject.DECODE_DONE - no top level errors found, but still log messages may be generated on nested TLVs
+                           gcp_object.GCPObject.DECODE_FRAGMENTED - there is not enough data
+
+        """
+        while length > 0:
+            rest = len(self.buffer) - offset
+            if length > rest:
+                raise BufferError("Invalid buffer offset/length")
+            # Unpack the type and length
+            if length < 3:  # check, there is enoung data for T and L
+                return gcp_object.GCPObject.DECODE_FRAGMENTED
+            (tlv_type, tlv_len) = struct.unpack_from(tl_format, self.buffer, offset=offset)
+            if (tl_offset + tlv_len) > rest:  # check, there is enoung data for V
+                return gcp_object.GCPObject.DECODE_FRAGMENTED
+
+            ret = gcp_object.GCPObject.DECODE_DONE
+            fmt = parent_fmt.child_dict_by_id.get(tlv_type)
+            if fmt == None:
+                ret = gcp_object.GCPObject.DECODE_UNKNOWN_FORMAT
+            elif not hasattr(parent_gpb, fmt.name):
+                # This may be the case where the data is corrupted,
+                # and/or the tree definition is superset of protobuf object
+                ret = gcp_object.GCPObject.DECODE_UNKNOWN_FIELD
+
+            elif fmt.desc_type == DataDescription.TYPE_REPEATED:  # Also forward a step for the gpb
+                gpb = getattr(parent_gpb, fmt.name).add()
+                ret = self._fast_decode2(fmt, gpb, offset + tl_offset, tlv_len, intent, tl_format=tl_format, tl_offset=tl_offset)
+
+            elif fmt.desc_type == DataDescription.TYPE_PARENT:
+                gpb = getattr(parent_gpb, fmt.name)
+                if tlv_len != 0:
+                    ret = self._fast_decode2(fmt, gpb, offset + tl_offset, tlv_len, intent, tl_format=tl_format, tl_offset=tl_offset)
+                else:
+                    GCPObject.default_gpb(gpb)
+
+            else:  # For leaf case and repeated field
+                #
+                # Decode value
+                #
+                val = None
+                if tlv_len == 0:
+                    pass
+                # For the variable len
+                elif fmt.value_is_mac():
+                    if tlv_len == DataDescription.B_SEQ_MAC_LEN:
+                        fmt_str = "!6B"  # "!%uB" % DataDescription.WELL_KNOWN_LEN[fmt.format_str]
+                        val = struct.unpack_from(fmt_str, self.buffer, offset + tl_offset)
+                        val = Convert.bytes_to_mac_str(val)
+                    else:
+                        val_len = DataDescription.B_SEQ_MAC_LEN
+                        self.logger.warn("%s: excepted format %s, fmt len %d, actual len is%d",
+                                         fmt.name, fmt.format_str, val_len, tlv_len)
+
+                elif fmt.value_is_ip_addr():
+                    if tlv_len == DataDescription.B_SEQ_IPv4_LEN or tlv_len == DataDescription.B_SEQ_IPv6_LEN:
+                        fmt_str = "!%uB" % tlv_len
+                        val = struct.unpack_from(fmt_str, self.buffer, offset + tl_offset)
+                        val = Convert.bytes_to_ip_addr(val)
+                    else:
+                        val_len = "4/16"
+                        self.logger.warn("%s: excepted format %s, fmt len %s, actual len is%d",
+                                         fmt.name, fmt.format_str, val_len, tlv_len)
+
+                elif fmt.format_str is None:
+                    # This place is triggered when there is composite gpb message is not defined,
+                    ret = gcp_object.GCPObject.DECODE_INCORRECT_FORMAT
+
+                elif DataDescription.WELL_KNOWN_LEN[fmt.format_str] == DataDescription.VARIABLE_LEN:
+                    fmt_str = "!%us" % tlv_len
+                    val = struct.unpack_from(fmt_str, self.buffer, offset + tl_offset)[0]
+                elif tlv_len < fmt.length:
+                    # This place is triggered when there is not enough data for value decoding
+                    ret = gcp_object.GCPObject.DECODE_DATA_TOO_SHORT
+
+                else:
+                    fmt_str = fmt.format_str
+                    val = struct.unpack_from(fmt_str, self.buffer, offset + tl_offset)[0]
+                    val_len = fmt.get_tlv_length_val(val)
+                    if val_len != tlv_len:
+                        self.logger.warn("%s: excepted format %s, fmt len %d, actual len is%d",
+                                         fmt.name, fmt.format_str, val_len, tlv_len)
+
+                #
+                # Set the value
+                #
+                if val is None:
+                    # There were no value (tlv_len is zero), or
+                    # there were problem with decoding value, so just
+                    # set the default value.
+                    # If this line raise exception, that means the upper level
+                    # calls _fast_decode2 with unmatching object and tlv definition.
+                    val = getattr(parent_gpb, fmt.name)
+                try:
+                    # Set value to protobuf property
+                    # It might raise exception...,
+                    # i.e. in case enum is wrong, or assignment string to int
+                    if fmt.desc_type == DataDescription.TYPE_REPEATED_FIELDS:
+                        # repeated field always expected to have a value
+                        getattr(parent_gpb, fmt.name).append(val)
+                    else:
+                        # leaf
+                        setattr(parent_gpb, fmt.name, val)
+                except Exception as ex:
+                    # ...but just log exception
+                    self.logger.error(
+                        "Cannot set value %s.%s the tlv type %d.%d - %s",
+                        parent_fmt.name, fmt.name, parent_fmt.id, tlv_type, ex)
+                    pass
+
+            # Log errors if any
+            if ret == gcp_object.GCPObject.DECODE_FRAGMENTED:
+                self.logger.error(
+                    "Cannot complitely decode %s.%s the tlv type %d.%d",
+                    parent_fmt.name, fmt.name, parent_fmt.id, tlv_type)
+            elif ret == gcp_object.GCPObject.DECODE_UNKNOWN_FORMAT:
+                self.logger.error(
+                    "Cannot find the tlv type %d in tlv format %s",
+                    tlv_type, parent_fmt.name)
+            elif ret == gcp_object.GCPObject.DECODE_INCORRECT_FORMAT:
+                self.logger.error(
+                    "Incorrect\incomplete format for %s.%s the tlv type %d.%d",
+                    parent_fmt.name, fmt.name, parent_fmt.id, tlv_type)
+            elif ret == gcp_object.GCPObject.DECODE_DATA_TOO_SHORT:
+                self.logger.error(
+                    "Too short data %d/%d for format %s.%s the tlv type %d.%d",
+                    tlv_len, fmt.length,
+                    parent_fmt.name, fmt.name, parent_fmt.id, tlv_type)
+            elif ret != gcp_object.GCPObject.DECODE_DONE:
+                self.logger.error(
+                    "Cannot decode %s.%s the tlv type %d.%d - error %d",
+                    parent_fmt.name, fmt.name, parent_fmt.id, tlv_type, ret)
+
+            offset += tl_offset
+            offset += tlv_len
+            length -= tl_offset
+            length -= tlv_len
 
         return gcp_object.GCPObject.DECODE_DONE
 
@@ -443,16 +605,16 @@ class RCPSequence(gcp_packet.TLVData):
             field_desc = field[0]
             field_val = field[1]
             ret_encode_len = 0
-            #self.logger.debug(intent_str + "fast encode: encode the field %s", field_desc.name)
+            # self.logger.debug(intent_str + "fast encode: encode the field %s", field_desc.name)
             if field_desc.name not in parent_fmt.child_dict_by_name:
-                #self.logger.error("Cannot find the gpb %s in tlv format %s", field_desc.name, parent_fmt.name)
+                # self.logger.error("Cannot find the gpb %s in tlv format %s", field_desc.name, parent_fmt.name)
                 return gcp_object.GCPObject.DECODE_FAILED, encode_len
 
             fmt = parent_fmt.child_dict_by_name[field_desc.name]
-            #self.logger.debug(intent_str + "fast encode: get the format from the DB, name: %s, format str:%s, desc:%d",
+            # self.logger.debug(intent_str + "fast encode: get the format from the DB, name: %s, format str:%s, desc:%d",
             #                  fmt.name, fmt.format_str, fmt.desc_type)
 
-            if fmt.desc_type == DataDescription.TYPE_REPEATED: # Repeated parents
+            if fmt.desc_type == DataDescription.TYPE_REPEATED:  # Repeated parents
                 ret_encode_len = 0
                 # For every repeated parent
                 for repeated_parent_val in field_val:
@@ -479,7 +641,7 @@ class RCPSequence(gcp_packet.TLVData):
                         field_val, fmt.name)
                     return gcp_object.GCPObject.DECODE_FAILED, encode_len
                 ret_encode_len = 0
-                for repeated_leaf_val in field_val: # For every repeated leaf
+                for repeated_leaf_val in field_val:  # For every repeated leaf
                     if isinstance(repeated_leaf_val, unicode):
                         repeated_leaf_val = repeated_leaf_val.encode("ascii")
                     if fmt.value_is_mac():
@@ -502,7 +664,7 @@ class RCPSequence(gcp_packet.TLVData):
                     fmt_str = "!BH" + fmt_str
                     ret_val = [fmt.id, val_len]
                     ret_val.extend(val)
-                    #self.logger.debug(intent_str + "fast encode: set the value %s for repeated leaf.", str(val))
+                    # self.logger.debug(intent_str + "fast encode: set the value %s for repeated leaf.", str(val))
                     struct.pack_into(fmt_str, self.buffer, offset + ret_encode_len, *ret_val)
                     ret_encode_len += 3 + val_len
 
@@ -520,7 +682,7 @@ class RCPSequence(gcp_packet.TLVData):
                     "!BH", self.buffer, offset, fmt.id, ret_encode_len)
                 ret_encode_len += 3
             else:  # For leaf case
-                #self.logger.debug(intent_str + "fast encode: encode a leaf: field name:%s.", fmt.name)
+                # self.logger.debug(intent_str + "fast encode: encode a leaf: field name:%s.", fmt.name)
                 if isinstance(field_val, unicode):
                     field_val = field_val.encode("ascii")
                 if fmt.value_is_mac():
@@ -543,7 +705,7 @@ class RCPSequence(gcp_packet.TLVData):
                 fmt_str = "!BH" + fmt_str[1:]
                 ret_val = [fmt.id, ret_encode_len]
                 ret_val.extend(val)
-                #self.logger.debug(intent_str + "fast encode: set the value %s for leaf, format str:%s",
+                # self.logger.debug(intent_str + "fast encode: set the value %s for leaf, format str:%s",
                 #                  str(ret_val), fmt_str)
                 struct.pack_into(fmt_str, self.buffer, offset, *ret_val)
                 ret_encode_len += 3
@@ -741,7 +903,7 @@ class RCPMessage(gcp_object.GCPObject):
         # check if the RCP msg type is expected in the GCP message
         if rcp_msg_type not in \
                 gcp_msg_def.GCP_MSG_SET.child_dict_by_id[self.gcp_message_id]. \
-                        tlvs.child_dict_by_id:
+                tlvs.child_dict_by_id:
             raise RCPMessageDecodeError(
                 "Unexpected RCP message: {} ({}) in "
                 "the GCP message: {} ({})".format(
@@ -778,8 +940,7 @@ class RCPMessage(gcp_object.GCPObject):
                 ret = seq.decode(self.buffer, self.offset,
                                  self.offset + rcp_msg_len)
                 if gcp_object.GCPObject.DECODE_FAILED == ret:
-                    raise RCPMessageDecodeError(
-                        "Failed to decode RCP sequence")
+                    self.logger.warn("Failed to decode RCP sequence")
 
                 decoded_bytes = seq.offset - self.offset
                 if not decoded_bytes:
@@ -789,12 +950,13 @@ class RCPMessage(gcp_object.GCPObject):
                 # move offset and append the sequence
                 rcp_msg_len -= decoded_bytes
                 self.offset = seq.offset
-                self.sequences.append(seq)
+                if gcp_object.GCPObject.DECODE_FAILED != ret:
+                    self.sequences.append(seq)
+                    self.logger.debug("RCP Message: %s (%u), Decoded RCP sequence, "
+                                      "operation: %u",
+                                      self.rcp_message_name, self.rcp_message_id,
+                                      seq.operation)
 
-                self.logger.debug("RCP Message: %s (%u), Decoded RCP sequence, "
-                                  "operation: %u",
-                                  self.rcp_message_name, self.rcp_message_id,
-                                  seq.operation)
                 if gcp_object.GCPObject.DECODE_NEXT != ret:
                     break
 
@@ -802,17 +964,17 @@ class RCPMessage(gcp_object.GCPObject):
                 self.logger.exception("Failed to decode sequence of RCP msgs")
                 raise RCPMessageDecodeError("Failed to decode sequence of RCP "
                                             "messages: {} ({}): {}".format(
-                    self.rcp_message_name,
-                    self.rcp_message_id,
-                    ex))
+                                                self.rcp_message_name,
+                                                self.rcp_message_id,
+                                                ex))
 
         if 0 != rcp_msg_len:
             raise RCPMessageDecodeError("No all data of the RCP message were "
                                         "decoded: {} ({}), remaining "
                                         "bytes: {}".format(
-                self.rcp_message_name,
-                self.rcp_message_id,
-                rcp_msg_len))
+                                            self.rcp_message_name,
+                                            self.rcp_message_id,
+                                            rcp_msg_len))
 
         if not is_last_rcp_msg:
             return gcp_object.GCPObject.DECODE_NEXT

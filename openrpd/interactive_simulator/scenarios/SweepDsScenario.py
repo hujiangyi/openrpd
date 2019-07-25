@@ -64,7 +64,7 @@ class SweepDsScenario(Scenario):
         for i in range(1, 100):
             up_params = list(self.up_params)
             down_params = list(self.down_params)
-            freq = start_freq+(i*8*(10**6))
+            freq = start_freq + (i * 8 * (10**6))
             up_params += ["RfChannelSelector.RfChannelIndex={}".format(i), "DsScQamChannelConfig.CenterFrequency={}".format(freq)]
             down_params += ["RfChannelSelector.RfChannelIndex={}".format(i)]
             up_attrs = parse_scenario_attrs(up_params)

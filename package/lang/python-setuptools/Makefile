@@ -7,21 +7,15 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=python-setuptools
-PKG_VERSION:=22.0.5
+PKG_NAME:=setuptools
+PKG_VERSION:=39.0.1
 PKG_RELEASE:=1
 
-PKG_SOURCE:=setuptools-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://pypi.python.org/packages/90/7a/b64d5804b6d1aebed1892e4df1c21bcb4f8480095ba8004e48999601119d/
-PKG_MD5SUM:=869f3029dcc66a64ba39875e2a2f044a
+PKG_SOURCE:=setuptools-$(PKG_VERSION).zip
+PKG_SOURCE_URL:=https://pypi.python.org/packages/72/c2/c09362ab29338413ab687b47dab03bab4a792e2bbb727a1eb5e0a88e3b86/
+PKG_MD5SUM:=75310b72ca0ab4e673bf7679f69d7a62
 
 HOST_BUILD_DEPENDS:=python python/host
-
-PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
-PKG_UNPACK=$(HOST_TAR) -C $(PKG_BUILD_DIR) --strip-components=1 -xzf $(DL_DIR)/$(PKG_SOURCE)
-
-HOST_BUILD_DIR:=$(BUILD_DIR_HOST)/$(PKG_NAME)-$(PKG_VERSION)
-HOST_UNPACK=$(HOST_TAR) -C $(HOST_BUILD_DIR) --strip-components=1 -xzf $(DL_DIR)/$(PKG_SOURCE)
 
 include $(INCLUDE_DIR)/host-build.mk
 include $(INCLUDE_DIR)/package.mk
@@ -33,7 +27,7 @@ define Package/python-setuptools
   SECTION:=lang
   CATEGORY:=Languages
   TITLE:=Tool for installing Python packages.
-  URL:=https://bitbucket.org/pypa/setuptools
+  URL:=https://github.com/pypa/setuptools
   DEPENDS:=+python +ca-certificates
   MAINTAINER:=Alexandru Ardelean <ardeleanalex@gmail.com>
 endef

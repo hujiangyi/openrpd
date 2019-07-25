@@ -222,7 +222,7 @@ class L2tpv3Transport(object):
         """
         if not isinstance(dispatcher, L2tpv3Dispatcher):
             self.logger.warn(L2tpv3TransportError.ParameterTypeError + ", the dispatcher is not instance of "
-                                                                        "L2tpv3Dispatcher.")
+                             "L2tpv3Dispatcher.")
             raise L2tpv3TransportError(L2tpv3TransportError.ParameterTypeError)
 
         self.dispatcher = dispatcher
@@ -260,7 +260,7 @@ class L2tpv3Transport(object):
         # The pkt should be decoded
         if not isinstance(pkt, L2tpv3ControlPacket.L2tpv3ControlPacket):
             self.logger.warn(L2tpv3TransportError.ParameterTypeError + ", the dispatcher is not instance of "
-                                                                        "L2tpv3ControlPacket.")
+                             "L2tpv3ControlPacket.")
             raise L2tpv3TransportError(L2tpv3TransportError.ParameterTypeError)
 
         if self.connection.isInRecovery:
@@ -377,7 +377,7 @@ class L2tpv3Transport(object):
             self.lastSendTime = time.time()
             self.needSendZlb = False
 
-        #when sending out a FSR for an incoming FSQ some sessions may be stale
+        # when sending out a FSR for an incoming FSQ some sessions may be stale
         if pkt.isFSR():
             self.connection.queryStaleSessions()
 
@@ -486,6 +486,6 @@ class L2tpv3Transport(object):
                 # response
                 if resendStructure["sendTimes"] > self.resendTimes:
                     self.logger.warn("Connection[%d] has tried to send packet %d time(s), no response from remote, "
-                                      "close the connection.", self.connection.localConnID,
-                                      resendStructure["sendTimes"])
+                                     "close the connection.", self.connection.localConnID,
+                                     resendStructure["sendTimes"])
                     self.connection.CloseConnection()

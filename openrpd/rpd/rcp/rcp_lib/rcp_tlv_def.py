@@ -199,6 +199,20 @@ INTERLEAVER_DEPTH_7_taps128Increment1 = \
     7, "INTERLEAVER_DEPTH_7_taps128Increment1"
 INTERLEAVER_DEPTH_8_taps12increment17 = \
     8, "INTERLEAVER_DEPTH_8_taps12increment17"
+INTERLEAVER_DEPTH_9_taps128increment2 = \
+    9, "INTERLEAVER_DEPTH_9_taps128increment2"
+INTERLEAVER_DEPTH_10_taps128increment3 = \
+    10, "INTERLEAVER_DEPTH_10_taps128increment3"
+INTERLEAVER_DEPTH_11_taps128increment4 = \
+    11, "INTERLEAVER_DEPTH_11_taps128increment4"
+INTERLEAVER_DEPTH_12_taps128increment5 = \
+    12, "INTERLEAVER_DEPTH_12_taps128increment5"
+INTERLEAVER_DEPTH_13_taps128increment6 = \
+    13, "INTERLEAVER_DEPTH_13_taps128increment6"
+INTERLEAVER_DEPTH_14_taps128increment7 = \
+    14, "INTERLEAVER_DEPTH_14_taps128increment7"
+INTERLEAVER_DEPTH_15_taps128increment8 = \
+    15, "INTERLEAVER_DEPTH_15_taps128increment8"
 INTERLEAVER_DEPTH = (INTERLEAVER_DEPTH_1_unknown,
                      INTERLEAVER_DEPTH_2_other,
                      INTERLEAVER_DEPTH_3_taps8Increment16,
@@ -206,7 +220,14 @@ INTERLEAVER_DEPTH = (INTERLEAVER_DEPTH_1_unknown,
                      INTERLEAVER_DEPTH_5_taps32Increment4,
                      INTERLEAVER_DEPTH_6_taps64Increment2,
                      INTERLEAVER_DEPTH_7_taps128Increment1,
-                     INTERLEAVER_DEPTH_8_taps12increment17)
+                     INTERLEAVER_DEPTH_8_taps12increment17,
+                     INTERLEAVER_DEPTH_9_taps128increment2,
+                     INTERLEAVER_DEPTH_10_taps128increment3,
+                     INTERLEAVER_DEPTH_11_taps128increment4,
+                     INTERLEAVER_DEPTH_12_taps128increment5,
+                     INTERLEAVER_DEPTH_13_taps128increment6,
+                     INTERLEAVER_DEPTH_14_taps128increment7,
+                     INTERLEAVER_DEPTH_15_taps128increment8)
 INTERLEAVER_DEPTH_DICT = {n: s for n, s in INTERLEAVER_DEPTH}
 INTERLEAVER_DEPTH_TYPES = tuple([n for n, s in INTERLEAVER_DEPTH])
 
@@ -497,9 +518,9 @@ CYCLIC_PREFIX_97_TYPES = tuple([n for n, s in CYCLIC_PREFIX_97])
 # Number of symbols per frame definitions
 #
 NUM_SYMBOL_PER_FRAME_6_min = 6, "NUM_SYMBOL_PER_FRAME_6_min"
-NUM_SYMBOL_PER_FRAME_32_max = 32, "NUM_SYMBOL_PER_FRAME_32_max"
+NUM_SYMBOL_PER_FRAME_36_max = 36, "NUM_SYMBOL_PER_FRAME_36_max"
 NUM_SYMBOL_PER_FRAME = (NUM_SYMBOL_PER_FRAME_6_min,
-                        NUM_SYMBOL_PER_FRAME_32_max)
+                        NUM_SYMBOL_PER_FRAME_36_max)
 NUM_SYMBOL_PER_FRAME_DICT = {n: s for n, s in NUM_SYMBOL_PER_FRAME}
 NUM_SYMBOL_PER_FRAME_TYPES = tuple([n for n, s in NUM_SYMBOL_PER_FRAME])
 
@@ -533,13 +554,51 @@ START_MIN_SLOT = (START_MIN_SLOT_0_min,
 START_MIN_SLOT_DICT = {n: s for n, s in START_MIN_SLOT}
 START_MIN_SLOT_TYPE = tuple([n for n, s in START_MIN_SLOT])
 
-MINISLOT_PILOT_1_min = 1, "MINISLOT_PILOT_1_min"
+MINISLOT_PILOT_0_min = 0, "MINISLOT_PILOT_0_min"
 MINISLOT_PILOT_14_max = 14, "MINISLOT_PILOT_14_max"
-MINISLOT_PILOT = (MINISLOT_PILOT_1_min,
+MINISLOT_PILOT = (MINISLOT_PILOT_0_min,
                   MINISLOT_PILOT_14_max)
 MINISLOT_PILOT_DICT = {n: s for n, s in MINISLOT_PILOT}
 MINISLOT_PILOT_TYPES = tuple([n for n, s in MINISLOT_PILOT])
 
+# FILE STATUS CONTROL for 40.3
+CONTROL_OTHER = 1, "other"
+CONTROL_UPLOAD = 2, "upload"
+CONTROL_CANCELUPLOAD = 3, "cancelUpload"
+CONTROL_DELETEFILE = 4, "delete"
+CONTROL_UPLOADANDDELETE = 5, "uploadAndDelete"
+
+# FILE DATA SERVER for 40.4
+PROTOCOL_TFTP = 2, "tftp"
+PROTOCOL_HTTP = 3, "http"
+PROTOCOL_LIST = (PROTOCOL_TFTP,
+                 PROTOCOL_HTTP)
+PROTOCOL_NAME = {n: s for n, s in PROTOCOL_LIST}
+
+FILE_CTRL_NAME_LIST = (CONTROL_OTHER,
+                       CONTROL_UPLOAD,
+                       CONTROL_CANCELUPLOAD,
+                       CONTROL_DELETEFILE,
+                       CONTROL_UPLOADANDDELETE)
+FILE_CTRL_NAME = {n: s for n, s in FILE_CTRL_NAME_LIST}
+
+# FILE STATUS for 100.20
+STATUS_OTHER = 1, "other"
+STATUS_AVAILFORUPLOAD = 2, "availableForUpload"
+STATUS_UPLOADINPROGRESS = 3, "uploadInProgress"
+STATUS_UPLOADCOMPLETED = 4, "uploadCompleted"
+STATUS_UPLOADPENDING = 5, "uploadPending"
+STATUS_UPLOADCANCELLED = 6, "uploadCancelled"
+STATUS_ERROR = 7, "error"
+
+FILE_STATUS_LIST = (STATUS_OTHER,
+                    STATUS_AVAILFORUPLOAD,
+                    STATUS_UPLOADINPROGRESS,
+                    STATUS_UPLOADCOMPLETED,
+                    STATUS_UPLOADPENDING,
+                    STATUS_UPLOADCANCELLED,
+                    STATUS_ERROR)
+FILE_STATUS_NAME = {n: s for n, s in FILE_STATUS_LIST}
 
 #
 # Data Symbol Modulation definitions
@@ -550,39 +609,39 @@ DATA_SYMBOL_MODULATION__2_zeroValued = \
     2, "DATA_SYMBOL_MODULATION__2_zeroValued"
 DATA_SYMBOL_MODULATION__3_qpsk = \
     3, "DATA_SYMBOL_MODULATION__3_qpsk"
-DATA_SYMBOL_MODULATION__4_qam16 = \
-    4, "DATA_SYMBOL_MODULATION__4_qam16"
-DATA_SYMBOL_MODULATION__5_qam64 = \
-    5, "DATA_SYMBOL_MODULATION__5_qam64"
-DATA_SYMBOL_MODULATION__6_qam128 = \
-    6, "DATA_SYMBOL_MODULATION__6_qam128"
-DATA_SYMBOL_MODULATION__7_qam256 = \
-    7, "DATA_SYMBOL_MODULATION__7_qam256"
-DATA_SYMBOL_MODULATION__8_qam512 = \
-    8, "DATA_SYMBOL_MODULATION__8_qam512"
-DATA_SYMBOL_MODULATION__9_qam1024 = \
-    9, "DATA_SYMBOL_MODULATION__9_qam1024"
-DATA_SYMBOL_MODULATION__10_qam2048 = \
-    10, "DATA_SYMBOL_MODULATION__10_qam2048"
-DATA_SYMBOL_MODULATION__11_qam4096 = \
-    11, "DATA_SYMBOL_MODULATION__11_qam4096"
-DATA_SYMBOL_MODULATION__12_qam8192 = \
-    12, "DATA_SYMBOL_MODULATION__12_qam8192"
-DATA_SYMBOL_MODULATION__13_qam16384 = \
-    13, "DATA_SYMBOL_MODULATION__13_qam16384"
+DATA_SYMBOL_MODULATION__4_qam8 = \
+    4, "DATA_SYMBOL_MODULATION__4_qam8"
+DATA_SYMBOL_MODULATION__5_qam16 = \
+    5, "DATA_SYMBOL_MODULATION__5_qam16"
+DATA_SYMBOL_MODULATION__6_qam32 = \
+    6, "DATA_SYMBOL_MODULATION__6_qam32"
+DATA_SYMBOL_MODULATION__7_qam64 = \
+    7, "DATA_SYMBOL_MODULATION__7_qam64"
+DATA_SYMBOL_MODULATION__8_qam128 = \
+    8, "DATA_SYMBOL_MODULATION__8_qam128"
+DATA_SYMBOL_MODULATION__9_qam256 = \
+    9, "DATA_SYMBOL_MODULATION__9_qam256"
+DATA_SYMBOL_MODULATION__10_qam512 = \
+    10, "DATA_SYMBOL_MODULATION__10_qam512"
+DATA_SYMBOL_MODULATION__11_qam1024 = \
+    11, "DATA_SYMBOL_MODULATION__11_qam1024"
+DATA_SYMBOL_MODULATION__12_qam2048 = \
+    12, "DATA_SYMBOL_MODULATION__12_qam2048"
+DATA_SYMBOL_MODULATION__13_qam4096 = \
+    13, "DATA_SYMBOL_MODULATION__13_qam4096"
 DATA_SYMBOL_MODULATION = (DATA_SYMBOL_MODULATION__1_Other,
                           DATA_SYMBOL_MODULATION__2_zeroValued,
                           DATA_SYMBOL_MODULATION__3_qpsk,
-                          DATA_SYMBOL_MODULATION__4_qam16,
-                          DATA_SYMBOL_MODULATION__5_qam64,
-                          DATA_SYMBOL_MODULATION__6_qam128,
-                          DATA_SYMBOL_MODULATION__7_qam256,
-                          DATA_SYMBOL_MODULATION__8_qam512,
-                          DATA_SYMBOL_MODULATION__9_qam1024,
-                          DATA_SYMBOL_MODULATION__10_qam2048,
-                          DATA_SYMBOL_MODULATION__11_qam4096,
-                          DATA_SYMBOL_MODULATION__12_qam8192,
-                          DATA_SYMBOL_MODULATION__13_qam16384)
+                          DATA_SYMBOL_MODULATION__4_qam8,
+                          DATA_SYMBOL_MODULATION__5_qam16,
+                          DATA_SYMBOL_MODULATION__6_qam32,
+                          DATA_SYMBOL_MODULATION__7_qam64,
+                          DATA_SYMBOL_MODULATION__8_qam128,
+                          DATA_SYMBOL_MODULATION__9_qam256,
+                          DATA_SYMBOL_MODULATION__10_qam512,
+                          DATA_SYMBOL_MODULATION__11_qam1024,
+                          DATA_SYMBOL_MODULATION__12_qam2048,
+                          DATA_SYMBOL_MODULATION__13_qam4096)
 DATA_SYMBOL_MODULATION_DICT = {n: s for n, s in DATA_SYMBOL_MODULATION}
 DATA_SYMBOL_MODULATION_TYPES = tuple([n for n, s in DATA_SYMBOL_MODULATION])
 
@@ -679,7 +738,11 @@ GeneralNotificationType = {
     2: "RedirectResultNotification",
     3: "PtpResultNotification",
     4: "AuxCoreResultNotification",
-    5: "TimeOutNotification"
+    5: "TimeOutNotification",
+    6: "Deprecated",
+    7: "ReconnectNotification",
+    8: "AuxCoreGcpStatusNotification",
+    9: "ChannelUcdRefreshRequest"
 }
 
 RpdRedirectResult = {
@@ -728,6 +791,35 @@ RPD_EVENT_NTF_EN_DICT = {n: s for n, s in RPD_EVENT_NTF_EN}
 RPD_EVENT_NTF_EN_TYPES = tuple([n for n, s in RPD_EVENT_NTF_EN])
 
 #
+# RPD interface attributes
+#
+EnableStatus_1_UP = 1, "Intf_EnableStatus_1_up"
+EnableStatus_2_DOWN = 2, "Intf_EnableStatus_2_down"
+EnableStatus_TYPE = (EnableStatus_1_UP,
+                     EnableStatus_2_DOWN)
+EnableStatus_TYPE_DICT = {n: s for n, s in EnableStatus_TYPE}
+EnableStatus_TYPE_TYPES = tuple([n for n, s in EnableStatus_TYPE])
+
+#
+# RPD interface ipaddress attributes
+#
+INETADDRESSTYPE_UNKNOWN = 0, 'INETADDRESSTYPE_UNKNOWN'
+INETADDRESSTYPE_IPV4 = 1, 'INETADDRESSTYPE_IPV4'
+INETADDRESSTYPE_IPV6 = 2, 'INETADDRESSTYPE_IPV6'
+INETADDRESSTYPE_IPV4Z = 3, 'INETADDRESSTYPE_IPV4Z'
+INETADDRESSTYPE_IPV6Z = 4, 'INETADDRESSTYPE_IPV6Z'
+INETADDRESSTYPE_DNS = 16, 'INETADDRESSTYPE_DNS'
+
+INETADDRESSTYPE = (INETADDRESSTYPE_UNKNOWN,
+                   INETADDRESSTYPE_IPV4,
+                   INETADDRESSTYPE_IPV6,
+                   INETADDRESSTYPE_IPV4Z,
+                   INETADDRESSTYPE_IPV6Z,
+                   INETADDRESSTYPE_DNS)
+INETADDRESSTYPE_DICT = {n: s for n, s in INETADDRESSTYPE}
+INETADDRESSTYPE_TYPES = tuple([n for n, s in INETADDRESSTYPE])
+
+#
 # RPD interface ipaddress attributes
 #
 IPADDR_TYPE_1_unicast = 1, 'IPADDR_TYPE_1_unicast'
@@ -773,7 +865,38 @@ IPADDR_STATUS = (IPADDR_STATUS_1_preferred,
 IPADDR_STATUS_DICT = {n: s for n, s in IPADDR_STATUS}
 IPADDR_STATUS_TYPES = tuple([n for n, s in IPADDR_STATUS])
 
+#
+# RPDInfo attributes
+#
+SEVERITYLEVEL_TYPE_0_emergency = 0, "emergency"
+SEVERITYLEVEL_TYPE_1_alert = 1, "alert"
+SEVERITYLEVEL_TYPE_2_critical = 2, "critical"
+SEVERITYLEVEL_TYPE_3_error = 3, "error"
+SEVERITYLEVEL_TYPE_4_warning = 4, "warning"
+SEVERITYLEVEL_TYPE_5_notice = 5, "notice"
+SEVERITYLEVEL_TYPE_6_information = 6, "information"
+SEVERITYLEVEL_TYPE_7_debug = 7, "debug"
+SEVERITYLEVEL_TYPE = (SEVERITYLEVEL_TYPE_0_emergency,
+                      SEVERITYLEVEL_TYPE_1_alert,
+                      SEVERITYLEVEL_TYPE_2_critical,
+                      SEVERITYLEVEL_TYPE_3_error,
+                      SEVERITYLEVEL_TYPE_4_warning,
+                      SEVERITYLEVEL_TYPE_5_notice,
+                      SEVERITYLEVEL_TYPE_6_information,
+                      SEVERITYLEVEL_TYPE_7_debug)
+SEVERITYLEVEL_TYPE_DICT = {n: s for n, s in SEVERITYLEVEL_TYPE}
+SEVERITYLEVEL_TYPE_TYPES = tuple(SEVERITYLEVEL_TYPE_DICT.keys())
 
+#
+# L2tp session info OP_status
+#
+OP_STATUS_OTHER = 0
+OP_STATUS_UP = 1
+OP_STATUS_DOWN = 2
+OP_STATUS_TESTING = 3
+OP_STATUS_DORMANT = 4
+OP_STATUS_NOT_PRESENT = 5
+OP_STATUS_LOWER_DOWN = 6
 
 #
 # Internal definitions
@@ -784,6 +907,33 @@ RW_FLAG_key = DataDescription.RW_FLAG_key
 RW_FLAG_row_key = DataDescription.RW_FLAG_row_key
 RW_FLAG_r = DataDescription.RW_FLAG_r
 RW_FLAG_rw = DataDescription.RW_FLAG_rw
+
+# RPDIfStats definitions
+RPD_IF_ENET_LN_UPDWN_ENABLE = 1, "RPD_IF_ENET_LN_UPDWN_ENABLE"
+RPD_IF_ENET_LN_UPDWN_DISENABLE = 2, "RPD_IF_ENET_LN_UPDWN_DISENABLE"
+
+RPD_IF_ENET_ADMIN_STATUS_UP = 1, "RPD_IF_ENET_ADMIN_STATUS_UP"
+RPD_IF_ENET_ADMIN_STATUS_DW = 2, "RPD_IF_ENET_ADMIN_STATUS_DW"
+
+RPD_IF_TYPE_OTHER = 1, "RPD_IF_TYPE_OTHER"
+RPD_IF_TYPE_REGULAR1822 = 2, "RPD_IF_TYPE_REGULAR1822"
+RPD_IF_TYPE_HDH1822 = 3, "RPD_IF_TYPE_HDH1822"
+RPD_IF_TYPE_DDNX25 = 4, "RPD_IF_TYPE_DDNX25"
+RPD_IF_TYPE_RFC877X25 = 5, "RPD_IF_TYPE_RFC877X25"
+RPD_IF_TYPE_ETHERNETCSMACD = 6, "RPD_IF_TYPE_ETHERNETCSMACD"
+RPD_IF_TYPE_ISO88023CSMACD = 7, "RPD_IF_TYPE_ISO88023CSMACD"
+
+RPD_IF_ENET_ADMIN_OPER_STATUS_UP = 1, "RPD_IF_ENET_ADMIN_OPER_STATUS_UP"
+RPD_IF_ENET_ADMIN_OPER_STATUS_DW = 2, "RPD_IF_ENET_ADMIN_OPER_STATUS_DW"
+
+RPD_IF_ENET_PROMISCUOUSMODE_TRUE = 1, "RPD_IF_ENET_PROMISCUOUSMODE_TRUE"
+RPD_IF_ENET_PROMISCUOUSMODE_FALSE = 2, "RPD_IF_ENET_PROMISCUOUSMODE_FALSE"
+
+RPD_IF_ENET_CONNECTORPRESENT_TRUE = 1, "RPD_IF_ENET_CONNECTORPRESENT_TRUE"
+RPD_IF_ENET_CONNECTORPRESENT_FALSE = 2, "RPD_IF_ENET_CONNECTORPRESENT_FALSE"
+
+RPD_IF_ENET_LINKUPDOWNTRAPENABLE_TRUE = 1, "RPD_IF_ENET_LINKUPDOWNTRAPENABLE_TRUE"
+RPD_IF_ENET_LINKUPDOWNTRAPENABLE_DISABLE = 2, "RPD_IF_ENET_LINKUPDOWNTRAPENABLE_DISABLE"
 
 #
 # RCP Messages and General Purpose TLVs
@@ -803,6 +953,7 @@ class RCPGPTLV(gcp_tlv_def.TLVDesc):
                                        length, constraint,
                                        length_field_len=RCP_TLV_LENGTH_LEN,
                                        rw=rw)
+
 
 #
 # RCP Messages
@@ -839,6 +990,11 @@ C_RCPSequence_09 = RCPGPTLV(9, "SequenceTLV",
 C_SequenceNumber_10 = RCPGPTLV(10, "SequenceNumber", C_RCPSequence_09, "!H")
 C_Operation_11 = RCPGPTLV(11, "Operation", C_RCPSequence_09, "!B",
                           constraint=EnumConstraint(RCP_OPERATION_DICT))
+
+C_ReadCount_26 = RCPGPTLV(26, "ReadCount",
+                          parent=(C_RCPSequence_09,
+                                  RCP_CFG_TLV_SET),
+                          format_str="!H")
 
 # TODO add parents according new version of specification
 C_EnetPortIndex_14 = RCPGPTLV(14, "EnetPortIndex", format_str="!B")
@@ -892,7 +1048,8 @@ class RCPTLV(gcp_tlv_def.TLVDesc):
     def __init__(self, identifier, name,
                  parent=_ALL_RCP_CFG_TLV_PARENTS,
                  format_str=None, length=None, constraint=None, rw=RW_FLAG_rw):
-        super(RCPTLV, self).__init__(identifier, name, parent, format_str,
+
+        gcp_tlv_def.TLVDesc.__init__(self, identifier, name, parent, format_str,
                                      length, constraint,
                                      length_field_len=2, rw=rw)
 
@@ -910,6 +1067,21 @@ RCPTLV(4, "EvThrottleInterval", C_EvCfg_1, format_str="!I")
 RCPTLV(5, "NotifyEnable", C_EvCfg_1, format_str="!B",
        constraint=EnumConstraint(RPD_EVENT_NTF_EN_DICT))
 
+C_GcpConnVerification_2 = RCPTLV(2, "GcpConnVerification", C_RpdGlobal_15, rw=RW_FLAG_row)
+RCPTLV(1, "CoreId", C_GcpConnVerification_2, "bytes")
+RCPTLV(2, "MaxGcpIdleTime", C_GcpConnVerification_2, "!H")
+RCPTLV(3, "GcpRecoveryAction", C_GcpConnVerification_2, "!B")
+RCPTLV(4, "GcpRecoveryActionRetry", C_GcpConnVerification_2, "!B")
+RCPTLV(5, "GcpRecoveryActionDelay", C_GcpConnVerification_2, "!H")
+RCPTLV(6, "GcpReconnectTimeout", C_GcpConnVerification_2, "!H")
+
+C_IpConfig_3 = RCPTLV(3, "IpConfig", C_RpdGlobal_15, rw=RW_FLAG_row)
+RCPTLV(1, "IpStackControl", C_IpConfig_3, "!B")
+
+C_UepiControl_4 = RCPTLV(4, "UepiControl", C_RpdGlobal_15, rw=RW_FLAG_row)
+RCPTLV(1, "ScQamUseRngPw", C_UepiControl_4, "!B")
+RCPTLV(2, "OfdmaMaxNumPayloadUnits", C_UepiControl_4, "!B")
+RCPTLV(3, "OfdmaMaxNumTrailerUnits", C_UepiControl_4, "!B")
 
 C_RfChannel_16 = RCPTLV(16, "RfChannel", rw=RW_FLAG_row_key)
 C_RfPort_17 = RCPTLV(17, "RfPort", rw=RW_FLAG_row_key)
@@ -917,34 +1089,6 @@ C_DocsisMsg_22 = RCPTLV(22, "DocsisMsg", C_RfChannel_16, "bytes", rw=RW_FLAG_r)
 
 C_VendorSpecificExtension_21 = RCPTLV(21, "VendorSpecificExtension", rw=RW_FLAG_row)
 RCPTLV(1, "VendorId", C_VendorSpecificExtension_21, "!H")
-
-C21_Ipv6Address_2 = \
-    RCPTLV(2, "Ipv6Address", C_VendorSpecificExtension_21, rw=RW_FLAG_row)
-RCPTLV(1, "AddrType", C21_Ipv6Address_2, "!B", rw=RW_FLAG_key)
-RCPTLV(2, "IpAddress", C21_Ipv6Address_2, "IPAddr", rw=RW_FLAG_key)
-RCPTLV(3, "EnetPortIndex", C21_Ipv6Address_2, "!B", rw=RW_FLAG_r)
-RCPTLV(4, "Type", C21_Ipv6Address_2, "!B", rw=RW_FLAG_r)
-RCPTLV(5, "PrefixLen", C21_Ipv6Address_2, "!H", rw=RW_FLAG_r)
-RCPTLV(6, "Origin", C21_Ipv6Address_2, "!B", rw=RW_FLAG_r)
-RCPTLV(7, "Status", C21_Ipv6Address_2, "!B", rw=RW_FLAG_r)
-RCPTLV(8, "Created", C21_Ipv6Address_2, "!I", rw=RW_FLAG_r)
-RCPTLV(9, "LastChanged", C21_Ipv6Address_2, "!I", rw=RW_FLAG_r)
-
-C21_RpdGroupInfo_3 = \
-        RCPTLV(3, "RpdGroupInfo", C_VendorSpecificExtension_21, rw=RW_FLAG_row)
-RCPTLV(1, "ShelfId", C21_RpdGroupInfo_3, "MAC", rw=RW_FLAG_rw)
-RCPTLV(2, "Master", C21_RpdGroupInfo_3, "!B", rw=RW_FLAG_rw)
-RCPTLV(3, "ShelfSn", C21_RpdGroupInfo_3, "var", rw=RW_FLAG_rw,
-       constraint=StringLenConstraint(16))
-RCPTLV(4, "CpuId", C21_RpdGroupInfo_3, "!B", rw=RW_FLAG_rw)
-
-C21_RequestRpdOutput_4 = \
-        RCPTLV(4, "RequestRpdOutput", C_VendorSpecificExtension_21, rw=RW_FLAG_row)
-RCPTLV(1, "DataType", C21_RequestRpdOutput_4, "!B", rw=RW_FLAG_r)
-RCPTLV(2, "FragmentIndex", C21_RequestRpdOutput_4, "!B", rw=RW_FLAG_rw)
-RCPTLV(3, "FragmentLast", C21_RequestRpdOutput_4, "!B", rw=RW_FLAG_rw)
-RCPTLV(4, "PayloadStr", C21_RequestRpdOutput_4, "bytes", rw=RW_FLAG_rw,
-       constraint=StringLenConstraint(6000))
 
 #
 C_RpdRedirect_25 = RCPTLV(25, "RpdRedirect", rw=RW_FLAG_row)
@@ -990,7 +1134,7 @@ RCPTLV(6, "BootRomVersion", C50_RpdIdentification_19, "var", rw=RW_FLAG_r,
        constraint=StringLenConstraint(255))
 RCPTLV(7, "DeviceDescription", C50_RpdIdentification_19, "var", rw=RW_FLAG_r,
        constraint=StringLenConstraint(255))
-RCPTLV(8, "DeviceAlias", C50_RpdIdentification_19, "var", rw=RW_FLAG_r,
+RCPTLV(8, "DeviceAlias", C50_RpdIdentification_19, "var", rw=RW_FLAG_rw,
        constraint=StringLenConstraint(255))
 RCPTLV(9, "SerialNumber", C50_RpdIdentification_19, "var", rw=RW_FLAG_r,
        constraint=StringLenConstraint(16))
@@ -1009,9 +1153,14 @@ RCPTLV(15, "RpdRcpSchemaVersion", C50_RpdIdentification_19, "var",
 RCPTLV(16, "HwRevision", C50_RpdIdentification_19, "var",
        rw=RW_FLAG_r, constraint=StringLenConstraint(255))
 RCPTLV(17, "AssetId", C50_RpdIdentification_19, "var",
-       rw=RW_FLAG_r, constraint=StringLenConstraint(32))
+       rw=RW_FLAG_rw, constraint=StringLenConstraint(32))
 RCPTLV(18, "VspSelector", C50_RpdIdentification_19, "var",
        rw=RW_FLAG_r, constraint=StringLenConstraint(16))
+RCPTLV(19, "CurrentSwImageLastUpdate", C50_RpdIdentification_19, "bytes", rw=RW_FLAG_r,
+       constraint=StringLenRangeConstraint(8, 11))
+RCPTLV(20, "CurrentSwImageName", C50_RpdIdentification_19, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(21, "CurrentSwImageServer", C50_RpdIdentification_19, "IPAddr", rw=RW_FLAG_r)
 
 # LcceChannelReachability
 C50_LcceChannelReachability_20 = \
@@ -1074,11 +1223,11 @@ RCPTLV(6, "AllocatedNdrChannels", C50_AllocUsChanResources_23, "!H",
 # DeviceLocation
 C50_DeviceLocation_24 = \
     RCPTLV(24, "DeviceLocation", C_RpdCapabilities_50, rw=RW_FLAG_row)
-RCPTLV(1, "DeviceLocationDescription", C50_DeviceLocation_24, "var",
+RCPTLV(1, "DeviceLocationDescription", C50_DeviceLocation_24, "var", rw=RW_FLAG_rw,
        constraint=StringLenRangeConstraint(1, 255))
-RCPTLV(2, "GeoLocationLatitude", C50_DeviceLocation_24, "var",
+RCPTLV(2, "GeoLocationLatitude", C50_DeviceLocation_24, "var", rw=RW_FLAG_rw,
        constraint=StringLenConstraint(9))
-RCPTLV(3, "GeoLocationLongitude", C50_DeviceLocation_24, "var",
+RCPTLV(3, "GeoLocationLongitude", C50_DeviceLocation_24, "var", rw=RW_FLAG_rw,
        constraint=StringLenConstraint(10))
 
 RCPTLV(25, "NumAsyncVideoChannels", C_RpdCapabilities_50, "!B", rw=RW_FLAG_r)
@@ -1104,13 +1253,13 @@ RCPTLV(35, "MaxDsPspSegCount", C_RpdCapabilities_50, "!B", rw=RW_FLAG_r)
 RCPTLV(36, "DirectDsFlowQueueMapping", C_RpdCapabilities_50, "!B", rw=RW_FLAG_r)
 
 C50_DsSchedulerPhbIdList_37 = \
-    RCPTLV(37, "DsSchedulerPhbIdList", C_RpdCapabilities_50, "var", rw=RW_FLAG_r, 
-         constraint=StringLenConstraint(255))
+    RCPTLV(37, "DsSchedulerPhbIdList", C_RpdCapabilities_50, "var", rw=RW_FLAG_r,
+           constraint=StringLenConstraint(255))
 
 RCPTLV(38, "RpdPendingEvRepQueueSize", C_RpdCapabilities_50, "!H", rw=RW_FLAG_r)
 RCPTLV(39, "RpdLocalEventLogSize", C_RpdCapabilities_50, "!I", rw=RW_FLAG_r)
 RCPTLV(40, "SupportsOpticalNodeRf", C_RpdCapabilities_50, "!B", rw=RW_FLAG_r,
-        constraint=BOOL_CONSTR)
+       constraint=BOOL_CONSTR)
 RCPTLV(41, "MaxDsFrequency", C_RpdCapabilities_50, "!I", rw=RW_FLAG_r)
 RCPTLV(42, "MinDsFrequency", C_RpdCapabilities_50, "!I", rw=RW_FLAG_r)
 RCPTLV(43, "MaxBasePower", C_RpdCapabilities_50, "!H", rw=RW_FLAG_r)
@@ -1119,7 +1268,38 @@ RCPTLV(45, "MinPowerAdjustScQam", C_RpdCapabilities_50, "!h", rw=RW_FLAG_r)
 RCPTLV(46, "MaxPowerAdjustScQam", C_RpdCapabilities_50, "!H", rw=RW_FLAG_r)
 RCPTLV(47, "MinPowerAdjustOfdm", C_RpdCapabilities_50, "!h", rw=RW_FLAG_r)
 RCPTLV(48, "MaxPowerAdjustOfdm", C_RpdCapabilities_50, "!H", rw=RW_FLAG_r)
+C50_UsPowerCapabilities_49 = \
+    RCPTLV(49, "UsPowerCapabilities", C_RpdCapabilities_50, rw=RW_FLAG_row)
+RCPTLV(1, "MinBaseUsPowerTargetLevel", C50_UsPowerCapabilities_49, "!h", rw=RW_FLAG_r)
+RCPTLV(2, "MaxBaseUsPowerTargetLevel", C50_UsPowerCapabilities_49, "!h", rw=RW_FLAG_r)
+RCPTLV(3, "MinTargetRxPowerAdjustScqam", C50_UsPowerCapabilities_49, "!h", rw=RW_FLAG_r)
+RCPTLV(4, "MaxTargetRxPowerAdjustScqam", C50_UsPowerCapabilities_49, "!h", rw=RW_FLAG_r)
+RCPTLV(5, "MinTargetRxPowerAdjustOfdma", C50_UsPowerCapabilities_49, "!h", rw=RW_FLAG_r)
+RCPTLV(6, "MaxTargetRxPowerAdjustOfdma", C50_UsPowerCapabilities_49, "!h", rw=RW_FLAG_r)
+RCPTLV(7, "MinTargetRxPowerAdjustNdr", C50_UsPowerCapabilities_49, "!h", rw=RW_FLAG_r)
+RCPTLV(8, "MaxTargetRxPowerAdjustNdr", C50_UsPowerCapabilities_49, "!h", rw=RW_FLAG_r)
+C50_StaticPwCapabilities_50 = \
+    RCPTLV(50, "StaticPwCapabilities", C_RpdCapabilities_50, rw=RW_FLAG_row)
+RCPTLV(1, "MaxFwdStaticPws", C50_StaticPwCapabilities_50, "!H", rw=RW_FLAG_r)
+RCPTLV(2, "MaxRetStaticPws", C50_StaticPwCapabilities_50, "!H", rw=RW_FLAG_r)
+RCPTLV(3, "SupportsMptDepiPw", C50_StaticPwCapabilities_50, "!B", rw=RW_FLAG_r)
+RCPTLV(4, "SupportsMpt55d1RetPw", C50_StaticPwCapabilities_50, "!B", rw=RW_FLAG_r)
+RCPTLV(5, "SupportsPspNdfPw", C50_StaticPwCapabilities_50, "!B", rw=RW_FLAG_r)
+RCPTLV(6, "SupportsPspNdrPw", C50_StaticPwCapabilities_50, "!B", rw=RW_FLAG_r)
+C50_DsCapabilities_51 = \
+    RCPTLV(51, "DsCapabilities", C_RpdCapabilities_50, rw=RW_FLAG_row)
+RCPTLV(1, "DsScqamInterleaverSupport", C50_DsCapabilities_51, "!I", rw=RW_FLAG_r)
+C50_GcpCapabilities_52 = \
+    RCPTLV(52, "GcpCapabilities", C_RpdCapabilities_50, rw=RW_FLAG_row)
+RCPTLV(1, "GcpKaResponseTime", C50_GcpCapabilities_52, "!H", rw=RW_FLAG_r)
 
+C50_SwimageCapabilities_53 = \
+    RCPTLV(53, "SwimageCapabilities", C_RpdCapabilities_50, rw=RW_FLAG_row)
+
+C50_OfdmConfigurationCapabilities_54 = \
+    RCPTLV(54, "OfdmConfigurationCapabilities", C_RpdCapabilities_50, rw=RW_FLAG_row)
+RCPTLV(1, "RequiresOfdmaImDurationConfig", C50_OfdmConfigurationCapabilities_54, "!B", rw=RW_FLAG_r,
+       constraint=BOOL_CONSTR)
 #
 # Newly added for PTP clock status
 #
@@ -1133,7 +1313,7 @@ C_RpdConfigurationDone_52 = RCPTLV(52, "RpdConfigurationDone", format_str="!B", 
 
 
 # RPD EVENT LOG CONF
-C_EventNotification_85 = RCPTLV(85, "EventNotification", rw=RW_FLAG_row)
+C_EventNotification_85 = RCPTLV(85, "EventNotification", rw=RW_FLAG_row_key)
 RCPTLV(1, "RpdEvLogIndex", C_EventNotification_85, "!I")
 RCPTLV(2, "PendingOrLocalLog", C_EventNotification_85, "!B",
        constraint=EnumConstraint(RPD_EVENT_NOTIFICATION_DICT))
@@ -1168,16 +1348,16 @@ C_RpdState_87 = RCPTLV(87, "RpdState", rw=RW_FLAG_row)
 RCPTLV(1, "TopLevelRPDState", C_RpdState_87, "!B", rw=RW_FLAG_r)
 
 C87_NetworkAuthenticationState_2 = \
-RCPTLV(2, "NetworkAuthenticationState", C_RpdState_87, rw=RW_FLAG_row)
+    RCPTLV(2, "NetworkAuthenticationState", C_RpdState_87, rw=RW_FLAG_row)
 RCPTLV(1, "NetworkAuthenticationPortIndex", C87_NetworkAuthenticationState_2, "!B", rw=RW_FLAG_key)
 RCPTLV(2, "NetworkAuthenticationRpdState", C87_NetworkAuthenticationState_2, "!B", rw=RW_FLAG_r)
 
 RCPTLV(3, "ConnectPrincipalCoreSubState", C_RpdState_87, "!B", rw=RW_FLAG_r)
 
 C87_AuxCoreState_4 = \
-RCPTLV(4, "AuxCoreState", C_RpdState_87, rw=RW_FLAG_row)
+    RCPTLV(4, "AuxCoreState", C_RpdState_87, rw=RW_FLAG_row)
 RCPTLV(1, "AuxCoreIndex", C87_AuxCoreState_4, "!B", rw=RW_FLAG_key)
-RCPTLV(2, "AuxCoreId", C87_AuxCoreState_4, "!B", rw=RW_FLAG_r )
+RCPTLV(2, "AuxCoreId", C87_AuxCoreState_4, "!B", rw=RW_FLAG_r)
 RCPTLV(3, "AuxCoreIp", C87_AuxCoreState_4, "!B", rw=RW_FLAG_r)
 RCPTLV(4, "AuxCoreRPDState", C87_AuxCoreState_4, "!B", rw=RW_FLAG_r)
 
@@ -1189,14 +1369,14 @@ C_StaticPwConfig_58 = \
     RCPTLV(58, "StaticPwConfig", rw=RW_FLAG_row)
 
 C58_FwdStaticPwConfig_1 = \
-RCPTLV(1, "FwdStaticPwConfig", C_StaticPwConfig_58, rw=RW_FLAG_row)
-RCPTLV(1, "Index", C58_FwdStaticPwConfig_1, "!H",rw=RW_FLAG_r)
+    RCPTLV(1, "FwdStaticPwConfig", C_StaticPwConfig_58, rw=RW_FLAG_row)
+RCPTLV(1, "Index", C58_FwdStaticPwConfig_1, "!H", rw=RW_FLAG_r)
 RCPTLV(2, "CcapCoreOwner", C58_FwdStaticPwConfig_1, "MAC", rw=RW_FLAG_rw)
 RCPTLV(3, "GroupAddress", C58_FwdStaticPwConfig_1, "IPAddr", rw=RW_FLAG_rw)
 RCPTLV(4, "SourceAddress", C58_FwdStaticPwConfig_1, "IPAddr", rw=RW_FLAG_rw)
 
 C58_RetStaticPwConfig_2 = \
-RCPTLV(2, "RetStaticPwConfig", C_StaticPwConfig_58, rw=RW_FLAG_row)
+    RCPTLV(2, "RetStaticPwConfig", C_StaticPwConfig_58, rw=RW_FLAG_row)
 RCPTLV(1, "Index", C58_RetStaticPwConfig_2, "!H", rw=RW_FLAG_r)
 RCPTLV(2, "CcapCoreOwner", C58_RetStaticPwConfig_2, "MAC", rw=RW_FLAG_rw)
 RCPTLV(3, "DestAddress", C58_RetStaticPwConfig_2, "IPAddr", rw=RW_FLAG_rw)
@@ -1204,7 +1384,7 @@ RCPTLV(4, "MtuSize", C58_RetStaticPwConfig_2, "!H", rw=RW_FLAG_rw)
 RCPTLV(5, "UsPhbId", C58_RetStaticPwConfig_2, "!B", rw=RW_FLAG_rw)
 
 C58_CommonStaticPwConfig_3 = \
-RCPTLV(3, "CommonStaticPwConfig", C_StaticPwConfig_58, rw=RW_FLAG_row)
+    RCPTLV(3, "CommonStaticPwConfig", C_StaticPwConfig_58, rw=RW_FLAG_row)
 RCPTLV(1, "Direction", C58_CommonStaticPwConfig_3, "!B", rw=RW_FLAG_rw)
 RCPTLV(2, "Index", C58_CommonStaticPwConfig_3, "!H", rw=RW_FLAG_r)
 RCPTLV(4, "PwType", C58_CommonStaticPwConfig_3, "!H", rw=RW_FLAG_r)
@@ -1216,11 +1396,11 @@ RCPTLV(9, "CircuitStatus", C58_CommonStaticPwConfig_3, "!H", rw=RW_FLAG_rw)
 RCPTLV(10, "RpdEnetPortIndex", C58_CommonStaticPwConfig_3, "!B", rw=RW_FLAG_rw)
 
 C58_PwAssociation_3_11 = \
-RCPTLV(11, "PwAssociation", C58_CommonStaticPwConfig_3, rw=RW_FLAG_row)
+    RCPTLV(11, "PwAssociation", C58_CommonStaticPwConfig_3, rw=RW_FLAG_row)
 RCPTLV(1, "Index", C58_PwAssociation_3_11, "!B", rw=RW_FLAG_key)
 
 C58_PwAssociation_3_11_2 = \
-RCPTLV(2, "ChannelSelector", C58_PwAssociation_3_11, rw=RW_FLAG_row)
+    RCPTLV(2, "ChannelSelector", C58_PwAssociation_3_11, rw=RW_FLAG_row)
 RCPTLV(1, "RfPortIndex", C58_PwAssociation_3_11_2, "!B", rw=RW_FLAG_rw)
 RCPTLV(2, "ChannelType", C58_PwAssociation_3_11_2, "!B", rw=RW_FLAG_rw)
 RCPTLV(3, "ChannelIndex", C58_PwAssociation_3_11_2, "!B", rw=RW_FLAG_rw)
@@ -1230,7 +1410,7 @@ RCPTLV(12, "EnableStatusNotification", C58_CommonStaticPwConfig_3, "!B")
 C_StaticPwStatus_59 = \
     RCPTLV(59, "StaticPwStatus", rw=RW_FLAG_row)
 C59_StaticPwStatus_1 = \
-RCPTLV(1, "CommonStaticPwStatus", C_StaticPwStatus_59, rw=RW_FLAG_row)
+    RCPTLV(1, "CommonStaticPwStatus", C_StaticPwStatus_59, rw=RW_FLAG_row)
 RCPTLV(1, "Direction", C59_StaticPwStatus_1, "!B")
 RCPTLV(2, "Index", C59_StaticPwStatus_1, "!H")
 RCPTLV(3, "RpdCircuitStatus", C59_StaticPwStatus_1, "!H")
@@ -1264,6 +1444,7 @@ RCPTLV(8, "InitialConfigurationComplete", C_CcapCoreIdentification_60, "!B", con
 RCPTLV(9, "MoveToOperational", C_CcapCoreIdentification_60, "!B", constraint=BOOL_CONSTR)
 RCPTLV(10, "CoreFunction", C_CcapCoreIdentification_60, "!H")
 RCPTLV(11, "ResourceSetIndex", C_CcapCoreIdentification_60, "!B")
+RCPTLV(12, "ProtocolSupport", C_CcapCoreIdentification_60, "!H")
 
 #
 # DsRfPort
@@ -1368,7 +1549,7 @@ C_DsOfdmProfile_64 = \
 RCPTLV(1, "ProfileId", C_DsOfdmProfile_64, "!B",
        constraint=RangeConstraint(PROFILE_ID_TYPES[0], PROFILE_ID_TYPES[-1]))
 C64_DsOfdmSubcarrierModulation_2 = \
-RCPTLV(2, "DsOfdmSubcarrierModulation", C_DsOfdmProfile_64,
+    RCPTLV(2, "DsOfdmSubcarrierModulation", C_DsOfdmProfile_64,
            rw=RW_FLAG_row)
 RCPTLV(1, "StartSubcarrierId", C64_DsOfdmSubcarrierModulation_2, "!H",
        rw=RW_FLAG_key,
@@ -1376,12 +1557,12 @@ RCPTLV(1, "StartSubcarrierId", C64_DsOfdmSubcarrierModulation_2, "!H",
                                   SUBCARRIER_ID_TYPES[-1]))
 RCPTLV(2, "EndSubcarrierId", C64_DsOfdmSubcarrierModulation_2, "!H",
        constraint=RangeConstraint(SUBCARRIER_ID_TYPES[0],
-                                SUBCARRIER_ID_TYPES[-1]))
+                                  SUBCARRIER_ID_TYPES[-1]))
 RCPTLV(3, "Modulation", C64_DsOfdmSubcarrierModulation_2, "!B",
-      constraint=EnumConstraint(DATA_SYMBOL_MODULATION_DICT))
+       constraint=EnumConstraint(MODULATION_722_DICT))
 
 #
-# B.7.8 DOCSIS Upstream Channel Configuration
+# DOCSIS Upstream Channel Configuration
 #
 C_UsScQamChannelConfig_65 = \
     RCPTLV(65, "UsScQamChannelConfig", C_RfChannel_16, rw=RW_FLAG_row)
@@ -1438,8 +1619,6 @@ RCPTLV(15, "GuardTime", C65_IntervalUsageCode_10, "!B")
 #
 C_UsOfdmaChannelConfig_66 = \
     RCPTLV(66, "UsOfdmaChannelConfig", C_RfChannel_16, rw=RW_FLAG_row)
-# TODO __DB__ RCPTLV(0, "Index" , C_UsOfdmaChannelConfig_9, "!H",
-# rw=RW_FLAG_key) # ??? on DIAGRAM but MISSING IN TLV
 RCPTLV(1, "AdminState", C_UsOfdmaChannelConfig_66, "!B",
        constraint=EnumConstraint(ADMIN_STATE_DICT))
 RCPTLV(2, "CcapCoreOwner", C_UsOfdmaChannelConfig_66, "MAC")
@@ -1458,14 +1637,22 @@ RCPTLV(9, "NumSymbolsPerFrame", C_UsOfdmaChannelConfig_66, "!B",
                                   NUM_SYMBOL_PER_FRAME_TYPES[-1]))
 RCPTLV(10, "NumActiveSubcarriers", C_UsOfdmaChannelConfig_66, "!H")
 RCPTLV(11, "StartingMinislot", C_UsOfdmaChannelConfig_66, "!I")
-RCPTLV(12, "PreambleString", C_UsOfdmaChannelConfig_66, "var")  # ??? max 192
-RCPTLV(13, "TargetRxPower", C_UsOfdmaChannelConfig_66, "!H")
+RCPTLV(12, "PreambleString", C_UsOfdmaChannelConfig_66, "bytes")  # ??? max 192
+RCPTLV(13, "TargetRxPowerAdjust", C_UsOfdmaChannelConfig_66, "!H")
 RCPTLV(14, "EnableFlowTags", C_UsOfdmaChannelConfig_66, "!B",
        constraint=BOOL_CONSTR)
 RCPTLV(15, "ScramblerSeed", C_UsOfdmaChannelConfig_66, "!I")
+RCPTLV(16, "ConfigMultiSectionTimingMer", C_UsOfdmaChannelConfig_66, "var")
+# BwReqAggrControlOfdma
+C66_BwReqAggrControlOfdma_17 = \
+    RCPTLV(17, "BwReqAggrControlOfdma", C_UsOfdmaChannelConfig_66, rw=RW_FLAG_row)
+RCPTLV(1, "MaxReqBlockEnqTimeout", C66_BwReqAggrControlOfdma_17, "!H")
+RCPTLV(2, "MaxReqBlockEnqNumber", C66_BwReqAggrControlOfdma_17, "!B")
 RCPTLV(18, "UpStreamChanId", C_UsOfdmaChannelConfig_66, "!B")
 RCPTLV(19, "ConfigChangeCount", C_UsOfdmaChannelConfig_66, "!B")
 RCPTLV(20, "DownStreamChanId", C_UsOfdmaChannelConfig_66, "!B")
+RCPTLV(21, "BroadcastImRegionDuration", C_UsOfdmaChannelConfig_66, "!B")
+RCPTLV(22, "UnicastImRegionDuration", C_UsOfdmaChannelConfig_66, "!B")
 
 #
 # UsOfdmaInitialRangingIuc
@@ -1510,11 +1697,11 @@ RCPTLV(6, "DataSymbolModulation", C_UsOfdmaDataIuc_69, "!B",
 C_UsOfdmaSubcarrierCfgState_70 = \
     RCPTLV(70, "UsOfdmaSubcarrierCfgState", C_RfChannel_16, rw=RW_FLAG_row)
 RCPTLV(1, "StartingSubcarrierId", C_UsOfdmaSubcarrierCfgState_70, "!H",
-       rw=RW_FLAG_key, constraint=RangeConstraint(
-       STARTING_SUBCARRIER_ID_TYPES[0],
-       STARTING_SUBCARRIER_ID_TYPES[-1]))
+       rw=RW_FLAG_key,
+       constraint=RangeConstraint(STARTING_SUBCARRIER_ID_TYPES[0],
+                                  STARTING_SUBCARRIER_ID_TYPES[-1]))
 RCPTLV(2, "NumConsecutiveSubcarriers", C_UsOfdmaSubcarrierCfgState_70, "!H")
-RCPTLV(3, "SubarrierUsage", C_UsOfdmaSubcarrierCfgState_70, "!B",
+RCPTLV(3, "SubcarrierUsage", C_UsOfdmaSubcarrierCfgState_70, "!B",
        constraint=EnumConstraint(SUBCARRIER_USAGE_13_DICT))
 
 #
@@ -1528,30 +1715,14 @@ RCPTLV(3, "SidSfType", C_SidQos_96, "!B")
 RCPTLV(4, "SidUepiFlowId", C_SidQos_96, "!B")
 RCPTLV(5, "SidFlowTag", C_SidQos_96, "!I")
 
-#
-# IucCounter
-#
-C_IucCounter_98 = \
-    RCPTLV(98, "IucCounter", C_RfChannel_16, rw=RW_FLAG_row)
-RCPTLV(1, "CliCmd", C_IucCounter_98, "!H")
-RCPTLV(2, "Slot", C_IucCounter_98, "!H")
-RCPTLV(3, "DevId", C_IucCounter_98, "!B")
-RCPTLV(4, "Pch", C_IucCounter_98, "!B")
-RCPTLV(5, "LogChan", C_IucCounter_98, "!B")
-RCPTLV(6, "Iuc", C_IucCounter_98, "!B")
-RCPTLV(7, "RawData",C_IucCounter_98, "var", 
-       constraint=StringLenConstraint(2048))
-#
-# Fft
-#
-C_FftCfg_99 = \
-    RCPTLV(99, "FftCfg", C_RfChannel_16, rw=RW_FLAG_row_key)
-RCPTLV(1, "Sid", C_FftCfg_99, "!H")
-RCPTLV(2, "Freq", C_FftCfg_99, "!I")
-RCPTLV(3, "Iuc", C_FftCfg_99, "!B")
-RCPTLV(4, "Size", C_FftCfg_99, "!I")
-RCPTLV(5, "Mode", C_FftCfg_99, "!H")
-RCPTLV(6, "Pch", C_FftCfg_99, "!H")
+C_UsRfPort_98 = \
+    RCPTLV(98, "UsRfPort", C_RfPort_17, rw=RW_FLAG_row)
+RCPTLV(1, "AdminState", C_UsRfPort_98, "!B", constraint=EnumConstraint(ADMIN_STATE_DICT))
+C98_BwReqAggrControl = \
+    RCPTLV(2, "BwReqAggrControl", C_UsRfPort_98, rw=RW_FLAG_row)
+RCPTLV(1, "MaxReqBlockEnqTimeout", C98_BwReqAggrControl, "!H", constraint=RangeConstraint(0, 500))
+RCPTLV(2, "MaxReqBlockEnqNumber", C98_BwReqAggrControl, "!B", constraint=RangeConstraint(1, 63))
+RCPTLV(3, "BaseTargetRxPower", C_UsRfPort_98, "!h")
 
 #
 # Status and performance TLVs
@@ -1561,32 +1732,32 @@ C_DsRfPortPerf_71 = \
 
 C_DsScQamChannelPerf_72 = \
     RCPTLV(72, "DsScQamChannelPerf", C_RfChannel_16, rw=RW_FLAG_row)
-RCPTLV(1, "outDiscards", C_DsScQamChannelPerf_72, "!I", rw=RW_FLAG_r)
-RCPTLV(2, "outErrors", C_DsScQamChannelPerf_72, "!I", rw=RW_FLAG_r)
+RCPTLV(1, "outDiscards", C_DsScQamChannelPerf_72, "!Q", rw=RW_FLAG_r)
+RCPTLV(2, "outErrors", C_DsScQamChannelPerf_72, "!Q", rw=RW_FLAG_r)
 
 C_DsOfdmChannelPerf_73 = \
     RCPTLV(73, "DsOfdmChannelPerf", C_RfChannel_16, rw=RW_FLAG_row)
-RCPTLV(1, "outDiscards", C_DsOfdmChannelPerf_73, "!I", rw=RW_FLAG_r)
-RCPTLV(2, "outErrors", C_DsOfdmChannelPerf_73, "!I", rw=RW_FLAG_r)
-C73_DsOrdmProfilePerf_3 = \
+RCPTLV(1, "outDiscards", C_DsOfdmChannelPerf_73, "!Q", rw=RW_FLAG_r)
+RCPTLV(2, "outErrors", C_DsOfdmChannelPerf_73, "!Q", rw=RW_FLAG_r)
+C73_DsOfdmProfilePerf_3 = \
     RCPTLV(3, "DsOfdmProfilePerf", C_DsOfdmChannelPerf_73, rw=RW_FLAG_row)
-RCPTLV(1, "ProfileIndex", C73_DsOrdmProfilePerf_3, "!B", rw=RW_FLAG_r)
-RCPTLV(2, "outCodewords", C73_DsOrdmProfilePerf_3, "!I", rw=RW_FLAG_r)
+RCPTLV(1, "ProfileIndex", C73_DsOfdmProfilePerf_3, "!B", rw=RW_FLAG_r)
+RCPTLV(2, "outCodewords", C73_DsOfdmProfilePerf_3, "!Q", rw=RW_FLAG_r)
 
 C_DsOob551IPerf_74 = \
     RCPTLV(74, "DsOob551IPerf", C_RfChannel_16, rw=RW_FLAG_row)
-RCPTLV(1, "outDiscards", C_DsOob551IPerf_74, "!I", rw=RW_FLAG_r)
-RCPTLV(2, "outErrors", C_DsOob551IPerf_74, "!I", rw=RW_FLAG_r)
+RCPTLV(1, "outDiscards", C_DsOob551IPerf_74, "!Q", rw=RW_FLAG_r)
+RCPTLV(2, "outErrors", C_DsOob551IPerf_74, "!Q", rw=RW_FLAG_r)
 
 C_DsOob552Perf_75 = \
     RCPTLV(75, "DsOob552Perf", C_RfChannel_16, rw=RW_FLAG_row)
-RCPTLV(1, "outDiscards", C_DsOob552Perf_75, "!I", rw=RW_FLAG_r)
-RCPTLV(2, "outErrors", C_DsOob552Perf_75, "!I", rw=RW_FLAG_r)
+RCPTLV(1, "outDiscards", C_DsOob552Perf_75, "!Q", rw=RW_FLAG_r)
+RCPTLV(2, "outErrors", C_DsOob552Perf_75, "!Q", rw=RW_FLAG_r)
 
 C_NdfPerf_76 = \
     RCPTLV(76, "NdfPerf", C_RfChannel_16, rw=RW_FLAG_row)
-RCPTLV(1, "outDiscards", C_NdfPerf_76, "!I", rw=RW_FLAG_r)
-RCPTLV(2, "outErrors", C_NdfPerf_76, "!I", rw=RW_FLAG_r)
+RCPTLV(1, "outDiscards", C_NdfPerf_76, "!Q", rw=RW_FLAG_r)
+RCPTLV(2, "outErrors", C_NdfPerf_76, "!Q", rw=RW_FLAG_r)
 
 C_UsRfPortPerf_77 = \
     RCPTLV(77, "UsRfPortPerf", C_RfChannel_16, rw=RW_FLAG_row)
@@ -1598,9 +1769,17 @@ C78_UsScQamIucIPerf_1 = \
 RCPTLV(1, "UsIuc", C78_UsScQamIucIPerf_1, "!B", rw=RW_FLAG_r)
 RCPTLV(2, "Collisions", C78_UsScQamIucIPerf_1, "!I", rw=RW_FLAG_r)
 RCPTLV(3, "NoEnergy", C78_UsScQamIucIPerf_1, "!I", rw=RW_FLAG_r)
+C78_UcdRefreshScqam_10 = \
+    RCPTLV(10, "UcdRefreshStatusScqam", C_UsScQamChannelPerf_78, rw=RW_FLAG_row)
+RCPTLV(1, "UcdRefreshRequestScqam", C78_UcdRefreshScqam_10, "!B", rw=RW_FLAG_r, constraint=BOOL_CONSTR)
+RCPTLV(2, "UcdRefreshReasonScqam", C78_UcdRefreshScqam_10, "var", rw=RW_FLAG_r, constraint=StringLenConstraint(32))
 
 C_UsOfdmaChannelPerf_79 = \
     RCPTLV(79, "UsOfdmaChannelPerf", C_RfChannel_16, rw=RW_FLAG_row)
+C79_UcdRefreshOfdma_10 = \
+    RCPTLV(10, "UcdRefreshStatusOfdma", C_UsOfdmaChannelPerf_79, rw=RW_FLAG_row)
+RCPTLV(1, "UcdRefreshRequestOfdma", C79_UcdRefreshOfdma_10, "!B", rw=RW_FLAG_r, constraint=BOOL_CONSTR)
+RCPTLV(2, "UcdRefreshReasonOfdma", C79_UcdRefreshOfdma_10, "var", rw=RW_FLAG_r, constraint=StringLenConstraint(32))
 
 C_UsOob551IPerf_80 = \
     RCPTLV(80, "UsOob551IPerf", C_RfChannel_16, rw=RW_FLAG_row)
@@ -1614,7 +1793,7 @@ C_NdrPerf_82 = \
 # MultiCore
 #
 C_MultiCore_88 = \
-    RCPTLV(88, "MultiCore",rw=RW_FLAG_row)
+    RCPTLV(88, "MultiCore", rw=RW_FLAG_row)
 
 C88_ConfiguredCoreTable_1 = \
     RCPTLV(1, "ConfiguredCoreTable", C_MultiCore_88, rw=RW_FLAG_row)
@@ -1652,6 +1831,35 @@ RCPTLV(4, "LockParameters", C88_DownChannelConstraintTable_4, "!I", rw=RW_FLAG_r
 #
 # Device Management TLVs
 #
+
+RESET_TYPE = {
+    1: "softReset",
+    2: "hardReset",
+    3: "nvReset",
+    4: "factoryReset",
+}
+
+C_RpdCtrl_40 = \
+    RCPTLV(40, "RpdCtrl", rw=RW_FLAG_row)
+C40_ResetCtrl_1 = \
+    RCPTLV(1, "ResetCtrl", C_RpdCtrl_40, rw=RW_FLAG_row)
+RCPTLV(1, "Reset", C40_ResetCtrl_1, "!B", constraint=EnumConstraint(RESET_TYPE), rw=RW_FLAG_rw)
+C40_LogCtrl_2 = \
+    RCPTLV(2, "LogCtrl", C_RpdCtrl_40, rw=RW_FLAG_row)
+RCPTLV(1, "ResetLog", C40_LogCtrl_2, "!B", rw=RW_FLAG_rw)
+
+C40_CrashDataFileCtrl_3 = \
+    RCPTLV(3, "CrashDataFileCtrl", C_RpdCtrl_40, rw=RW_FLAG_row)
+RCPTLV(1, "Index", C40_CrashDataFileCtrl_3, "!B", rw=RW_FLAG_key)
+RCPTLV(2, "FileControl", C40_CrashDataFileCtrl_3, "!B", rw=RW_FLAG_rw)
+
+C40_CrashDataServerCtrl_4 = \
+    RCPTLV(4, "CrashDataServerCtrl", C_RpdCtrl_40, rw=RW_FLAG_row)
+RCPTLV(1, "DestIpAddress", C40_CrashDataServerCtrl_4, "IPAddr", rw=RW_FLAG_rw)
+RCPTLV(2, "DestPath", C40_CrashDataServerCtrl_4, "var", rw=RW_FLAG_rw)
+RCPTLV(3, "Protocol", C40_CrashDataServerCtrl_4, "!B", rw=RW_FLAG_rw)
+
+
 C_Ssd_90 = \
     RCPTLV(90, "Ssd", rw=RW_FLAG_row)
 RCPTLV(1, "SsdServerAddress", C_Ssd_90, "IPAddr")
@@ -1662,9 +1870,9 @@ RCPTLV(5, "SsdControl", C_Ssd_90, "!B")
 RCPTLV(6, "SsdManufCvcChain", C_Ssd_90, "bytes")
 RCPTLV(7, "SsdCosignerCvcChain", C_Ssd_90, "bytes")
 
-###############################################################################
+#
 # SCTE 55-1 OOB Configuration TLVs
-###############################################################################
+#
 C_DsOob55d1_91 = \
     RCPTLV(91, "DsOob55d1", C_RfChannel_16, rw=RW_FLAG_row)
 RCPTLV(1, "AdminState", C_DsOob55d1_91, "!B",
@@ -1687,9 +1895,9 @@ RCPTLV(4, "VarpdDeviceId", C_UsOob55d1_92, "!I")
 RCPTLV(5, "VarpdRfPortId", C_UsOob55d1_92, "!B")
 RCPTLV(6, "VarpdDemodId", C_UsOob55d1_92, "!B")
 
-###############################################################################
+#
 # SCTE 55-2 OOB Configuration TLVs
-###############################################################################
+#
 C_Oob55d2Config_93 = \
     RCPTLV(93, "Oob55d2Config", rw=RW_FLAG_row)
 RCPTLV(1, "DsCenterFrequency", C_Oob55d2Config_93, "!I")
@@ -1715,9 +1923,9 @@ RCPTLV(4, "UsPortAssociation", C93_4_Oob55d2Demod_10, "!B", rw=RW_FLAG_r)
 RCPTLV(11, "RfMute", C93_Oob55d2Module_4, "!B",
        constraint=BOOL_CONSTR)
 
-###############################################################################
+#
 # NDF Configuration TLVs
-###############################################################################
+#
 C_NdfConfig_94 = \
     RCPTLV(94, "NdfConfig", rw=RW_FLAG_row)
 # TODO: Index shown in UML diagram but missing in TLVs ???
@@ -1729,9 +1937,9 @@ RCPTLV(4, "CenterFrequency", C_NdfConfig_94, "!I")
 RCPTLV(5, "ChannelWidth", C_NdfConfig_94, "!I")
 RCPTLV(6, "PowerAdjust", C_NdfConfig_94, "!B")
 
-###############################################################################
+#
 # NDR Configuration TLVs
-###############################################################################
+#
 C_NdrConfig_95 = \
     RCPTLV(95, "NdrConfig", rw=RW_FLAG_row)
 # TODO: Index shown in UML diagram but missing in TLVs ???
@@ -1742,9 +1950,9 @@ RCPTLV(4, "ChannelWidth", C_NdrConfig_95, "!I")
 RCPTLV(5, "NdrPower", C_NdrConfig_95, "!B")
 
 
-###############################################################################
+#
 # RDTI Configuration
-###############################################################################
+#
 C_RdtiConfig_97 = \
     RCPTLV(97, "RdtiConfig", rw=RW_FLAG_row)
 RCPTLV(1, "RpdRdtiMode", C_RdtiConfig_97, "!B", constraint=EnumConstraint(RDTI_MODE_DICT))
@@ -1775,28 +1983,30 @@ RCPTLV(15, "RpdPtpPortUnicastContractDuration", C97_RpdPtpPortConfig_8, "!H", co
 RCPTLV(16, "RpdPtpPortClockGW", C97_RpdPtpPortConfig_8, "IPAddr", rw=RW_FLAG_rw)
 RCPTLV(17, "RpdPtpPortClockAlternateGW", C97_RpdPtpPortConfig_8, "IPAddr", rw=RW_FLAG_rw)
 
-###############################################################################
+#
 # RPD Operational Monitoring
-###############################################################################
+#
 
 C_RpdInfo_100 = \
     RCPTLV(100, "RpdInfo", rw=RW_FLAG_row)
-RCPTLV(1, "RpdMacAddress", C_RpdInfo_100, "MAC", rw=RW_FLAG_r)
-# RCPTLV(2, "ControlAddrType", C_RpdInfo_100, "!H", rw=RW_FLAG_r)
+C100_RpdDevInfo_1 = \
+    RCPTLV(1, "RpdDevInfo", C_RpdInfo_100, rw=RW_FLAG_row)
+RCPTLV(1, "RpdSysUpTime", C100_RpdDevInfo_1, "!I", rw=RW_FLAG_r)
+RCPTLV(2, "NumCrashFilesAvail", C100_RpdDevInfo_1, "!B", rw=RW_FLAG_r)
 
 C100_RpdL2tpSessionInfo_2 = \
     RCPTLV(2, "RpdL2tpSessionInfo", C_RpdInfo_100, rw=RW_FLAG_row)
-RCPTLV(1, "SessionIpAddrType", C100_RpdL2tpSessionInfo_2, "!H",
+RCPTLV(1, "SessionIpAddrType", C100_RpdL2tpSessionInfo_2, "!I",
        rw=RW_FLAG_key)
-RCPTLV(2, "RpdLcceIpAddress", C100_RpdL2tpSessionInfo_2, "IPAddr",
+RCPTLV(2, "RemoteLcceIpAddr", C100_RpdL2tpSessionInfo_2, "IPAddr",
        rw=RW_FLAG_key)
-RCPTLV(3, "LocalL2tpSessionId", C100_RpdL2tpSessionInfo_2, "!I",
+RCPTLV(3, "RpdLcceIpAddress", C100_RpdL2tpSessionInfo_2, "IPAddr",
        rw=RW_FLAG_key)
-RCPTLV(4, "RemoteLcceIpAddr", C100_RpdL2tpSessionInfo_2, "IPAddr",
-       rw=RW_FLAG_r)
-RCPTLV(5, "RemoteL2tpSessionId", C100_RpdL2tpSessionInfo_2, "!I",
-       rw=RW_FLAG_r)
-RCPTLV(6, "CoreId", C100_RpdL2tpSessionInfo_2, "MAC", rw=RW_FLAG_r)
+RCPTLV(4, "Direction", C100_RpdL2tpSessionInfo_2, "!B",
+       rw=RW_FLAG_key)
+RCPTLV(5, "LocalL2tpSessionId", C100_RpdL2tpSessionInfo_2, "!I",
+       rw=RW_FLAG_key)
+RCPTLV(6, "CoreId", C100_RpdL2tpSessionInfo_2, "bytes", rw=RW_FLAG_r)
 RCPTLV(7, "ConnCtrlId", C100_RpdL2tpSessionInfo_2, "!I", rw=RW_FLAG_r)
 RCPTLV(8, "UdpPort", C100_RpdL2tpSessionInfo_2, "!H", rw=RW_FLAG_r)
 RCPTLV(9, "Description", C100_RpdL2tpSessionInfo_2, "var", rw=RW_FLAG_r,
@@ -1813,126 +2023,145 @@ RCPTLV(18, "OperStatus", C100_RpdL2tpSessionInfo_2, "!B", rw=RW_FLAG_r)
 RCPTLV(19, "LocalStatus", C100_RpdL2tpSessionInfo_2, "!B", rw=RW_FLAG_r)
 RCPTLV(20, "LastChange", C100_RpdL2tpSessionInfo_2, "!I", rw=RW_FLAG_r)
 
-C100_RpdL2tpSessionStats_3=RCPTLV(3, "SessionStats", C_RpdInfo_100, rw=RW_FLAG_row)
-RCPTLV(1, "SessionIpAddrType", C100_RpdL2tpSessionStats_3, "!H", rw=RW_FLAG_key)
-RCPTLV(2, "RpdLcceIpAddress", C100_RpdL2tpSessionStats_3, "IPAddr", rw=RW_FLAG_key)
-RCPTLV(3, "LocalL2tpSessionId", C100_RpdL2tpSessionStats_3, "!I", rw=RW_FLAG_key)
-RCPTLV(4, "OutOfSequencePackets", C100_RpdL2tpSessionStats_3, "!I", rw=RW_FLAG_r)
-
-
-RCPTLV(4, "RpdSysUpTime", C_RpdInfo_100, "!I", rw=RW_FLAG_r)
-
-C100_Location_6 = \
-    RCPTLV(6, "Location", C_RpdInfo_100, rw=RW_FLAG_row)
-RCPTLV(1, "LocationDescription", C100_Location_6, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(2, "Latitude", C100_Location_6, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(3, "Longitude", C100_Location_6, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-
-# IpInterfaceObject
-C100_IpInterfaceObject_7 = \
-    RCPTLV(7, "IpInterfaceObject", C_RpdInfo_100, rw=RW_FLAG_row)
-RCPTLV(1, "IfIndex", C100_IpInterfaceObject_7, "!H", rw=RW_FLAG_key)
-RCPTLV(2, "Ipv4InterfaceTableLastChange", C100_IpInterfaceObject_7, "!I",
+C100_2_RpdL2tpSessionStats_21 = \
+    RCPTLV(21, "SessionStats", C100_RpdL2tpSessionInfo_2, rw=RW_FLAG_row)
+RCPTLV(1, "OutOfSequencePackets", C100_2_RpdL2tpSessionStats_21, "!I",
        rw=RW_FLAG_r)
-RCPTLV(3, "Ipv6InterfaceTableLastChange", C100_IpInterfaceObject_7, "!I",
-       rw=RW_FLAG_r)
-RCPTLV(4, "IpIfStatsTableLastChange", C100_IpInterfaceObject_7, "!I",
-       rw=RW_FLAG_r)
-RCPTLV(5, "Ipv4DefaultTTL", C100_IpInterfaceObject_7, "!I", rw=RW_FLAG_r)
-RCPTLV(6, "Ipv4ReasmTimeout", C100_IpInterfaceObject_7, "!I", rw=RW_FLAG_r)
-RCPTLV(7, "Ipv6DefaultHopLimit", C100_IpInterfaceObject_7, "!I", rw=RW_FLAG_r)
+RCPTLV(2, "InPacket", C100_2_RpdL2tpSessionStats_21, "!Q", rw=RW_FLAG_r)
+RCPTLV(3, "InDiscards", C100_2_RpdL2tpSessionStats_21, "!Q", rw=RW_FLAG_r)
+RCPTLV(4, "OutPackets", C100_2_RpdL2tpSessionStats_21, "!Q", rw=RW_FLAG_r)
+RCPTLV(5, "OutErrors", C100_2_RpdL2tpSessionStats_21, "!Q", rw=RW_FLAG_r)
+RCPTLV(6, "CounterDiscTime", C100_2_RpdL2tpSessionStats_21, "bytes",
+       constraint=StringLenRangeConstraint(8, 11))
 
-# TODO: Fix overlapping TLV Type 100.7.7 in specification
-# C100_7_IpAddresses_7 = \
-#     RCPTLV(7, "IpAddresses", C100_IpInterfaceObject_7, rw=RW_FLAG_row)
-# RCPTLV(1, "AddrType", C100_7_IpAddresses_7, "!H", rw=RW_FLAG_r)
-# RCPTLV(2, "IpAddress", C100_7_IpAddresses_7, "IPAddr", rw=RW_FLAG_r)
-# RCPTLV(3, "ifIndex", C100_7_IpAddresses_7, "!H", rw=RW_FLAG_r)
-# RCPTLV(4, "Type", C100_7_IpAddresses_7, "!I", rw=RW_FLAG_r)
-# RCPTLV(5, "Prefix", C100_7_IpAddresses_7, "!I", rw=RW_FLAG_r)
-# RCPTLV(6, "Origin", C100_7_IpAddresses_7, "!H", rw=RW_FLAG_r)
-# RCPTLV(7, "Status", C100_7_IpAddresses_7, "!H", rw=RW_FLAG_r)
-# RCPTLV(8, "Created", C100_7_IpAddresses_7, "!I", rw=RW_FLAG_r)
-# RCPTLV(9, "LastChanged", C100_7_IpAddresses_7, "!I", rw=RW_FLAG_r)
+# 100.4 - DiagnosticStatus
+C100_DiagnosticStatus_4 = \
+    RCPTLV(4, "DiagnosticStatus", C_RpdInfo_100, rw=RW_FLAG_row)
+RCPTLV(1, "ProbableCause", C100_DiagnosticStatus_4, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(2, "AdditionalText", C100_DiagnosticStatus_4, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(3, "SeverityLevel", C100_DiagnosticStatus_4, "!B", rw=RW_FLAG_r,
+       constraint=EnumConstraint(SEVERITYLEVEL_TYPE_DICT))
 
-#C100_7_IpDefaultRouter_8 = \
-#    RCPTLV(8, "IpDefaultRouter", C100_IpInterfaceObject_7, rw=RW_FLAG_row)
-#RCPTLV(1, "AddrType", C100_7_IpDefaultRouter_8, "!H", rw=RW_FLAG_r)
-#RCPTLV(2, "RouterIpAddress", C100_7_IpDefaultRouter_8, "IPAddr", rw=RW_FLAG_r)
-#RCPTLV(3, "ifIndex", C100_7_IpDefaultRouter_8, "!H", rw=RW_FLAG_r)
-#RCPTLV(4, "Lifetime", C100_7_IpDefaultRouter_8, "!I", rw=RW_FLAG_r)
-#RCPTLV(5, "Preference", C100_7_IpDefaultRouter_8, "!I", rw=RW_FLAG_r)
+# 100.5 - DepiMcastSession
+C100_DepiMcastSession_5 = \
+    RCPTLV(5, "DepiMcastSession", C_RpdInfo_100, rw=RW_FLAG_row)
+RCPTLV(1, "IpAddrType", C100_DepiMcastSession_5, "!I", rw=RW_FLAG_key)
+RCPTLV(2, "GroupIpAddr", C100_DepiMcastSession_5, "IPAddr", rw=RW_FLAG_key)
+RCPTLV(3, "SrcIpAddr", C100_DepiMcastSession_5, "IPAddr", rw=RW_FLAG_key)
+RCPTLV(4, "LocalLcceIpAddr", C100_DepiMcastSession_5, "IPAddr", rw=RW_FLAG_r)
+RCPTLV(5, "RemoteLcceIpAddr", C100_DepiMcastSession_5, "IPAddr", rw=RW_FLAG_r)
+RCPTLV(6, "SessionId", C100_DepiMcastSession_5, "!I", rw=RW_FLAG_key)
+RCPTLV(7, "JoinTime", C100_DepiMcastSession_5, "bytes", rw=RW_FLAG_r)
 
-C100_7_IpNetToPhysical_9 = \
-    RCPTLV(9, "IpNetToPhysical", C100_IpInterfaceObject_7, rw=RW_FLAG_row)
-RCPTLV(1, "ifIndex", C100_7_IpNetToPhysical_9, "!H", rw=RW_FLAG_key)
-RCPTLV(2, "AddrType", C100_7_IpNetToPhysical_9, "!H", rw=RW_FLAG_r)
-RCPTLV(3, "NetAddress", C100_7_IpNetToPhysical_9, "IPAddr", rw=RW_FLAG_r)
-RCPTLV(4, "PhysAddress", C100_7_IpNetToPhysical_9, "MAC", rw=RW_FLAG_r)
-RCPTLV(5, "LastUpdated", C100_7_IpNetToPhysical_9, "!I", rw=RW_FLAG_r)
-RCPTLV(6, "Type", C100_7_IpNetToPhysical_9, "!i", rw=RW_FLAG_r)
-RCPTLV(7, "State", C100_7_IpNetToPhysical_9, "!i", rw=RW_FLAG_r)
+# 100.6 - Entity
+ClassType = {
+    1: "other",
+    2: "unknown",
+    3: "chassis",
+    4: "backplane",
+    5: "container",
+    6: "powerSupply",
+    7: "fan",
+    8: "sensor",
+    9: "module",
+    10: "port",
+    11: "stack",
+    12: "cpu"
+}
 
-C100_7_Ipv6Interfaces_10 = \
-    RCPTLV(10, "Ipv6Interfaces", C100_IpInterfaceObject_7, rw=RW_FLAG_row)
-RCPTLV(1, "ifIndex", C100_7_Ipv6Interfaces_10, "!H", rw=RW_FLAG_key)
-RCPTLV(2, "ReasmMaxSize", C100_7_Ipv6Interfaces_10, "!I", rw=RW_FLAG_r)
-# TODO: Length of InterfaceIdentifier missing in specification?
-RCPTLV(3, "InterfaceIdentifier", C100_7_Ipv6Interfaces_10, "var", rw=RW_FLAG_r)
-RCPTLV(4, "EnableStatus", C100_7_Ipv6Interfaces_10, "!i", rw=RW_FLAG_r)
-RCPTLV(5, "ReachableTime", C100_7_Ipv6Interfaces_10, "!I", rw=RW_FLAG_r)
-RCPTLV(6, "RetransmitTime", C100_7_Ipv6Interfaces_10, "!I", rw=RW_FLAG_r)
+C100_RpdEntity_6 = \
+    RCPTLV(6, "RpdEntityTable", C_RpdInfo_100, rw=RW_FLAG_row)
+RCPTLV(1, "EntityIndex", C100_RpdEntity_6, "!I", rw=RW_FLAG_key)
+RCPTLV(2, "Descr", C100_RpdEntity_6, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(3, "VendorType", C100_RpdEntity_6, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(4, "ContainedIn", C100_RpdEntity_6, "!I", rw=RW_FLAG_r)
+RCPTLV(5, "Class", C100_RpdEntity_6, "!B", constraint=EnumConstraint(ClassType))
+RCPTLV(6, "ParentRelPos", C100_RpdEntity_6, "!i", rw=RW_FLAG_r)
+RCPTLV(7, "Name", C100_RpdEntity_6, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(8, "HardwareRev", C100_RpdEntity_6, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(9, "FirmwareRev", C100_RpdEntity_6, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(10, "SoftwareRev", C100_RpdEntity_6, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(11, "SerialNum", C100_RpdEntity_6, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(12, "MfgName", C100_RpdEntity_6, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(13, "ModelName", C100_RpdEntity_6, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(14, "Alias", C100_RpdEntity_6, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(15, "AssetId", C100_RpdEntity_6, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(16, "IsFRU", C100_RpdEntity_6, "!B", constraint=BOOL_CONSTR)
+RCPTLV(17, "MfgDate", C100_RpdEntity_6, "bytes", rw=RW_FLAG_r,
+       constraint=StringLenRangeConstraint(8, 11))
+RCPTLV(18, "Uris", C100_RpdEntity_6, "bytes", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(2))
+RCPTLV(19, "CoreIfIndex", C100_RpdEntity_6, "!I", rw=RW_FLAG_r)
+RCPTLV(20, "Uuid", C100_RpdEntity_6, "bytes", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(16))
 
-C100_7_Ipv4Interfaces_11 = \
-    RCPTLV(11, "Ipv4Interfaces", C100_IpInterfaceObject_7, rw=RW_FLAG_row)
-RCPTLV(1, "ifIndex", C100_7_Ipv4Interfaces_11, "!H", rw=RW_FLAG_key)
-RCPTLV(2, "ReasmMaxSize", C100_7_Ipv4Interfaces_11, "!I", rw=RW_FLAG_r)
-RCPTLV(3, "EnableStatus", C100_7_Ipv4Interfaces_11, "!I", rw=RW_FLAG_r)
-RCPTLV(4, "RetransmitTime", C100_7_Ipv4Interfaces_11, "!I", rw=RW_FLAG_r)
+# rpd_sensor
+SensorType = {
+    1: "other",
+    2: "unknown",
+    3: "volts_ac",
+    4: "volts_dc",
+    5: "amperes",
+    6: "watts",
+    7: "herts",
+    8: "celsius",
+    9: "percentRH",
+    10: "rpm",
+    11: "cmm",
+    12: "truthvalue"
+}
 
-C100_7_IpIfStats_12 = \
-    RCPTLV(12, "IpIfStats", C100_IpInterfaceObject_7, rw=RW_FLAG_row)
-RCPTLV(1, "IpVersion", C100_7_IpIfStats_12, "!H", rw=RW_FLAG_r)
-RCPTLV(2, "ifIndex", C100_7_IpIfStats_12, "!H", rw=RW_FLAG_key)
-RCPTLV(3, "InReceives", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(4, "InOctets", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(5, "InHdrErrors", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(6, "InAddrErrors", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(7, "InUnknownProtos", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(8, "InTruncatedPkts", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(9, "InDiscards", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(10, "InDelivers", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(11, "OutRequests", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(12, "OutDiscards", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(13, "OutTransmits", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(14, "OutOctets", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(15, "InMcastPkts", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(16, "InMcastOctets", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(17, "OutMcastPkts", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(18, "OutMcastOctets", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(19, "InBcastPkts", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(20, "OutBcastPkts", C100_7_IpIfStats_12, "!Q", rw=RW_FLAG_r)
-RCPTLV(21, "DiscontinuityTime", C100_7_IpIfStats_12, "!I", rw=RW_FLAG_r)
-RCPTLV(22, "RefreshRate", C100_7_IpIfStats_12, "!I", rw=RW_FLAG_r)
+ScaleType = {
+    1: "yocto",
+    2: "zepto",
+    3: "atto",
+    4: "femto",
+    5: "pico",
+    6: "nano",
+    7: "micro",
+    8: "milli",
+    9: "units",
+    10: "kilo",
+    11: "mega",
+    12: "giga",
+    13: "tera",
+    14: "exa",
+    15: "peta",
+    16: "zetta",
+    17: "yotta"
+}
 
-C100_7_IcmpStats_13 = \
-    RCPTLV(13, "IcmpStats", C100_IpInterfaceObject_7, rw=RW_FLAG_row)
-RCPTLV(1, "IpVersion", C100_7_IcmpStats_13, "!H", rw=RW_FLAG_r)
-RCPTLV(2, "InMsgs", C100_7_IcmpStats_13, "!Q", rw=RW_FLAG_r)
-RCPTLV(3, "InErrors", C100_7_IcmpStats_13, "!Q", rw=RW_FLAG_r)
-RCPTLV(4, "OutMsgs", C100_7_IcmpStats_13, "!Q", rw=RW_FLAG_r)
-RCPTLV(5, "OutErrors", C100_7_IcmpStats_13, "!Q", rw=RW_FLAG_r)
+OperStatusType = {
+    1: "OK",
+    2: "unavailable",
+    3: "nonoperational"
+}
 
-C100_7_IcmpMsgStats_14 = \
-    RCPTLV(14, "IcmpMsgStats", C100_IpInterfaceObject_7, rw=RW_FLAG_row)
-RCPTLV(1, "IpVersion", C100_7_IcmpMsgStats_14, "!H", rw=RW_FLAG_r)
-RCPTLV(2, "Type", C100_7_IcmpMsgStats_14, "!I", rw=RW_FLAG_r)
-RCPTLV(3, "InPkts", C100_7_IcmpMsgStats_14, "!Q", rw=RW_FLAG_r)
-# TODO: Skipped TLV Type 100.7.14.4 in specification?
-RCPTLV(5, "OutPkts", C100_7_IcmpMsgStats_14, "!Q", rw=RW_FLAG_r)
+C100_RpdSensor_7 = \
+    RCPTLV(7, "RpdSensorTable", C_RpdInfo_100, rw=RW_FLAG_row)
+RCPTLV(1, "EntityIndex", C100_RpdSensor_7, "!I", rw=RW_FLAG_key)
+RCPTLV(2, "SensorType", C100_RpdSensor_7, "!B", constraint=EnumConstraint(SensorType))
+RCPTLV(3, "Scale", C100_RpdSensor_7, "!B", constraint=EnumConstraint(ScaleType))
+RCPTLV(4, "Precision", C100_RpdSensor_7, "!b", rw=RW_FLAG_r)
+RCPTLV(5, "Value", C100_RpdSensor_7, "!I", rw=RW_FLAG_r)
+RCPTLV(6, "OperStatus", C100_RpdSensor_7, "!B", constraint=EnumConstraint(OperStatusType))
+RCPTLV(7, "UnitsDisplay", C100_RpdSensor_7, "var", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(255))
+RCPTLV(8, "ValueTimeStamp", C100_RpdSensor_7, "!I", rw=RW_FLAG_r)
+RCPTLV(9, "ValueUpdateRate", C100_RpdSensor_7, "!I", rw=RW_FLAG_r)
 
 # EnetIfTable
 C100_EnetIfTable_8 = \
@@ -1952,106 +2181,60 @@ RCPTLV(9, "ifOperStatus", C100_EnetIfTable_8, "!B", rw=RW_FLAG_r)
 RCPTLV(10, "ifLastChange", C100_EnetIfTable_8, "!I", rw=RW_FLAG_r)
 RCPTLV(11, "ifHighSpeed", C100_EnetIfTable_8, "!I", rw=RW_FLAG_r)
 RCPTLV(12, "ifLinkUpDownTrapEnable", C100_EnetIfTable_8, "!B", rw=RW_FLAG_r)
-RCPTLV(13, "ifPromiscuousMode", C100_EnetIfTable_8, "!B", rw=RW_FLAG_r,
-       constraint=BOOL_CONSTR)
-RCPTLV(14, "ifConnectorPresent", C100_EnetIfTable_8, "!B", rw=RW_FLAG_r,
-       constraint=BOOL_CONSTR)
-RCPTLV(15, "ifInOctets", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(16, "ifInUnicastOctets", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(17, "ifInMulticastOctets", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(18, "ifInBroadcastOctets", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(19, "ifInFrames", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(20, "ifInUnicastFrames", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(21, "ifInMulticastFrames", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(22, "ifInBroadcastFrames", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(23, "ifInDiscards", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(24, "ifInErrors", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(25, "ifInUnknownProtos", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(26, "ifOutOctets", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(27, "ifOutUnicastOctets", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(28, "ifOutMulticastOctets", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(29, "ifOutBroadcastOctets", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(30, "ifOutFrames", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(31, "ifOutUnicastFrames", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(32, "ifOutMulticastFrames", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(33, "ifOutBroadcastFrames", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(34, "ifOutDiscards", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(35, "ifOutErrors", C100_EnetIfTable_8, "!Q", rw=RW_FLAG_r)
-RCPTLV(36, "ifCounterDiscontinuity", C100_EnetIfTable_8, "!I", rw=RW_FLAG_r)
+RCPTLV(13, "ifPromiscuousMode", C100_EnetIfTable_8, "!B", rw=RW_FLAG_r)
+RCPTLV(14, "ifConnectorPresent", C100_EnetIfTable_8, "!B", rw=RW_FLAG_r)
 
-C100_Capabilities_9 = \
-    RCPTLV(9, "Capabilities", C_RpdInfo_100, rw=RW_FLAG_row)
-RCPTLV(1, "NumCwToneGenerators", C100_Capabilities_9, "!B", rw=RW_FLAG_r)
-RCPTLV(2, "LowestCwToneFreq", C100_Capabilities_9, "!I", rw=RW_FLAG_r)
-RCPTLV(3, "HighestCwToneFreq", C100_Capabilities_9, "!I", rw=RW_FLAG_r)
-RCPTLV(4, "MaxCwTonePower", C100_Capabilities_9, "!H", rw=RW_FLAG_r)
-RCPTLV(5, "QamAsPilot", C100_Capabilities_9, "!B", rw=RW_FLAG_r,
-       constraint=BOOL_CONSTR)
-RCPTLV(6, "NumFourtyGeNsPorts", C100_Capabilities_9, "!B", rw=RW_FLAG_r)
+# 100.9 -  EnetIfStatsTable
+C100_EnetIfTable_9 = \
+    RCPTLV(9, "EnetIfStatsTable", C_RpdInfo_100, rw=RW_FLAG_row)
+RCPTLV(1, "ifIndex", C100_EnetIfTable_9, "!B", rw=RW_FLAG_key)
+RCPTLV(2, "ifInOctets", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(3, "ifInUnicastOctets", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(4, "ifInMulticastOctets", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(5, "ifInBroadcastOctets", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(6, "ifInFrames", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(7, "ifInUnicastFrames", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(8, "ifInMulticastFrames", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(9, "ifInBroadcastFrames", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(10, "ifInDiscards", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(11, "ifInErrors", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(12, "ifInUnknownProtos", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(13, "ifOutOctets", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(14, "ifOutUnicastOctets", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(15, "ifOutMulticastOctets", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(16, "ifOutBroadcastOctets", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(17, "ifOutFrames", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(18, "ifOutUnicastFrames", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(19, "ifOutMulticastFrames", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(20, "ifOutBroadcastFrames", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(21, "ifOutDiscards", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(22, "ifOutErrors", C100_EnetIfTable_9, "!Q", rw=RW_FLAG_r)
+RCPTLV(23, "ifCounterDiscontinuity", C100_EnetIfTable_9, "!I", rw=RW_FLAG_r)
 
-# TODO: Fix overlapping TLV Type 100.9.6 in specification
-# C100_9_ChannelReachability_6 = \
-#     RCPTLV(6, "ChannelReachability", C100_Capabilities_9, rw=RW_FLAG_row)
-# RCPTLV(1, "EnetPortIndex", C100_9_ChannelReachability_6, "!H", rw=RW_FLAG_r)
-# RCPTLV(2, "RfPortIndex", C100_9_ChannelReachability_6, "!H", rw=RW_FLAG_r)
-# RCPTLV(3, "ChannelType", C100_9_ChannelReachability_6, "!i", rw=RW_FLAG_r)
-# RCPTLV(4, "StartChanIndex", C100_9_ChannelReachability_6, "!H", rw=RW_FLAG_r)
-# RCPTLV(5, "EndChanIndex", C100_9_ChannelReachability_6, "!H", rw=RW_FLAG_r)
+# 100.10 - RpdEnetToCoreEntityMap
+C100_RpdEnetToCoreEntityMap_10 = \
+    RCPTLV(10, "RpdEnetToCoreEntityMap", C_RpdInfo_100, rw=RW_FLAG_row)
+RCPTLV(1, "EnetPortIndex", C100_RpdEnetToCoreEntityMap_10, "!B", rw=RW_FLAG_key)
+RCPTLV(2, "EntityIndex", C100_RpdEnetToCoreEntityMap_10, "!I", rw=RW_FLAG_r)
 
-# TODO: Skipped TLV Type 100.10 in specification?
-C100_EntityTable_11 = \
-    RCPTLV(11, "EntityTable", C_RpdInfo_100, rw=RW_FLAG_row)
-RCPTLV(1, "Index", C100_EntityTable_11, "!I", rw=RW_FLAG_key)
-RCPTLV(2, "Descr", C100_EntityTable_11, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(3, "VendorType", C100_EntityTable_11, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(4, "ContainedIn", C100_EntityTable_11, "!I", rw=RW_FLAG_r)  # length?
-RCPTLV(5, "Class", C100_EntityTable_11, "!i", rw=RW_FLAG_r)
-RCPTLV(6, "ParentRelPos", C100_EntityTable_11, "!I", rw=RW_FLAG_r)
-RCPTLV(7, "Name", C100_EntityTable_11, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(8, "HardwareRev", C100_EntityTable_11, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(9, "FirmwareRev", C100_EntityTable_11, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(10, "SoftwareRev", C100_EntityTable_11, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(11, "SerialNum", C100_EntityTable_11, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(12, "MfgName", C100_EntityTable_11, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(13, "ModelName", C100_EntityTable_11, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(14, "Alias", C100_EntityTable_11, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(15, "AssetId", C100_EntityTable_11, "var", rw=RW_FLAG_r,
-       constraint=StringLenConstraint(255))
-RCPTLV(16, "IsFRU", C100_EntityTable_11, "!B", rw=RW_FLAG_r,
-       constraint=BOOL_CONSTR)
-# TODO: MfgDate length 8 or 12 bytes?
-RCPTLV(17, "MfgDate", C100_EntityTable_11, "!Q", rw=RW_FLAG_r)
-# TODO: Uris length (2 bytes) incorrect in specification?
-RCPTLV(18, "Uris", C100_EntityTable_11, "var", rw=RW_FLAG_r)
+# 100.11 - IpInterfaceGrp
+C100_IpInterfaceGrp_11 = \
+    RCPTLV(11, "IpInterfaceGrp", C_RpdInfo_100, rw=RW_FLAG_row)
 
-# TODO: Fix overlapping TLV Type 100.11.9 in specification
-# C100_11_SensorDetailsObject_9 = \
-#     RCPTLV(9, "SensorDetailsObject", C100_EntityTable_11, rw=RW_FLAG_row)
-# RCPTLV(1, "SensorType", C100_11_SensorDetailsObject_9, "!i", rw=RW_FLAG_r)
-# RCPTLV(2, "Scale", C100_11_SensorDetailsObject_9, "!i", rw=RW_FLAG_r)
-# RCPTLV(3, "Precision", C100_11_SensorDetailsObject_9, "!I", rw=RW_FLAG_r)
-# RCPTLV(4, "Value", C100_11_SensorDetailsObject_9, "!I", rw=RW_FLAG_r)
-# RCPTLV(5, "OperStatus", C100_11_SensorDetailsObject_9, "!i", rw=RW_FLAG_r)
-# RCPTLV(6, "UnitsDisplay", C100_11_SensorDetailsObject_9, "var", rw=RW_FLAG_r,
-#        constraint=StringLenConstraint(255))
-# RCPTLV(7, "ValueTimeStamp", C100_11_SensorDetailsObject_9, "!I", rw=RW_FLAG_r)
-# RCPTLV(8, "ValueUpdateRate", C100_11_SensorDetailsObject_9, "!I", rw=RW_FLAG_r)
-
-C100_Ipv4Interface_12 = RCPTLV(12, "Ipv4Interfaces", C_RpdInfo_100, rw=RW_FLAG_row)
+# 100.12 - IpInterface
+C100_Ipv4Interface_12 = \
+    RCPTLV(12, "Ipv4Interfaces", C_RpdInfo_100, rw=RW_FLAG_row)
 RCPTLV(1, "EnetPortIndex", C100_Ipv4Interface_12, "!B", rw=RW_FLAG_key)
-RCPTLV(2, "ReasmMaxSize", C100_Ipv4Interface_12, "!I", rw=RW_FLAG_r)
 RCPTLV(3, "EnableStatus", C100_Ipv4Interface_12, "!B", rw=RW_FLAG_r)
 RCPTLV(4, "RetransmitTime", C100_Ipv4Interface_12, "!I", rw=RW_FLAG_r)
+
+C100_Ipv6Interface_13 = \
+    RCPTLV(13, "Ipv6Interfaces", C_RpdInfo_100, rw=RW_FLAG_row)
+RCPTLV(1, "EnetPortIndex", C100_Ipv6Interface_13, "!B", rw=RW_FLAG_key)
+RCPTLV(3, "EnableStatus", C100_Ipv6Interface_13, "!B", rw=RW_FLAG_r)
+RCPTLV(4, "RetransmitTime", C100_Ipv6Interface_13, "!I", rw=RW_FLAG_r)
+RCPTLV(5, "InterfaceIdentifier", C100_Ipv6Interface_13, "var", rw=RW_FLAG_r)
+RCPTLV(6, "ReachableTime", C100_Ipv6Interface_13, "!I", rw=RW_FLAG_r)
 
 C100_IpAddress_15 = RCPTLV(15, "IpAddress", C_RpdInfo_100, rw=RW_FLAG_row)
 RCPTLV(1, "AddrType", C100_IpAddress_15, "!B", rw=RW_FLAG_key)
@@ -2064,6 +2247,103 @@ RCPTLV(7, "Status", C100_IpAddress_15, "!B", constraint=EnumConstraint(IPADDR_ST
 RCPTLV(8, "Created", C100_IpAddress_15, "!I", rw=RW_FLAG_r)
 RCPTLV(9, "LastChanged", C100_IpAddress_15, "!I", rw=RW_FLAG_r)
 
+# 100.16 - IpNetToPhysical
+NeighType = {
+    1: "other",
+    2: "invalid",
+    3: "dynamic",
+    4: "static",
+    5: "local"
+}
+
+NeighState = {
+    1: "reachable",
+    2: "stale",
+    3: "delay",
+    4: "probe",
+    5: "nonvalid",
+    6: "unknown",
+    7: "incomplete"
+}
+
+C100_IpNetToPhysical_16 = \
+    RCPTLV(16, "IpNetToPhysical", C_RpdInfo_100, rw=RW_FLAG_row)
+RCPTLV(1, "EnetPortIndex", C100_IpNetToPhysical_16, "!B", rw=RW_FLAG_key)
+RCPTLV(2, "AddrType", C100_IpNetToPhysical_16, "!I", rw=RW_FLAG_key)
+RCPTLV(3, "IpAddress", C100_IpNetToPhysical_16, "IPAddr", rw=RW_FLAG_key)
+RCPTLV(4, "PhysAddress", C100_IpNetToPhysical_16, "MAC", rw=RW_FLAG_r)
+RCPTLV(5, "LastUpdated", C100_IpNetToPhysical_16, "!I", rw=RW_FLAG_r)
+RCPTLV(6, "Type", C100_IpNetToPhysical_16, "!B", rw=RW_FLAG_r, constraint=EnumConstraint(NeighType))
+RCPTLV(7, "State", C100_IpNetToPhysical_16, "!B", rw=RW_FLAG_r, constraint=EnumConstraint(NeighState))
+
+# 100.17 - IpDefaultRouter
+PreferenceType = {
+    -2: "reserved",
+    -1: "low",
+    0: "medium",
+    1: "high"
+}
+
+C100_IpDefaultRouter_17 = \
+    RCPTLV(17, "IpDefaultRouter", C_RpdInfo_100, rw=RW_FLAG_row)
+RCPTLV(1, "AddrType", C100_IpDefaultRouter_17, "!H", rw=RW_FLAG_r)
+RCPTLV(2, "IpAddress", C100_IpDefaultRouter_17, "IPAddr", rw=RW_FLAG_r)
+RCPTLV(3, "EnetPortIndex", C100_IpDefaultRouter_17, "!B", rw=RW_FLAG_r)
+RCPTLV(4, "Lifetime", C100_IpDefaultRouter_17, "!H", rw=RW_FLAG_r)
+RCPTLV(5, "Preference", C100_IpDefaultRouter_17, "!b", constraint=EnumConstraint(PreferenceType))
+
+C100_CrashDataFileStatus_20 = \
+    RCPTLV(20, "CrashDataFileStatus", C_RpdInfo_100, rw=RW_FLAG_row)
+RCPTLV(1, "Index", C100_CrashDataFileStatus_20, "!B", rw=RW_FLAG_key)
+RCPTLV(2, "FileName", C100_CrashDataFileStatus_20, "var", rw=RW_FLAG_r)
+RCPTLV(3, "FileStatus", C100_CrashDataFileStatus_20, "!B")
+
+C100_RpdPtpInfo_24 = \
+    RCPTLV(24, "RpdPtpInfo", C_RpdInfo_100, rw=RW_FLAG_row)
+
+C100_24_RpdPtpCurrentDataset_1 = \
+    RCPTLV(1, "RpdPtpCurrentDataset", C100_RpdPtpInfo_24, rw=RW_FLAG_row)
+RCPTLV(1, "RpdPtpCurrentDatasetStepsRemoved", C100_24_RpdPtpCurrentDataset_1, "!I", rw=RW_FLAG_r)
+RCPTLV(2, "RpdPtpCurrentDatasetOffsetFromMaster", C100_24_RpdPtpCurrentDataset_1, "!q", rw=RW_FLAG_r)
+RCPTLV(3, "RpdPtpCurrentDatasetMeanPathDelay", C100_24_RpdPtpCurrentDataset_1, "!I", rw=RW_FLAG_r)
+
+C100_24_PtpClockStatus_2 = \
+    RCPTLV(2, "PtpClockStatus", C100_RpdPtpInfo_24, rw=RW_FLAG_row)
+RCPTLV(1, "PtpClockClockState", C100_24_PtpClockStatus_2, "!B", rw=RW_FLAG_r)
+RCPTLV(2, "PtpClockLastStateChange", C100_24_PtpClockStatus_2, "!Q", rw=RW_FLAG_r)
+RCPTLV(3, "PtpClockPacketsSent", C100_24_PtpClockStatus_2, "!Q", rw=RW_FLAG_r)
+RCPTLV(4, "PtpClockPacketsReceived", C100_24_PtpClockStatus_2, "!Q", rw=RW_FLAG_r)
+RCPTLV(5, "PtpClockComputedPhaseOffset", C100_24_PtpClockStatus_2, "!Q", rw=RW_FLAG_r)
+RCPTLV(6, "PtpClockCounterDiscontinuityTime", C100_24_PtpClockStatus_2, "!Q", rw=RW_FLAG_r)
+
+C100_24_PtpPortDataset_3 = \
+    RCPTLV(3, "PtpPortDataset", C100_RpdPtpInfo_24, rw=RW_FLAG_row)
+RCPTLV(1, "PtpPortDatasetPortNumber", C100_24_PtpPortDataset_3, "!H", rw=RW_FLAG_key)
+RCPTLV(2, "PtpPortDatasetPortState", C100_24_PtpPortDataset_3, "!B", rw=RW_FLAG_r)
+RCPTLV(3, "PtpPortDatasetMeanPathDelay", C100_24_PtpPortDataset_3, "!i", rw=RW_FLAG_r)
+
+C100_24_PtpPortStatus_4 = \
+    RCPTLV(4, "PtpPortStatus", C100_RpdPtpInfo_24, rw=RW_FLAG_row)
+RCPTLV(1, "PtpPortRpdEnetPortIndex", C100_24_PtpPortStatus_4, "!B", rw=RW_FLAG_key)
+RCPTLV(2, "PtpPortPortNumber", C100_24_PtpPortStatus_4, "!B", rw=RW_FLAG_key)
+RCPTLV(3, "PtpPortPacketsSent", C100_24_PtpPortStatus_4, "!Q", rw=RW_FLAG_r)
+RCPTLV(4, "PtpPortPacketsReceived", C100_24_PtpPortStatus_4, "!Q", rw=RW_FLAG_r)
+RCPTLV(5, "PtpPortCounterDiscontinuityTime", C100_24_PtpPortStatus_4, "!Q", rw=RW_FLAG_r)
+
+C100_24_4_PtpPortStatus_6 = \
+    RCPTLV(6, "PtpPortMasterClockStatus", C100_24_PtpPortStatus_4, rw=RW_FLAG_row)
+RCPTLV(1, "PtpPortMasterClockMasterPriority", C100_24_4_PtpPortStatus_6, "!B", rw=RW_FLAG_key)
+RCPTLV(2, "PtpPortMasterClockPacketsSent", C100_24_4_PtpPortStatus_6, "!Q", rw=RW_FLAG_r)
+RCPTLV(3, "PtpPortMasterClockPacketsReceived", C100_24_4_PtpPortStatus_6, "!Q", rw=RW_FLAG_r)
+RCPTLV(4, "PtpPortMasterClockMasterClockId", C100_24_4_PtpPortStatus_6, "bytes", rw=RW_FLAG_r,
+       constraint=StringLenConstraint(8))
+RCPTLV(5, "PtpPortMasterClockMasterClockPortNumber", C100_24_4_PtpPortStatus_6, "!H", rw=RW_FLAG_r)
+RCPTLV(6, "PtpPortMasterClockTwoStepFlag", C100_24_4_PtpPortStatus_6, "!B", rw=RW_FLAG_r)
+RCPTLV(7, "PtpPortMasterClockIsBmc", C100_24_4_PtpPortStatus_6, "!B", rw=RW_FLAG_r)
+RCPTLV(8, "PtpPortMasterClockIsMasterConnected", C100_24_4_PtpPortStatus_6, "!B", rw=RW_FLAG_r)
+RCPTLV(9, "PtpPortMasterClockStatusDomain", C100_24_4_PtpPortStatus_6, "!I", rw=RW_FLAG_r)
+RCPTLV(10, "PtpPortMasterClockFreqOffset", C100_24_4_PtpPortStatus_6, "!I", rw=RW_FLAG_r)
+RCPTLV(11, "PtpPortMasterClockCounterDiscontinuityTime", C100_24_4_PtpPortStatus_6, "!Q", rw=RW_FLAG_r)
 
 # DOCS-IF31
 C_DocsIf31_101 = \
@@ -2224,6 +2504,7 @@ class UCDTLV(gcp_tlv_def.TLVDesc):
         super(UCDTLV, self).__init__(identifier, name, parent, format_str,
                                      length, constraint, length_field_len=1, rw=rw)
 
+
 UCDTLV(1, "ModulationRate", UCD_TLV_SET, "!B")
 UCDTLV(2, "Frequency", UCD_TLV_SET, "!I")
 UCDTLV(3, "PreamblePattern", UCD_TLV_SET, "bytes")
@@ -2247,6 +2528,18 @@ UCDTLV(19, "ChannelClassID", UCD_TLV_SET, "!B")
 UCDTLV(20, "SCDMASelectionModeForActiveCodesAndCodeHopping", UCD_TLV_SET, "!B")
 UCDTLV(21, "SCDMASelectionStringForActiveCodes", UCD_TLV_SET, "bytes")
 UCDTLV(22, "HigherUCDForTheSameUCIDPresentBitmap", UCD_TLV_SET, "!B")
+UCDTLV(23, "BurstDescDocsis3d1", UCD_TLV_SET, "bytes", rw=RW_FLAG_repeatedFields)
+UCDTLV(24, "UcdChangeIndicatorBitmask", UCD_TLV_SET, "!H")
+UCDTLV(25, "OFDMATimestampSnapshot", UCD_TLV_SET, "bytes")
+UCDTLV(26, "OFDMACyclicPrefixSize", UCD_TLV_SET, "!B")
+UCDTLV(27, "OFDMARolloffPeriodSize", UCD_TLV_SET, "!B")
+UCDTLV(28, "SubcarrierSpacing", UCD_TLV_SET, "!B")
+UCDTLV(29, "CenterFrequencyOfSubcarrier0", UCD_TLV_SET, "!I")
+UCDTLV(30, "SubcarrierExclusionBand", UCD_TLV_SET, "bytes", rw=RW_FLAG_repeatedFields)
+UCDTLV(31, "UnusedSubcarrierSpecification", UCD_TLV_SET, "bytes", rw=RW_FLAG_repeatedFields)
+UCDTLV(32, "SymbolsInOFDMFrame", UCD_TLV_SET, "!B")
+UCDTLV(33, "RandomizationSeed", UCD_TLV_SET, "bytes")
+
 
 # For the burst Profile
 UCD_BURST_PROFILE_TLV_SET = gcp_tlv_def.TLVDescriptionSet(
@@ -2262,6 +2555,7 @@ class UCDUburstProfileTLV(gcp_tlv_def.TLVDesc):
         super(
             UCDUburstProfileTLV, self).__init__(identifier, name, parent, format_str,
                                                 length, constraint, length_field_len=1, rw=rw)
+
 
 UCDUburstProfileTLV(1, "ModulationType", UCD_BURST_PROFILE_TLV_SET, "!B")
 UCDUburstProfileTLV(2, "DifferentialEncoding", UCD_BURST_PROFILE_TLV_SET, "!B")
@@ -2285,17 +2579,22 @@ UCDUburstProfileTLV(
 UCDUburstProfileTLV(
     17, "SCDMAFramerInterleavingStepSize", UCD_BURST_PROFILE_TLV_SET, "!B")
 UCDUburstProfileTLV(18, "TCMEncoding", UCD_BURST_PROFILE_TLV_SET, "!B")
+UCDUburstProfileTLV(19, "SubcarrierInitialRanging", UCD_BURST_PROFILE_TLV_SET, "!H")
+UCDUburstProfileTLV(20, "SubcarrierFineRanging", UCD_BURST_PROFILE_TLV_SET, "!H")
+UCDUburstProfileTLV(21, "OFDMAProfile", UCD_BURST_PROFILE_TLV_SET, "bytes")
+UCDUburstProfileTLV(22, "OFDMAIRPowerControl", UCD_BURST_PROFILE_TLV_SET, "!H")
+
 
 # Maps TLV sets for sequences per RCP message
-_IRA_SEQ_TLV_SET = gcp_tlv_def.TLVDescriptionSet(hierarchy_name="IRA_SEQ_TLVs")
+_IRA_SEQ_TLV_SET = gcp_tlv_def.TLVDescriptionSet(hierarchy_name="IRA_SEQ_TLVs", id=RCP_MSG_TYPE_IRA)
 _IRA_SEQ_TLV_SET.update_descriptions(C_RCPSequence_09)
 _IRA_SEQ_TLV_SET.update_descriptions(RCP_CFG_IRA_TLV_SET)
 
-_REX_SEQ_TLV_SET = gcp_tlv_def.TLVDescriptionSet(hierarchy_name="REX_SEQ_TLVs")
+_REX_SEQ_TLV_SET = gcp_tlv_def.TLVDescriptionSet(hierarchy_name="REX_SEQ_TLVs", id=RCP_MSG_TYPE_REX)
 _REX_SEQ_TLV_SET.update_descriptions(C_RCPSequence_09)
 _REX_SEQ_TLV_SET.update_descriptions(RCP_CFG_REX_TLV_SET)
 
-_NTF_SEQ_TLV_SET = gcp_tlv_def.TLVDescriptionSet(hierarchy_name="NTF_SEQ_TLVs")
+_NTF_SEQ_TLV_SET = gcp_tlv_def.TLVDescriptionSet(hierarchy_name="NTF_SEQ_TLVs", id=RCP_MSG_TYPE_NTF)
 _NTF_SEQ_TLV_SET.update_descriptions(C_RCPSequence_09)
 _NTF_SEQ_TLV_SET.update_descriptions(RCP_CFG_NTF_TLV_SET)
 
@@ -2320,6 +2619,7 @@ class OCDTLV(gcp_tlv_def.TLVDesc):
         super(OCDTLV, self).__init__(identifier, name, parent, format_str,
                                      length, constraint, length_field_len=1, rw=rw)
 
+
 OCDTLV(0, "DiscreteFourierTransformsize", OCD_TLV_SET, "!B")
 OCDTLV(1, "CyclicPrefix", OCD_TLV_SET, "!B")
 OCDTLV(2, "RollOff", OCD_TLV_SET, "!B")
@@ -2332,7 +2632,7 @@ OCDTLV(6, "PrimaryCapabilityIndicator", OCD_TLV_SET, "!B")
 
 #
 # dpd Related TLVs
-#DATA_SYMBOL_MODULATION__4_QAM8
+# DATA_SYMBOL_MODULATION__4_QAM8
 DPD_TLV_SET = gcp_tlv_def.TLVDescriptionSet("DPD_TLVs")
 
 
@@ -2344,7 +2644,9 @@ class DPDTLV(gcp_tlv_def.TLVDesc):
                  format_str=None, length=None, constraint=None, rw=RW_FLAG_rw):
         super(DPDTLV, self).__init__(identifier, name, parent, format_str,
                                      length, constraint, length_field_len=1, rw=rw)
-DPDTLV(5, "SubcarrierAssignment", DPD_TLV_SET,"bytes",
+
+
+DPDTLV(5, "SubcarrierAssignment", DPD_TLV_SET, "bytes",
        rw=RW_FLAG_repeatedFields)
 DPDTLV(6, "SubcarrierAssignmentVector", DPD_TLV_SET, "bytes",
        rw=RW_FLAG_repeatedFields)
@@ -2354,12 +2656,12 @@ DPDTLV(6, "SubcarrierAssignmentVector", DPD_TLV_SET, "bytes",
 # add general config RfChannelSelector and RfPortSelector for US and DS cfg
 #
 C_RfChannelSelector_12 = RCPTLV(12, "RfChannelSelector", C_RfChannel_16,
-                                  rw=RW_FLAG_row)
+                                rw=RW_FLAG_row)
 RCPTLV(1, "RfPortIndex", C_RfChannelSelector_12, "!B", rw=RW_FLAG_r)
 RCPTLV(2, "RfChannelType", C_RfChannelSelector_12, "!B", rw=RW_FLAG_r)
 RCPTLV(3, "RfChannelIndex", C_RfChannelSelector_12, "!B", rw=RW_FLAG_r)
 
 C_RfPortSelector_13 = RCPTLV(13, "RfPortSelector", C_RfPort_17,
-                               rw=RW_FLAG_row)
+                             rw=RW_FLAG_row)
 RCPTLV(1, "RfPortIndex", C_RfPortSelector_13, "!B", rw=RW_FLAG_r)
 RCPTLV(2, "RfPortType", C_RfPortSelector_13, "!B", rw=RW_FLAG_r)

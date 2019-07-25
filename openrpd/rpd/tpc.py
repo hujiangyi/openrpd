@@ -38,15 +38,15 @@ __all__ = ['TimeClient']
 class TimeClient(object):
     PORT = 37
     SOCK_TIMEOUT = 1
-    COLLISION_MAX_DEFAULT = 7 
+    COLLISION_MAX_DEFAULT = 7
     RESPONSE_DATA_LEN = 4
     EXIT_TIMEOUT = 5
 
     __metaclass__ = AddLoggerToClass
 
     def __init__(self, collisions=COLLISION_MAX_DEFAULT, ipv6=False,
-                 ipc_sock_addr=None,port=PORT):
-        self.collision_max=collisions
+                 ipc_sock_addr=None, port=PORT):
+        self.collision_max = collisions
         self.family = socket.AF_INET6 if ipv6 else socket.AF_INET
         self.port = port
         self.ipc_sock = None
@@ -178,7 +178,7 @@ class TimeClient(object):
 
         """
         self.server_list = server_list
-        if len(server_list) == 0: # pragma: no cover
+        if len(server_list) == 0:  # pragma: no cover
             self.send_error_ipc_msg("Empty list of time-servers")
             exit(EX_DATAERR)
 
@@ -203,11 +203,11 @@ class TimeClient(object):
         :return:
 
         """
-        if ipc_msg is None or not ipc_msg.IsInitialized(): # pragma: no cover
+        if ipc_msg is None or not ipc_msg.IsInitialized():  # pragma: no cover
             self.logger.error('Invalid IPC message provided')
             return
         msg_str = ipc_msg.SerializeToString()
-        if 0 == len(msg_str): # pragma: no cover
+        if 0 == len(msg_str):  # pragma: no cover
             self.logger.warn('Empty IPC msg, dropping ...')
             return
         self.ipc_sock.send(msg_str)
@@ -221,7 +221,7 @@ class TimeClient(object):
         :return:
 
         """
-        if self.ipc_sock is None: # pragma: no cover
+        if self.ipc_sock is None:  # pragma: no cover
             return
         msg = t_TpcMessage()
         msg.Status = msg.ALL_ATTEMPTS_FAILED
@@ -235,7 +235,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ipv6', action='store_true')
     parser.add_argument('--port', type=int, help='connection port')
-    parser.add_argument('--collisions',type=int, help='collisions')
+    parser.add_argument('--collisions', type=int, help='collisions')
     parser.add_argument(
         '--offset', type=int, required=True, help='Time offset')
     parser.add_argument('--servers', nargs='+', required=True,
@@ -257,7 +257,7 @@ def main():
         args.port = TimeClient.PORT
     # Start time client
     client = TimeClient(ipv6=args.ipv6, collisions=args.collisions,
-                        ipc_sock_addr=args.ipc_address,port=args.port)
+                        ipc_sock_addr=args.ipc_address, port=args.port)
     client.process_system_time(args.servers, args.offset)
 
     # let the manager to receive message till exit

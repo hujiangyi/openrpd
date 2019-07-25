@@ -133,6 +133,7 @@ def _mainLoop():
                 logger.warn(
                     "Cannot handle the event, No handler for it:%s" % str(socks[sock]))
 
+
 def _parseConfiguraion(default_path='hal.conf'):
     """Loads the configuration from the configuration file and  put them in
     the runtime configuration.
@@ -222,6 +223,7 @@ def main():
 
 def handle_interrrupt_signal(signum, frame):
     sys.exit(0)
+
 
 # register the ctrl C to handle this signal
 if __name__ == "__main__":

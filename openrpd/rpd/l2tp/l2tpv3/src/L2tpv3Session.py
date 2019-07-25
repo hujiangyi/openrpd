@@ -30,6 +30,11 @@ from rpd.mcast.src.mcast import Mcast
 from rpd.common.utils import SysTools
 from rpd.common.utils import Convert
 from rpd.common import rpd_event_def
+from .L2tpv3SessionDb import L2tpSessionRecord
+from rpd.common import utils
+from rpd.common.rpdinfo_utils import RpdInfoUtils
+import L2tpv3Hal
+from rpd.rcp.rcp_lib.rcp_tlv_def import OP_STATUS_UP, OP_STATUS_DOWN
 
 
 class L2tpv3Session(object):
@@ -377,7 +382,7 @@ class L2tpv3Session(object):
             avps.append(L2tpv3RFC3931AVPs.SbfdDiscriminator(
                 int(socket.inet_aton(self.connection.localAddr).encode('hex'), 16)))
             avps.append(L2tpv3RFC3931AVPs.SbfdVccv(
-                 L2tpv3RFC3931AVPs.SbfdVccv.VccvValue))
+                L2tpv3RFC3931AVPs.SbfdVccv.VccvValue))
 
         # Need add some Cable labs avp
         self.logger.debug(
@@ -476,18 +481,21 @@ class L2tpv3Session(object):
                 if msg.req_data.circuit_status != self.local_circuit_status:
                     self.local_circuit_status = msg.req_data.circuit_status
                     status_change = True
-        #notify an event
+        # notify an event
         if status_change:
             if self.local_circuit_status == L2tpv3Session.CIRCUIT_STATUS_UP:
+                opStatus = OP_STATUS_UP
                 self.notify.info(rpd_event_def.RPD_EVENT_L2TP_SESSION_UP[0],
-                    str(hex(self.localSessionId)), str(hex(self.connection.localConnID)),
-                    rpd_event_def.RpdEventTag.ccap_ip(self.connection.remoteAddr))
+                                 str(hex(self.localSessionId)), str(hex(self.connection.localConnID)),
+                                 rpd_event_def.RpdEventTag.ccap_ip(self.connection.remoteAddr))
             else:
+                opStatus = OP_STATUS_DOWN
                 self.notify.error(rpd_event_def.RPD_EVENT_L2TP_SESSION_DOWN[0],
-                    str(hex(self.localSessionId)), str(hex(self.connection.localConnID)),
-                    rpd_event_def.RpdEventTag.ccap_ip(self.connection.remoteAddr))
-            #nodify core
+                                  str(hex(self.localSessionId)), str(hex(self.connection.localConnID)),
+                                  rpd_event_def.RpdEventTag.ccap_ip(self.connection.remoteAddr))
+            # nodify core
             self.sendSLI()
+            self.updateSessionRecord_dpconfig(opStatus)
 
     def SendHalMsg(self, msg_type):
         hal_client = L2tpv3GlobalSettings.L2tpv3GlobalSettings.l2tp_hal_client
@@ -565,6 +573,7 @@ class L2tpv3Session(object):
     def fsmStateRecipientEnterStateEstablished(self, event):
         self.lastchangetime = time.time()
         self.SendHalMsg(L2tpv3Session.ADD_SESSION)
+        self.updateSessionRecord()
         # if multicast session ,send mcast join
         for avp in self.avps_icrq:
             if isinstance(avp, L2tpv3CableLabsAvps.DepiRemoteMulticastJoin):
@@ -597,7 +606,7 @@ class L2tpv3Session(object):
                         mcast = Mcast.findMcastInstance(address=address)
                         if mcast is not None:
                             mcast.leave(session=(self.connection.localAddr, self.connection.remoteAddr,
-                                                    self.localSessionId, self.remoteSessionId))
+                                                 self.localSessionId, self.remoteSessionId))
                     except Exception as e:
                         self.logger.warn(
                             "Session [%d, %d] mcast join failed %s: %s",
@@ -666,3 +675,95 @@ class L2tpv3Session(object):
                 transport.SendPacket(cdn, None)
             # Clean up the session
             self.connection.removeSession(self)
+
+    def updateSessionRecord(self):
+        sessionRecord = L2tpSessionRecord()
+        rfchanList = self.getRfchanInfo(self.avps_icrq)
+        direction = sessionRecord.parseDirection(rfchanList)
+        sessionRecord.updateL2tpSessionKey(self.connection.remoteAddr,
+                                           self.connection.localAddr,
+                                           direction,
+                                           self.localSessionId)
+
+        thecoreId = sessionRecord.getCoreId(self.connection.remoteAddr)
+        description = sessionRecord.getDescription(rfchanList)
+        pwtype = self.getPwType(self.avps_icrq)
+        sessType = sessionRecord.parseSessionType(pwtype)
+        sessSubType = sessionRecord.parseSessionSubType(
+            self.session_l2Sublayer)
+        coreMTU = self.getCoreIfMTU(self.avps_icrq)
+        rpdMTU = L2tpv3Hal.L2tpHalClient.getRpdIfMTU()
+        maxPayload = coreMTU
+        if (rpdMTU < coreMTU):
+            maxPayload = rpdMTU
+        opStatus = OP_STATUS_UP
+        lastchangetime = RpdInfoUtils.getSysUpTime()
+        creationtime = lastchangetime
+        counterDiscTime = utils.Convert.pack_timestamp_to_string(time.time())
+
+        sessionRecord.updateL2tpSessionRecordData(
+            coreId=thecoreId,
+            connCtrlId=self.connection.localConnID,
+            udpPort=0,
+            descr=description,
+            sessionType=sessType,
+            sessionSubType=sessSubType,
+            maxPayload=maxPayload,
+            pathPayload=0,
+            rpdIfMtu=rpdMTU,
+            coreIfMtu=coreMTU,
+            errorCode=1,
+            creationTime=creationtime,
+            operStatus=opStatus,
+            localStatus=0,
+            lastChange=lastchangetime,
+            counterDiscontinuityTime=counterDiscTime)
+        sessionRecord.write()
+
+    def updateSessionRecord_dpconfig(self, op_status):
+        sessionRecord = L2tpSessionRecord()
+        rfchanList = self.getRfchanInfo(self.avps_icrq)
+        direction = sessionRecord.parseDirection(rfchanList)
+        sessionRecord.updateL2tpSessionKey(self.connection.remoteAddr,
+                                           self.connection.localAddr,
+                                           direction,
+                                           self.localSessionId)
+        sessionRecord.read()
+        opStatus = op_status
+        sessionRecord.updateL2tpSessionRecordData_dpconfig(operStatus=opStatus)
+        sessionRecord.write()
+
+    def deleteSessionRecord(self):
+        sessionRecord = L2tpSessionRecord()
+        rfchanList = self.getRfchanInfo(self.avps_icrq)
+        direction = sessionRecord.parseDirection(rfchanList)
+        sessionRecord.updateL2tpSessionKey(self.connection.remoteAddr,
+                                           self.connection.localAddr,
+                                           direction,
+                                           self.localSessionId)
+        sessionRecord.delete()
+
+    def getRfchanInfo(self, avps):
+        rfChanList = set()
+        for avp in avps:
+            if isinstance(avp, L2tpv3RFC3931AVPs.RemoteEndID):
+                for rf_selector, value, in avp.rpd_mapping:
+                    RfPortIndex, RfChanType, RfChanIndex = rf_selector
+                    rfChanList.add((RfPortIndex, RfChanType, RfChanIndex))
+        return rfChanList
+
+    def getPwType(self, avps):
+        pwtype = 0
+        for avp in avps:
+            if isinstance(avp, L2tpv3RFC3931AVPs.PseudowireType):
+                pwtype = avp.pwType
+                break
+        return pwtype
+
+    def getCoreIfMTU(self, avps):
+        coreMTU = 0
+        for avp in avps:
+            if isinstance(avp, L2tpv3CableLabsAvps.LocalMTUCableLabs):
+                coreMTU = avp.localMTU
+                break
+        return coreMTU

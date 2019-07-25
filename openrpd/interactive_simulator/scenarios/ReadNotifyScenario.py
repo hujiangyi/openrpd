@@ -20,7 +20,7 @@ class ReadNotifyScenario(Scenario):
     DESCRIPTION = "This scenario is used internally for checking if first message received from rpd is notify.\
                   Don't use this scenario."
 
-    def __init__(self,  kwargs={}):
+    def __init__(self, kwargs={}):
         super(ReadNotifyScenario, self).__init__()
         self.add_next_step(self.check_if_notify, True)
 

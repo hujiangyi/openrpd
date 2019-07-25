@@ -41,7 +41,7 @@ class L2tpv3GlobalSettings(object):
     # for unit test
     UnitTest_StopL2tp = False
 
-    #for RFC 4951
+    # for RFC 4951
     failoverCapofCC = True
     failoverCapofDC = False
     recoveryTime = 0

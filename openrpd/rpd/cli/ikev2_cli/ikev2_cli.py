@@ -160,7 +160,7 @@ class Ikev2Cli(object):
                 print_list.append(("   Local id:" + value["local-id"]))
                 print_list.append(("   Remote id:" + value["remote-id"]))
 
-                #print the child sa info
+                # print the child sa info
                 print_list.append(" ")
                 print_list.append("Child sa:")
 
@@ -176,11 +176,11 @@ class Ikev2Cli(object):
                     print_list.append(("   Local Selector:" + local_ts))
                     print_list.append(("   Remote Selector:" + remote_ts))
                     print_list.append(("   Protocol:" + child_value["protocol"] + "," +
-                                      "mode:" + child_value["mode"]))
+                                       "mode:" + child_value["mode"]))
                     print_list.append(("   spi in/out:" + child_value["spi-in"] + "/" +
-                                      child_value["spi-out"]))
+                                       child_value["spi-out"]))
 
-                    #no encr-keysize if use null encryption
+                    # no encr-keysize if use null encryption
                     if "encr-keysize" not in child_value:
                         child_value["encr-keysize"] = "Null"
 
@@ -201,4 +201,4 @@ class Ikev2Cli(object):
         for field in print_list:
             print field
 
-        #continue print other info
+        # continue print other info

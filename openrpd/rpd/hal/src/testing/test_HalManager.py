@@ -129,7 +129,6 @@ class TestHalManager(unittest.TestCase):
         except Exception:
             pass
 
-
     def test_HandleClientRegister(self):
         """test HalDriverManager#handleRegisterRequest,
 
@@ -352,6 +351,7 @@ class TestHalManager(unittest.TestCase):
         clientMgr.disconnectCb(HalGlobal.gClientDB["321"]['agent'])
         clientMgr.disconnectCb(HalGlobal.gClientDB["123"]['agent'])
         clientMgr.disconnectCb(None)
+
 
 if __name__ == '__main__':
     unittest.main()

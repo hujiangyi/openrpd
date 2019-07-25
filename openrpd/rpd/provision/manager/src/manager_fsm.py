@@ -46,7 +46,8 @@ class FsmBase(object):
                     if callback["TrackPoint"] not in ["on", "before", "after"]:
                         raise CCAPFsmError(
                             "Cannot register event callback since Trackpoint type unrecognised")
-                elif isinstance(callback["TrackPoint"], tuple) or isinstance(callback["TrackPoint"], list): # for the iter
+                elif isinstance(callback["TrackPoint"], tuple) or isinstance(callback["TrackPoint"], list):
+                    # for the iter
                     for trackpoint in callback["TrackPoint"]:
                         if trackpoint not in ["on", "before", "after"]:
                             raise CCAPFsmError(
@@ -62,7 +63,8 @@ class FsmBase(object):
                     if callback["TrackPoint"] not in ["on", "leave", "enter", "reenter", "after"]:
                         raise CCAPFsmError(
                             "Cannot register state callback since Trackpoint type unrecognised")
-                elif isinstance(callback["TrackPoint"], tuple) or isinstance(callback["TrackPoint"], list): # for the iter
+                elif isinstance(callback["TrackPoint"], tuple) or isinstance(callback["TrackPoint"], list):
+                    # for the iter
                     for trackpoint in callback["TrackPoint"]:
                         if trackpoint not in ["on", "leave", "enter", "reenter", "after"]:
                             raise CCAPFsmError(
@@ -116,49 +118,185 @@ class FsmBase(object):
 
 
 class CCAPFsm(FsmBase):
+    """
+    This FSM defines state machine of ccap-core
+    """
+
+    """
+    Define all states here
+    """
+    STATE_FAIL = "FAIL"
+    STATE_DEL = "DEL"
+    STATE_INIT_IPSEC = 'init(ipsec)'
+    STATE_INIT_TCP = 'init(tcp)'
+    STATE_INIT_GCP_IRA = 'init(gcp-ira)'
+    STATE_INIT_GCP_CFG = 'init(gcp-cfg)'
+    STATE_INIT_GCP_CFG_CPL = 'init(gcp-cfg-cpl)'
+    STATE_INIT_GCP_OP = 'init(gcp-op)'
+    STATE_REINIT_IPSEC = 'reinit(ipsec)'
+    STATE_REINIT_TCP = 'reinit(tcp)'
+    STATE_REINIT_GCP_IRA = 'reinit(gcp-ira)'
+    STATE_ONLINE = 'online'
+    STATE_CHANGE = "changestate"
+
+    """
+    not the state for a FSM, just for some checkout points
+    """
+    STATE_ALL = [STATE_FAIL, STATE_DEL, STATE_INIT_IPSEC, STATE_INIT_TCP, STATE_INIT_GCP_IRA, STATE_INIT_GCP_CFG,
+                 STATE_INIT_GCP_CFG_CPL, STATE_INIT_GCP_OP,
+                 STATE_REINIT_IPSEC, STATE_REINIT_TCP, STATE_REINIT_GCP_IRA, STATE_ONLINE]
+    STATE_OPERATIONAL = [STATE_INIT_GCP_OP, STATE_ONLINE]
+
+    STATE_GCP = 'init(gcp)'
+    STATE_GCP_ALL = [STATE_INIT_TCP, STATE_INIT_GCP_IRA, STATE_INIT_GCP_CFG, STATE_INIT_GCP_CFG_CPL,
+                     STATE_REINIT_TCP, STATE_REINIT_GCP_IRA]
+
+    STATE_IPSEC = 'init(ipsec)'
+    STATE_IPSEC_ALL = [STATE_INIT_IPSEC, STATE_REINIT_IPSEC]
+
+    STATE_ALL_INIT = [STATE_INIT_IPSEC, STATE_INIT_TCP, STATE_INIT_GCP_IRA, STATE_INIT_GCP_CFG,
+                      STATE_INIT_GCP_CFG_CPL, STATE_INIT_GCP_OP]
+    STATE_ALL_REINIT = [STATE_REINIT_IPSEC, STATE_REINIT_TCP, STATE_REINIT_GCP_IRA, STATE_ONLINE]
+    STATE_FINAL = [STATE_FAIL, STATE_DEL]
+    STATE_ALL_OPERATIONAL = [STATE_ONLINE, STATE_INIT_GCP_OP]
+
+    """
+    Define all events here.
+    """
+    EVENT_IPSEC_OK = 'TRIGGER_IPSEC_OK'
+    EVENT_IPSEC_FAIL = 'TRIGGER_IPSEC_FAIL'
+
+    EVENT_TCP_OK = 'TRIGGER_TCP_OK'
+    EVENT_TCP_FAIL = 'TRIGGER_TCP_FAIL'
+    EVENT_GCP_IRA = 'TRIGGER_GCP_IRA'
+    EVENT_GCP_NO_IRA = 'TRIGGER_GCP_NO_IRA'
+    EVENT_GCP_CFG = 'TRIGGER_GCP_CFG'
+    EVENT_GCP_NO_CFG = 'TRIGGER_GCP_NO_CFG'
+    EVENT_GCP_CFG_CPL = 'TRIGGER_GCP_CFG_CPL'
+    EVENT_GCP_NO_CFG_CPL = 'TRIGGER_GCP_NO_CFG_CPL'
+    EVENT_GCP_OP = 'TRIGGER_GCP_OP'
+    EVENT_GCP_NO_OP = 'TRIGGER_GCP_NO_GCP_OP'
+    EVENT_STARTUP_CORE_EXIT_ONLINE = "TRIGGER_Startup_exit_online"
+    EVENT_STARTUP_CORE_ONLINE = "TRIGGER_Startup_online"
+
+    AGENT_FAIL_EVENTS = [EVENT_IPSEC_FAIL, EVENT_TCP_FAIL, EVENT_GCP_NO_CFG]
+
+    # For the module timeout, the module will report as a fail message,
+    # For the retry, the process agent also will handle this.
+    # The timeout here means, After retry several times, the process agent always reports as an FAIL message.
+    EVENT_ENTER_CURRENT_STATE = 'TRIGGER_ENTER_CURRENT_STATE'
+    EVENT_STARTUP = 'TRIGGER_Startup'
+    EVENT_ERROR = 'TRIGGER_Error'
+    EVENT_DEL = 'TRIGGER_DEL'
+    FsmSetupCfg = {
+        'initial': None,
+        'events': [
+            {'name': EVENT_STARTUP, 'src': 'none', 'dst': STATE_INIT_IPSEC},
+            {'name': EVENT_IPSEC_FAIL, 'src': STATE_ALL_INIT, 'dst': STATE_INIT_IPSEC},
+            {'name': EVENT_IPSEC_FAIL, 'src': STATE_ALL_REINIT, 'dst': STATE_REINIT_IPSEC},
+            {'name': EVENT_IPSEC_FAIL, 'src': STATE_FINAL, 'dst': '='},
+            {'name': EVENT_IPSEC_FAIL, 'src': STATE_IPSEC_ALL, 'dst': '='},
+
+            {'name': EVENT_IPSEC_OK, 'src': STATE_INIT_IPSEC, 'dst': STATE_INIT_TCP},
+            {'name': EVENT_IPSEC_OK, 'src': STATE_REINIT_IPSEC, 'dst': STATE_REINIT_TCP},
+            {'name': EVENT_IPSEC_OK, 'src': [state for state in STATE_ALL if state not in STATE_IPSEC_ALL], 'dst': '='},
+
+            {'name': EVENT_TCP_OK, 'src': STATE_INIT_TCP, 'dst': STATE_INIT_GCP_IRA},
+            {'name': EVENT_TCP_OK, 'src': STATE_REINIT_TCP, 'dst': STATE_REINIT_GCP_IRA},
+            {'name': EVENT_TCP_OK,
+             'src': [state for state in STATE_ALL if state not in [STATE_INIT_TCP, STATE_REINIT_TCP]],
+             'dst': '='},
+
+            {'name': EVENT_TCP_FAIL, 'src': STATE_ALL_INIT, 'dst': STATE_INIT_IPSEC},
+            {'name': EVENT_TCP_FAIL, 'src': STATE_ALL_REINIT, 'dst': STATE_REINIT_IPSEC},
+            {'name': EVENT_TCP_FAIL, 'src': STATE_FINAL, 'dst': '='},
+
+            {'name': EVENT_GCP_IRA, 'src': STATE_INIT_GCP_IRA, 'dst': STATE_INIT_GCP_CFG},
+            {'name': EVENT_GCP_IRA, 'src': STATE_REINIT_GCP_IRA, 'dst': STATE_ONLINE},
+            {'name': EVENT_GCP_IRA,
+             'src': [state for state in STATE_ALL if state not in [STATE_INIT_GCP_IRA, STATE_REINIT_GCP_IRA]],
+             'dst': '='},
+
+            {'name': EVENT_GCP_NO_IRA, 'src': STATE_INIT_GCP_IRA, 'dst': STATE_INIT_IPSEC},
+            {'name': EVENT_GCP_NO_IRA, 'src': STATE_REINIT_GCP_IRA, 'dst': STATE_REINIT_IPSEC},
+            {'name': EVENT_GCP_NO_IRA,
+             'src': [state for state in STATE_ALL if state not in [STATE_INIT_GCP_IRA, STATE_REINIT_GCP_IRA]],
+             'dst': '='},
+
+            {'name': EVENT_GCP_CFG, 'src': STATE_INIT_GCP_CFG, 'dst': STATE_INIT_GCP_CFG_CPL},
+            {'name': EVENT_GCP_CFG,
+             'src': [state for state in STATE_ALL if state not in [STATE_INIT_GCP_CFG, ]],
+             'dst': '='},
+
+            {'name': EVENT_GCP_NO_CFG, 'src': STATE_INIT_GCP_CFG, 'dst': STATE_INIT_IPSEC},
+            {'name': EVENT_GCP_NO_CFG,
+             'src': [state for state in STATE_ALL if state not in [STATE_INIT_GCP_CFG, ]],
+             'dst': '='},
+
+            {'name': EVENT_GCP_CFG_CPL, 'src': STATE_INIT_GCP_CFG_CPL, 'dst': STATE_INIT_GCP_OP},
+            {'name': EVENT_GCP_CFG_CPL,
+             'src': [state for state in STATE_ALL if state not in [STATE_INIT_GCP_CFG_CPL, ]],
+             'dst': '='},
+
+            {'name': EVENT_GCP_NO_CFG_CPL, 'src': STATE_INIT_GCP_CFG_CPL, 'dst': STATE_INIT_IPSEC},
+            {'name': EVENT_GCP_NO_CFG_CPL,
+             'src': [state for state in STATE_ALL if state not in [STATE_INIT_GCP_CFG_CPL, ]],
+             'dst': '='},
+
+            {'name': EVENT_GCP_OP, 'src': STATE_INIT_GCP_OP, 'dst': STATE_ONLINE},
+            {'name': EVENT_GCP_OP,
+             'src': [state for state in STATE_ALL if state not in [STATE_INIT_GCP_OP, ]],
+             'dst': '='},
+
+            {'name': EVENT_GCP_NO_OP, 'src': '*', 'dst': '='},
+
+            # Receive Fail for several times
+            {'name': EVENT_ERROR, 'src': "*", 'dst': STATE_FAIL},
+
+            {'name': EVENT_ENTER_CURRENT_STATE, 'src': '*', 'dst': '='},
+
+            {'name': EVENT_STARTUP_CORE_EXIT_ONLINE, 'src': STATE_ALL_INIT, 'dst': STATE_INIT_IPSEC},
+            {'name': EVENT_STARTUP_CORE_EXIT_ONLINE, 'src': STATE_ALL_REINIT, 'dst': STATE_REINIT_IPSEC},
+            {'name': EVENT_STARTUP_CORE_EXIT_ONLINE, 'src': STATE_FINAL, 'dst': '='},
+            {'name': EVENT_STARTUP_CORE_ONLINE, 'src': '*', 'dst': '='},
+
+            {'name': EVENT_DEL, 'src': '*', 'dst': STATE_DEL}
+        ],
+    }
+
+    def __init__(self, callbacks):
+        states = CCAPFsm.getAllState()
+        events = CCAPFsm.getAllEvents()
+        super(CCAPFsm, self).__init__(states, events, self.FsmSetupCfg, callbacks)
+        self.logger.info("CCAP Fsm has been created.")
+
+
+class CCAPFsmStartup(FsmBase):
+    """
+    the ccap core state machine for startup core
+    """
+
+    """
+    define all states here.
+    """
     STATE_FAIL = "FAIL"
     STATE_INIT = 'INIT'
     STATE_DEL = "DEL"
     STATE_INTERFACE_UP = 'init(dot1x)'
     STATE_8021X_OK = 'init(dhcp)'
     STATE_DHCP_OK = 'init(tod)'
-    STATE_TOD_OK = 'init(ipsec)'
-    STATE_IPSEC_OK = 'init(gcp)'
-    STATE_RCP_OK = 'init(clock)'
-    STATE_PTP1588_OK = 'online'
-    STATE_OPERATIONAL_OK = 'online'
+    STATE_TOD_OK = 'online(startup)'
     STATE_CHANGE = "changestate"
-
-    STATE_ALL = [STATE_INIT, STATE_INTERFACE_UP, STATE_8021X_OK, STATE_DHCP_OK, STATE_TOD_OK,
-                 STATE_IPSEC_OK, STATE_RCP_OK, STATE_PTP1588_OK, STATE_OPERATIONAL_OK]
-
+    """
+    STATE for check usage
+    """
+    STATE_ALL = [STATE_FAIL, STATE_INIT, STATE_DEL, STATE_INTERFACE_UP, STATE_8021X_OK, STATE_DHCP_OK, STATE_TOD_OK]
     STATE_FINAL = [STATE_FAIL, STATE_DEL]
-
-    STATE_AFTER_INIT = STATE_ALL[1:]
-
-    STATE_AFTER_INTERFACE_UP = STATE_ALL[2:]
-    STATE_BEFORE_INTERFACE_UP = STATE_ALL[:1]
-
-    STATE_AFTER_8021X = STATE_ALL[3:]
-    STATE_BEFORE_8021X = STATE_ALL[:2]
-
-    STATE_AFTER_DHCP = STATE_ALL[4:]
-    STATE_BEFORE_DHCP = STATE_ALL[:3]
-
-    STATE_AFTER_TOD = STATE_ALL[5:]
-    STATE_BEFORE_TOD = STATE_ALL[:4]
-
-    STATE_AFTER_IPSEC = STATE_ALL[6:]
-    STATE_BEFORE_IPSEC = STATE_ALL[:5]
-
-    STATE_AFTER_RCP = STATE_ALL[7:]
-    STATE_BEFORE_RCP = STATE_ALL[:6]
-
-    STATE_AFTER_PTP1588 = STATE_ALL[8:]
-    STATE_BEFORE_PTP1588 = STATE_ALL[:7]
-
-    STATE_ALL_OPERATIONAL = [STATE_PTP1588_OK, STATE_OPERATIONAL_OK]
-
+    STATE_AFTER_8021X = [STATE_8021X_OK, STATE_DHCP_OK, STATE_TOD_OK]
+    STATE_AFTER_DHCP = [STATE_DHCP_OK, STATE_TOD_OK]
+    """
+    define all events here.
+    """
     EVENT_INTERFACE_UP = 'TRIGGER_INTERFACE_UP'
     EVENT_INTERFACE_DOWN = 'TRIGGER_INTERFACE_DOWN'
     EVENT_8021X_OK = 'TRIGGER_MAC_8021X_OK'
@@ -167,21 +305,11 @@ class CCAPFsm(FsmBase):
     EVENT_DHCP_FAIL = 'TRIGGER_DHCP_FAIL'
     EVENT_TOD_OK = 'TRIGGER_TOD_OK'
     EVENT_TOD_FAIL = 'TRIGGER_TOD_FAIL'
-    EVENT_IPSEC_OK = 'TRIGGER_IPSEC_OK'
-    EVENT_IPSEC_FAIL = 'TRIGGER_IPSEC_FAIL'
-    EVENT_RCP_OK = 'TRIGGER_RCP_OK'
-    EVENT_RCP_FAIL = 'TRIGGER_RCP_FAIL'
-    EVENT_PTP1588_OK = 'TRIGGER_PTPT1588_OK'
-    EVENT_PTP1588_FAIL = 'TRIGGER_PTP1588_FAIL'
-    EVENT_MOVE_OPERATIONAL = 'TRIGGER_MOVE_OPERATIONAL'
-
-    EVENT_REDIRECT = 'TRIGGER_REDIRECT'
 
     # For the module timeout, the module will report as a fail message,
     # For the retry, the process agent also will handle this.
     # The timeout here means, After retry several times, the process agent always reports as an FAIL message.
     EVENT_TIMEOUT = 'TRIGGER_TIMEOUT'
-    EVENT_CANNOT_REACH_AGENT = 'TRIGGER_CANNOT_REACH_AGENT'
 
     EVENT_ENTER_CURRENT_STATE = 'TRIGGER_ENTER_CURRENT_STATE'
     EVENT_STARTUP = 'TRIGGER_Startup'
@@ -189,124 +317,58 @@ class CCAPFsm(FsmBase):
     EVENT_ERROR = 'TRIGGER_Error'
     EVENT_DEL = 'TRIGGER_DEL'
 
-    FAIL_EVENTS = (EVENT_INTERFACE_DOWN, EVENT_8021X_FAIL, EVENT_DHCP_FAIL,
-                   EVENT_TOD_FAIL, EVENT_IPSEC_FAIL, EVENT_RCP_FAIL, EVENT_PTP1588_FAIL,
-                   EVENT_TIMEOUT, EVENT_ERROR)
+    AGENT_FAIL_EVENTS = [EVENT_INTERFACE_DOWN, EVENT_8021X_FAIL, EVENT_DHCP_FAIL, EVENT_TOD_FAIL]
 
     FsmSetupCfg = {
         'initial': None,
         'events': [
-            {'name': EVENT_INTERFACE_DOWN, 'src': '*', 'dst': STATE_INIT},
+            {'name': EVENT_INTERFACE_DOWN,
+             'src': [state for state in STATE_ALL if state not in STATE_FINAL], 'dst': STATE_INIT},
+            {'name': EVENT_INTERFACE_DOWN,
+             'src': STATE_FINAL, 'dst': '='},
+
             {'name': EVENT_INTERFACE_UP, 'src': STATE_INIT, 'dst': STATE_INTERFACE_UP},
-            {'name': EVENT_INTERFACE_UP, 'src': STATE_AFTER_INIT, 'dst': '='},
-            {'name': EVENT_INTERFACE_UP, 'src': STATE_FINAL, 'dst': '='},
+            {'name': EVENT_INTERFACE_UP, 'src': [state for state in STATE_ALL if state not in [STATE_INIT, ]],
+             'dst': '='},
 
-            {'name': EVENT_8021X_FAIL, 'src': STATE_BEFORE_INTERFACE_UP, 'dst': '='},
-            {'name': EVENT_8021X_FAIL, 'src': STATE_INTERFACE_UP, 'dst': '='},
-            {'name': EVENT_8021X_FAIL, 'src': STATE_AFTER_INTERFACE_UP, 'dst': STATE_INTERFACE_UP},
-            {'name': EVENT_8021X_FAIL, 'src': STATE_FINAL, 'dst': '='},
+            {'name': EVENT_8021X_FAIL, 'src': STATE_AFTER_8021X, 'dst': STATE_INTERFACE_UP},
+            {'name': EVENT_8021X_FAIL,
+             'src': [state for state in STATE_ALL if state not in STATE_AFTER_8021X], 'dst': '='},
+
             {'name': EVENT_8021X_OK, 'src': STATE_INTERFACE_UP, 'dst': STATE_8021X_OK},
-            {'name': EVENT_8021X_OK, 'src': STATE_AFTER_INTERFACE_UP, 'dst': '='},
-            {'name': EVENT_8021X_OK, 'src': STATE_BEFORE_INTERFACE_UP, 'dst': '='},
-            {'name': EVENT_8021X_OK, 'src': STATE_FINAL, 'dst': '='},
+            {'name': EVENT_8021X_OK,
+             'src': [state for state in STATE_ALL if state not in STATE_INTERFACE_UP], 'dst': '='},
 
-            {'name': EVENT_DHCP_FAIL, 'src': STATE_BEFORE_8021X, 'dst': '='},
-            {'name': EVENT_DHCP_FAIL, 'src': STATE_8021X_OK, 'dst': '='},
-            {'name': EVENT_DHCP_FAIL, 'src': STATE_AFTER_8021X, 'dst': STATE_8021X_OK},
-            {'name': EVENT_DHCP_FAIL, 'src': STATE_FINAL, 'dst': '='},
+            {'name': EVENT_DHCP_FAIL, 'src': STATE_AFTER_DHCP, 'dst': STATE_8021X_OK},
+            {'name': EVENT_DHCP_FAIL,
+             'src': [state for state in STATE_ALL if state not in STATE_AFTER_DHCP], 'dst': '='},
+
             {'name': EVENT_DHCP_OK, 'src': STATE_8021X_OK, 'dst': STATE_DHCP_OK},
-            {'name': EVENT_DHCP_OK, 'src': STATE_AFTER_8021X, 'dst': '='},
-            {'name': EVENT_DHCP_OK, 'src': STATE_BEFORE_8021X, 'dst': '='},
-            {'name': EVENT_DHCP_OK, 'src': STATE_FINAL, 'dst': '='},
+            {'name': EVENT_DHCP_OK, 'src': [state for state in STATE_ALL if state not in STATE_8021X_OK], 'dst': '='},
 
-            {'name': EVENT_TOD_FAIL, 'src': STATE_BEFORE_DHCP, 'dst': '='},
-            {'name': EVENT_TOD_FAIL, 'src': STATE_DHCP_OK, 'dst': '='},
-            {'name': EVENT_TOD_FAIL, 'src': STATE_AFTER_DHCP, 'dst': STATE_DHCP_OK},
-            {'name': EVENT_TOD_FAIL, 'src': STATE_FINAL, 'dst': '='},
+            {'name': EVENT_TOD_FAIL, 'src': STATE_TOD_OK, 'dst': STATE_DHCP_OK},
+            {'name': EVENT_TOD_FAIL, 'src': [state for state in STATE_ALL if state not in STATE_TOD_OK], 'dst': '='},
+
             {'name': EVENT_TOD_OK, 'src': STATE_DHCP_OK, 'dst': STATE_TOD_OK},
-            {'name': EVENT_TOD_OK, 'src': STATE_AFTER_DHCP, 'dst': '='},
-            {'name': EVENT_TOD_OK, 'src': STATE_BEFORE_DHCP, 'dst': '='},
-            {'name': EVENT_TOD_OK, 'src': STATE_FINAL, 'dst': '='},
-
-            {'name': EVENT_IPSEC_FAIL, 'src': STATE_BEFORE_TOD, 'dst': '='},
-            {'name': EVENT_IPSEC_FAIL, 'src': STATE_TOD_OK, 'dst': '='},
-            {'name': EVENT_IPSEC_FAIL, 'src': STATE_AFTER_TOD, 'dst': STATE_TOD_OK},
-            {'name': EVENT_IPSEC_FAIL, 'src': STATE_FINAL, 'dst': '='},
-            {'name': EVENT_IPSEC_OK, 'src': STATE_TOD_OK, 'dst': STATE_IPSEC_OK},
-            {'name': EVENT_IPSEC_OK, 'src': STATE_AFTER_TOD, 'dst': '='},
-            {'name': EVENT_IPSEC_OK, 'src': STATE_BEFORE_TOD, 'dst': '='},
-            {'name': EVENT_IPSEC_OK, 'src': STATE_FINAL, 'dst': '='},
-
-            {'name': EVENT_RCP_FAIL, 'src': STATE_BEFORE_IPSEC, 'dst': '='},
-            {'name': EVENT_RCP_FAIL, 'src': STATE_IPSEC_OK, 'dst': '='},
-            {'name': EVENT_RCP_FAIL, 'src': STATE_AFTER_IPSEC, 'dst': STATE_IPSEC_OK},
-            {'name': EVENT_RCP_FAIL, 'src': STATE_FINAL, 'dst': '='},
-            {'name': EVENT_RCP_OK, 'src': STATE_IPSEC_OK, 'dst': STATE_RCP_OK},
-            {'name': EVENT_RCP_OK, 'src': STATE_AFTER_IPSEC, 'dst': '='},
-            {'name': EVENT_RCP_OK, 'src': STATE_BEFORE_IPSEC, 'dst': '='},
-            {'name': EVENT_RCP_OK, 'src': STATE_FINAL, 'dst': '='},
-
-            {'name': EVENT_REDIRECT, 'src':STATE_BEFORE_IPSEC, 'dst': '='},
-            {'name': EVENT_REDIRECT, 'src': STATE_AFTER_TOD, 'dst': STATE_TOD_OK},
-            {'name': EVENT_REDIRECT, 'src': STATE_FINAL, 'dst': '='},
-
-            {'name': EVENT_PTP1588_FAIL, 'src': STATE_BEFORE_RCP, 'dst': '='},
-            {'name': EVENT_PTP1588_FAIL, 'src': STATE_RCP_OK, 'dst': '='},
-            {'name': EVENT_PTP1588_FAIL, 'src': STATE_AFTER_RCP, 'dst': STATE_RCP_OK},
-            {'name': EVENT_PTP1588_FAIL, 'src': STATE_FINAL, 'dst': '='},
-            {'name': EVENT_PTP1588_OK, 'src': STATE_RCP_OK, 'dst': STATE_PTP1588_OK},
-            {'name': EVENT_PTP1588_OK, 'src': STATE_AFTER_RCP, 'dst': '='},
-            {'name': EVENT_PTP1588_OK, 'src': STATE_BEFORE_RCP, 'dst': '='},
-            {'name': EVENT_PTP1588_OK, 'src': STATE_FINAL, 'dst': '='},
-
-            {'name': EVENT_MOVE_OPERATIONAL, 'src': STATE_AFTER_IPSEC, 'dst': STATE_OPERATIONAL_OK},
-
-
-            # Cannot reach the event
-            {'name': EVENT_CANNOT_REACH_AGENT, 'src': "*", 'dst': STATE_FAIL},
+            {'name': EVENT_TOD_OK, 'src': [state for state in STATE_ALL if state not in STATE_DHCP_OK], 'dst': '='},
 
             # Receive Fail for several times
             {'name': EVENT_TIMEOUT, 'src': "*", 'dst': STATE_FAIL},
             {'name': EVENT_ERROR, 'src': "*", 'dst': STATE_FAIL},
 
-            {'name': EVENT_ENTER_CURRENT_STATE, 'src':'*', 'dst':'='},
+            {'name': EVENT_ENTER_CURRENT_STATE, 'src': '*', 'dst': '='},
 
-            {'name': EVENT_STARTUP, 'src':'none', 'dst':STATE_INIT},
-            {'name': EVENT_DEL, 'src':'*', 'dst':STATE_DEL}
+            {'name': EVENT_STARTUP, 'src': 'none', 'dst': STATE_INIT},
+            {'name': EVENT_DEL, 'src': '*', 'dst': STATE_DEL}
         ],
     }
 
-    EventSources = (
-        ProcessAgent.AGENTTYPE_INTERFACE_STATUS,
-        ProcessAgent.AGENTTYPE_8021X,
-        ProcessAgent.AGENTTYPE_DHCP,
-        ProcessAgent.AGENTTYPE_TOD,
-        ProcessAgent.AGENTTYPE_IPSEC,
-        ProcessAgent.AGENTTYPE_GCP,
-        ProcessAgent.AGENTTYPE_PTP,
-        ProcessAgent.AGENTTYPE_L2TP,
-    )
-
-    def __init__(self, callbacks, is_principal=True):
-        states = CCAPFsm.getAllState()
-        events = CCAPFsm.getAllEvents()
-        super(CCAPFsm, self).__init__(states, events, self.FsmSetupCfg, callbacks)
-        if is_principal:
-            self.logger.info("Principal CCAP Fsm has been created.")
-        else:
-            self.logger.info("Auxiliary CCAP Fsm has been created.")
-
-        self.is_principal = is_principal
-
-
-class PrincipleCCAPFsm(CCAPFsm):
     def __init__(self, callbacks):
-        super(PrincipleCCAPFsm, self).__init__(callbacks, is_principal=True)
-
-
-class AuxiliaryCCAPFsm(CCAPFsm):
-    def __init__(self, callbacks):
-        super(AuxiliaryCCAPFsm, self).__init__(callbacks, is_principal=False)
+        states = CCAPFsmStartup.getAllState()
+        events = CCAPFsmStartup.getAllEvents()
+        super(CCAPFsmStartup, self).__init__(states, events, self.FsmSetupCfg, callbacks)
+        self.logger.info("Startup CCAP Fsm has been created.")
+        self.is_principal = False
 
 
 class ManagerFsm(FsmBase):
@@ -324,18 +386,19 @@ class ManagerFsm(FsmBase):
          the system will enter into operational state from recovering state.
     """
     STATE_OPERATIONAL = 'OPERATIONAL'
-    STATE_RECOVERING = 'RECOVERING'
+    STATE_PRINCIPAL_FOUND = 'PRINCIPAL_FOUND'
 
     EVENT_INTERFACE_SCAN = 'INTERFACE_SCAN'
     EVENT_USER_MGMT = 'USER_MGMT'
     EVENT_GCP_MGMT = 'GCP_MGMT'
-    EVENT_DHCP= 'DHCP'
+    EVENT_DHCP = 'DHCP'
     EVENT_STARTUP_DHCP_OK = 'STARTUP_DHCP_OK'
     EVENT_STARTUP_CORE_FAIL = 'STARTUP_CORE_FAIL'
     EVENT_PROVISION_INTERFACE_FAIL = 'PROVISION_INTERFACE_FAIL'
     EVENT_OPERATIONAL_OK = 'OPERATIONAL_OK'
     EVENT_OPERATIONAL_FAIL = 'OPERATIONAL_FAIL'
     EVENT_SEEK_PRINCIPAL_FAIL = 'SEEK_PRINCIPAL_FAIL'
+    EVENT_SEEK_PRINCIPAL_OK = 'SEEK_PRINCIPAL_OK'
 
     EVENT_CORE_FAIL = "CORE_FAIL"
     EVENT_ENTER_CURRENT_STATE = "ENTER_CURRENT_STATE"
@@ -348,47 +411,43 @@ class ManagerFsm(FsmBase):
             {'name': EVENT_STARTUP, 'src': 'none', 'dst': STATE_INIT},
             {'name': EVENT_INTERFACE_SCAN, 'src': STATE_INIT, 'dst': STATE_INTERFACE_PROVISION},
             {'name': EVENT_INTERFACE_SCAN, 'src':
-                [STATE_INTERFACE_PROVISION,STATE_PRINCIPLE_PROVISION, STATE_OPERATIONAL], 'dst': '='},
+                [STATE_INTERFACE_PROVISION, STATE_PRINCIPLE_PROVISION, STATE_OPERATIONAL], 'dst': '='},
 
             {'name': EVENT_STARTUP_DHCP_OK, 'src': STATE_INTERFACE_PROVISION, 'dst': STATE_PRINCIPLE_PROVISION},
-            {'name': EVENT_CORE_FAIL, 'src': STATE_INTERFACE_PROVISION, 'dst': '='},
             {'name': EVENT_PROVISION_INTERFACE_FAIL, 'src': STATE_INTERFACE_PROVISION, 'dst': STATE_FAIL},
 
-            {'name': EVENT_USER_MGMT, 'src': STATE_OPERATIONAL, 'dst': '='},
-            {'name': EVENT_GCP_MGMT, 'src': STATE_OPERATIONAL, 'dst': '='},
+            {'name': EVENT_USER_MGMT, 'src': '*', 'dst': '='},
+            {'name': EVENT_GCP_MGMT, 'src': '*', 'dst': '='},
 
-            {'name': EVENT_DHCP, 'src': [STATE_PRINCIPLE_PROVISION,
-                                         STATE_PRINCIPLE_RETRY_FIRST,
-                                         STATE_PRINCIPLE_RETRY_SECOND,
-                                         STATE_PRINCIPLE_RETRY_THIRD,
-                                         STATE_OPERATIONAL], 'dst': '='},
+            {'name': EVENT_DHCP, 'src': '*', 'dst': '='},
+            {'name': EVENT_SEEK_PRINCIPAL_FAIL, 'src': [STATE_OPERATIONAL,
+                                                        STATE_PRINCIPAL_FOUND],
+                                                'dst': STATE_PRINCIPLE_PROVISION},
 
-            {'name': EVENT_SEEK_PRINCIPAL_FAIL, 'src': [STATE_PRINCIPLE_PROVISION, STATE_OPERATIONAL],
-             'dst': STATE_PRINCIPLE_RETRY_FIRST},
+            {'name': EVENT_SEEK_PRINCIPAL_FAIL, 'src': [STATE_PRINCIPLE_PROVISION, STATE_OPERATIONAL,
+                                                        STATE_PRINCIPAL_FOUND],
+                                                'dst': STATE_PRINCIPLE_RETRY_FIRST},
             {'name': EVENT_SEEK_PRINCIPAL_FAIL, 'src': STATE_PRINCIPLE_RETRY_FIRST,
              'dst': STATE_PRINCIPLE_RETRY_SECOND},
             {'name': EVENT_SEEK_PRINCIPAL_FAIL, 'src': STATE_PRINCIPLE_RETRY_SECOND,
              'dst': STATE_PRINCIPLE_RETRY_THIRD},
-            {'name': EVENT_SEEK_PRINCIPAL_FAIL, 'src': [STATE_PRINCIPLE_RETRY_THIRD, STATE_FAIL],
+            {'name': EVENT_SEEK_PRINCIPAL_FAIL, 'src': [STATE_PRINCIPLE_RETRY_THIRD, STATE_FAIL, STATE_INIT],
              'dst': STATE_FAIL},
 
-            {'name': EVENT_CORE_FAIL, 'src': [STATE_PRINCIPLE_PROVISION,
-                                              STATE_PRINCIPLE_RETRY_FIRST,
-                                              STATE_PRINCIPLE_RETRY_SECOND,
-                                              STATE_PRINCIPLE_RETRY_THIRD,
-                                              STATE_OPERATIONAL,
-                                              STATE_RECOVERING,
-                                              STATE_FAIL], 'dst': '='},
+            {'name': EVENT_CORE_FAIL, 'src': '*', 'dst': '='},
+            {'name': EVENT_SEEK_PRINCIPAL_OK, 'src': [STATE_PRINCIPLE_PROVISION,
+                                                      STATE_PRINCIPLE_RETRY_FIRST,
+                                                      STATE_PRINCIPLE_RETRY_SECOND,
+                                                      STATE_PRINCIPLE_RETRY_THIRD], 'dst': STATE_PRINCIPAL_FOUND},
+            {'name': EVENT_SEEK_PRINCIPAL_OK, 'src': [STATE_FAIL, STATE_INIT, STATE_OPERATIONAL, STATE_PRINCIPAL_FOUND],
+                                              'dst': '='},
 
-            {'name': EVENT_OPERATIONAL_OK, 'src': [STATE_PRINCIPLE_PROVISION,
-                                                   STATE_PRINCIPLE_RETRY_FIRST,
-                                                   STATE_PRINCIPLE_RETRY_SECOND,
-                                                   STATE_PRINCIPLE_RETRY_THIRD,
-                                                   STATE_RECOVERING,
+            {'name': EVENT_OPERATIONAL_OK, 'src': [STATE_PRINCIPAL_FOUND,
                                                    STATE_OPERATIONAL], 'dst': STATE_OPERATIONAL},
-            {'name': EVENT_OPERATIONAL_FAIL, 'src': STATE_OPERATIONAL, 'dst': STATE_RECOVERING},
+            {'name': EVENT_OPERATIONAL_FAIL, 'src': [STATE_OPERATIONAL, STATE_PRINCIPAL_FOUND], 'dst': STATE_PRINCIPAL_FOUND},
 
             {'name': EVENT_ERROR, 'src': "*", 'dst': STATE_FAIL},
+            {'name': EVENT_ENTER_CURRENT_STATE, 'src': '*', 'dst': '='},
         ],
     }
 
@@ -405,15 +464,14 @@ class ManagerFsm(FsmBase):
 
     def is_provision_retry(self):
         return self.fsm.current == self.STATE_PRINCIPLE_RETRY_FIRST or \
-               self.fsm.current == self.STATE_PRINCIPLE_RETRY_SECOND or \
-               self.fsm.current == self.STATE_PRINCIPLE_RETRY_THIRD
+            self.fsm.current == self.STATE_PRINCIPLE_RETRY_SECOND or \
+            self.fsm.current == self.STATE_PRINCIPLE_RETRY_THIRD
 
     def is_operational(self):
         return self.fsm.current == self.STATE_OPERATIONAL
 
-    def is_recovering(self):
-        return self.fsm.current == self.STATE_RECOVERING
+    def is_principal_found(self):
+        return self.fsm.current == self.STATE_PRINCIPAL_FOUND
 
     def is_fail(self):
         return self.fsm.current == self.STATE_FAIL
-

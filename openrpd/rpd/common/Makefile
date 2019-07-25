@@ -37,6 +37,7 @@ all:
 	python ./proto_generator.py --ocd ../rcp/gcp/gcp_lib/ocd.proto
 	python ./proto_generator.py --dpd ../rcp/gcp/gcp_lib/dpd.proto
 	python ./proto_generator.py --ucdBurst ../rcp/gcp/gcp_lib/ucdBurstProfile.proto
+	cp $(PROTO_PATH)/CcapCoreIdentification.proto ../provision/proto/
 	$(PROTO_COMPILER) --python_out=../rcp/gcp/gcp_lib/ --proto_path=../rcp/gcp/gcp_lib ../rcp/gcp/gcp_lib/*.proto
 
 	# make the Hal proto messages

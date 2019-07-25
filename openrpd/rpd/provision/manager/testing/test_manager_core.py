@@ -15,22 +15,31 @@
 # limitations under the License.
 
 import unittest
-import zmq
 import rpd.provision.proto.provision_pb2 as provision_pb2
 import time
 import json
+import os
 import threading
 import rpd.provision.proto.process_agent_pb2 as protoDef
 from rpd.provision.manager.src.manager_process import ManagerProcess
-from rpd.provision.manager.src.manager_ccap_core import CoreDescription, CCAPCore, ManagerCoreError
+from rpd.provision.manager.src.manager_ccap_core import CoreDescription, ManagerCoreError, CCAPCore
 from rpd.provision.process_agent.agent.agent import ProcessAgent
 from rpd.provision.transport.transport import Transport
 from rpd.statistics.provision_stat import ProvisionStateMachineRecord
 from rpd.provision.manager.src.manager_api import ManagerApi
 from rpd.gpb.CcapCoreIdentification_pb2 import t_CcapCoreIdentification
+from rpd.provision.manager.src.manager_fsm import CCAPFsm, CCAPFsmStartup
+from rpd.dispatcher.dispatcher import Dispatcher
+from rpd.provision.proto import process_agent_pb2
+from rpd.common.rpd_logging import AddLoggerToClass, setup_logging
+from rpd.confdb.rpd_redis_db import RCPDB
+from rpd.confdb.testing.test_rpd_redis_db import create_db_conf,\
+    start_redis, stop_redis
 
 uTMgrProcess = None
 uTMgrApiDispatch = None
+CONF_FILE = '/tmp/rcp_db.conf'
+SOCKET_PATH = '/tmp/testRedis.sock'
 
 
 class TestCCAPCore(CCAPCore):
@@ -93,7 +102,18 @@ def demoMgrProcess():
     uTMgrProcess.start()
     print "demoMgrProcess thread done!"
 
+
+def stop_dispatcher_loop(disp):
+    disp.end_loop()
+    start_time = time.time()
+    time_elapsed = 0
+    while (not disp.loop_stopped) and time_elapsed < disp.max_timeout_sec:
+        time.sleep(0.1)
+        time_elapsed = time.time() - start_time
+
+
 class TestCoreDescription(unittest.TestCase):
+
     def test_core_desc(self):
         fault_flag = False
         try:
@@ -122,6 +142,9 @@ class TestManagerCore(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         global uTMgrProcess
+        create_db_conf()
+        start_redis()
+        RCPDB.DB_CFG_FILE = CONF_FILE
         t = threading.Thread(target=demoMgrProcess)
         t.start()
         time.sleep(2)
@@ -131,14 +154,15 @@ class TestManagerCore(unittest.TestCase):
     def tearDownClass(cls):
         global uTMgrApiDispatch
         global uTMgrProcess
+        stop_redis()
+        os.remove(CONF_FILE)
+        if uTMgrApiDispatch is not None:
+            print "end loop here"
+            stop_dispatcher_loop(uTMgrApiDispatch)
         if uTMgrProcess is not None:
             uTMgrProcess.dispatcher.fd_unregister(uTMgrProcess.mgr_api.manager_api_sock.sock)
             time.sleep(1)
             uTMgrProcess.mgr_api.manager_api_sock.sock.close()
-        if uTMgrApiDispatch is not None:
-            print "end loop here"
-            uTMgrApiDispatch.end_loop()
-            time.sleep(2)
 
     def setUp(self):
         pass
@@ -281,7 +305,6 @@ class TestManagerCore(unittest.TestCase):
         core.del_ccap_core()
         core.register_status[ProcessAgent.AGENTTYPE_INTERFACE_STATUS] = None
 
-
     def test_core_handle(self):
         self.mgr.dhcp_parameter['lo'] = "dummy dhcp info"
         interface = 'lo;127.0.0.1'
@@ -296,7 +319,7 @@ class TestManagerCore(unittest.TestCase):
 
         core.fsm.TRIGGER_Startup()
         # handle_core_event_notification normal case
-        for event_id in range(ProcessAgent.AGENTTYPE_INTERFACE_STATUS, ProcessAgent.AGENTTYPE_L2TP + 1):
+        for event_id in range(ProcessAgent.AGENTTYPE_IPSEC, ProcessAgent.AGENTTYPE_L2TP + 1):
             core_event = protoDef.msg_core_event_notification()
             core_event.id = core.ccap_core_id
             core_event.ccap_core_id = core.ccap_core_id
@@ -307,7 +330,7 @@ class TestManagerCore(unittest.TestCase):
             TestCCAPCore.handle_core_event_notification(core_event, event_id)
             self.assertTrue(core.agent_status[event_id])
 
-        for event_id in range(ProcessAgent.AGENTTYPE_L2TP, ProcessAgent.AGENTTYPE_INTERFACE_STATUS - 1, -1):
+        for event_id in range(ProcessAgent.AGENTTYPE_L2TP, ProcessAgent.AGENTTYPE_IPSEC - 1, -1):
             core_event = protoDef.msg_core_event_notification()
             core_event.id = core.ccap_core_id
             core_event.ccap_core_id = core.ccap_core_id
@@ -320,7 +343,7 @@ class TestManagerCore(unittest.TestCase):
 
         # fm change fail timer exits
 
-        for event_id in range(ProcessAgent.AGENTTYPE_INTERFACE_STATUS, ProcessAgent.AGENTTYPE_L2TP + 1):
+        for event_id in range(ProcessAgent.AGENTTYPE_IPSEC, ProcessAgent.AGENTTYPE_L2TP + 1):
             timer = core.dispatcher.timer_register(
                 10, self.fake_cb)
             core.registered_timers[event_id] = timer
@@ -364,7 +387,6 @@ class TestManagerCore(unittest.TestCase):
         core_event.event_id = ProcessAgent.AGENTTYPE_INTERFACE_STATUS
         TestCCAPCore.handle_core_event_notification(core_event, ProcessAgent.AGENTTYPE_INTERFACE_STATUS)
 
-
     def test_gcp_optional_handle(self):
         self.mgr.dhcp_parameter['lo'] = "dummy dhcp info"
         interface = 'lo;127.0.0.1'
@@ -378,7 +400,7 @@ class TestManagerCore(unittest.TestCase):
 
         core.fsm.TRIGGER_Startup()
         # handle_core_event_notification normal case
-        for event_id in range(ProcessAgent.AGENTTYPE_INTERFACE_STATUS, ProcessAgent.AGENTTYPE_L2TP - 1):
+        for event_id in range(ProcessAgent.AGENTTYPE_IPSEC, ProcessAgent.AGENTTYPE_L2TP - 1):
             core_event = protoDef.msg_core_event_notification()
             core_event.id = core.ccap_core_id
             core_event.ccap_core_id = core.ccap_core_id
@@ -438,6 +460,225 @@ class TestManagerCore(unittest.TestCase):
         core_event.reason = reason
         core_event.event_id = ProcessAgent.AGENTTYPE_INTERFACE_STATUS
         TestCCAPCore.handle_core_event_notification(core_event, ProcessAgent.AGENTTYPE_INTERFACE_STATUS)
+
+
+class TestCCAPCoreClass(unittest.TestCase):
+    __metaclass__ = AddLoggerToClass
+
+    @classmethod
+    def setUpClass(cls):
+        setup_logging("PROVISION", "test.log")
+        cls.mgr = ManagerProcess(simulator=True, test_flag=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
+
+    def setUp(self):
+        self.startup_core = CCAPCore(ccap_core_id="test_startup", is_principal=CoreDescription.CORE_ROLE_NONE,
+                                     is_active=CoreDescription.CORE_MODE_NONE,
+                                     initiated="Startup",
+                                     para=None, mgr=self.mgr, ccap_core_interface=None,
+                                     ccap_core_network_address=None, added="Startup")
+        self.startup_core.fsm.TRIGGER_Startup()
+
+        self.gcp_core = CCAPCore(ccap_core_id="test_gcp_core", is_principal=CoreDescription.CORE_ROLE_NONE,
+                                 is_active=CoreDescription.CORE_MODE_NONE,
+                                 initiated="DHCP",
+                                 para=None, mgr=self.mgr, ccap_core_interface=None,
+                                 ccap_core_network_address=None, added="DHCP")
+        self.gcp_core.fsm.TRIGGER_Startup()
+
+    def tearDown(self):
+        self.startup_core.del_ccap_core()
+        self.gcp_core.del_ccap_core()
+
+    def test_init(self):
+        self.assertIsInstance(self.startup_core.fsm, CCAPFsmStartup)
+        self.assertIsInstance(self.gcp_core.fsm, CCAPFsm)
+
+    def test_startup_core_statechange(self):
+        self.startup_core.fsm.TRIGGER_INTERFACE_UP()
+        self.assertEqual(self.startup_core.fsm.current, CCAPFsmStartup.STATE_INTERFACE_UP)
+
+    @staticmethod
+    def build_event_notification(ccap_id, status, reason, result, agentid):
+        """This is a private function, used to send the event notification.
+
+        :param ccap_id: ccap core ID
+        :param status: FAIL/OK
+        :param reason: The fail reason
+        :param result: The success result.
+        :return: Node
+
+        """
+        msg_event_notification = process_agent_pb2.msg_event_notification()
+        msg_event_notification.core_event.id = ccap_id
+        msg_event_notification.core_event.ccap_core_id = ccap_id
+        msg_event_notification.core_event.status = status
+        msg_event_notification.core_event.reason = reason
+        msg_event_notification.core_event.event_id = agentid
+        msg_event_notification.core_event.result = result
+        return msg_event_notification.core_event
+
+    def test_handle_core_interface_up_event(self):
+        msg = self.build_event_notification(ccap_id=self.startup_core.ccap_core_id,
+                                            status=process_agent_pb2.msg_core_event_notification.OK,
+                                            reason="test",
+                                            result="UP",
+                                            agentid=provision_pb2.AGENTTYPE_INTERFACE_STATUS
+                                            )
+        self.startup_core._handle_core_interface_event(msg)
+        self.assertEqual(self.startup_core.fsm.current, CCAPFsmStartup.STATE_INTERFACE_UP)
+
+    def test_handle_core_8021x_event(self):
+        self.startup_core.fsm.TRIGGER_INTERFACE_UP()
+        msg = self.build_event_notification(ccap_id=self.startup_core.ccap_core_id,
+                                            status=process_agent_pb2.msg_core_event_notification.OK,
+                                            reason="test",
+                                            result="UP",
+                                            agentid=provision_pb2.AGENTTYPE_8021X
+                                            )
+        self.startup_core._handle_core_8021x_event(msg)
+        self.assertEqual(self.startup_core.fsm.current, CCAPFsmStartup.STATE_8021X_OK)
+
+    def test_handle_core_dhcp_event(self):
+        self.startup_core.fsm.TRIGGER_INTERFACE_UP()
+        self.startup_core.fsm.TRIGGER_MAC_8021X_OK()
+        msg = self.build_event_notification(ccap_id=self.startup_core.ccap_core_id,
+                                            status=process_agent_pb2.msg_core_event_notification.OK,
+                                            reason="test",
+                                            result="UP",
+                                            agentid=provision_pb2.AGENTTYPE_DHCP
+                                            )
+        self.startup_core._handle_core_dhcp_event(msg)
+        self.assertEqual(self.startup_core.fsm.current, CCAPFsmStartup.STATE_DHCP_OK)
+
+    def test_handle_core_tod_event(self):
+        self.startup_core.fsm.TRIGGER_INTERFACE_UP()
+        self.startup_core.fsm.TRIGGER_MAC_8021X_OK()
+        self.startup_core.fsm.TRIGGER_DHCP_OK()
+        msg = self.build_event_notification(ccap_id=self.startup_core.ccap_core_id,
+                                            status=process_agent_pb2.msg_core_event_notification.OK,
+                                            reason="test",
+                                            result="UP",
+                                            agentid=provision_pb2.AGENTTYPE_DHCP
+                                            )
+
+        self.startup_core._handle_core_tod_event(msg)
+        self.assertEqual(self.startup_core.fsm.current, CCAPFsmStartup.STATE_TOD_OK)
+
+    def test_handle_core_ipsec_event(self):
+        msg = self.build_event_notification(ccap_id=self.gcp_core.ccap_core_id,
+                                            status=process_agent_pb2.msg_core_event_notification.OK,
+                                            reason="test",
+                                            result="UP",
+                                            agentid=provision_pb2.AGENTTYPE_IPSEC
+                                            )
+        self.gcp_core._handle_core_ipsec_event(msg)
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_INIT_TCP)
+
+    def test_handle_core_gcp_event(self):
+        self.gcp_core.fsm.TRIGGER_IPSEC_OK()
+        msg = self.build_event_notification(ccap_id=self.gcp_core.ccap_core_id,
+                                            status=process_agent_pb2.msg_core_event_notification.OK,
+                                            reason="test",
+                                            result="TCP_OK",
+                                            agentid=provision_pb2.AGENTTYPE_GCP
+                                            )
+        self.gcp_core._handle_core_gcp_event(msg)
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_INIT_GCP_IRA)
+        self.assertIsNotNone(self.gcp_core.state_timer[self.gcp_core.fsm.current])
+
+        msg = self.build_event_notification(ccap_id=self.gcp_core.ccap_core_id,
+                                            status=process_agent_pb2.msg_core_event_notification.OK,
+                                            reason="test",
+                                            result="GCP_IRA",
+                                            agentid=provision_pb2.AGENTTYPE_GCP
+                                            )
+
+        self.gcp_core._handle_core_gcp_event(msg)
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_INIT_GCP_CFG)
+        self.assertIsNone(self.gcp_core.state_timer[CCAPFsm.STATE_INIT_GCP_IRA])
+        self.assertIsNotNone(self.gcp_core.state_timer[self.gcp_core.fsm.current])
+
+        msg = self.build_event_notification(ccap_id=self.gcp_core.ccap_core_id,
+                                            status=process_agent_pb2.msg_core_event_notification.OK,
+                                            reason="test",
+                                            result="GCP_CFG",
+                                            agentid=provision_pb2.AGENTTYPE_GCP
+                                            )
+
+        self.gcp_core._handle_core_gcp_event(msg)
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_INIT_GCP_CFG_CPL)
+        self.assertIsNone(self.gcp_core.state_timer[CCAPFsm.STATE_INIT_GCP_CFG])
+        msg = self.build_event_notification(ccap_id=self.gcp_core.ccap_core_id,
+                                            status=process_agent_pb2.msg_core_event_notification.OK,
+                                            reason="test",
+                                            result="GCP_CFG_CPL",
+                                            agentid=provision_pb2.AGENTTYPE_GCP
+                                            )
+
+        self.gcp_core._handle_core_gcp_event(msg)
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_INIT_GCP_OP)
+        msg = self.build_event_notification(ccap_id=self.gcp_core.ccap_core_id,
+                                            status=process_agent_pb2.msg_core_event_notification.OK,
+                                            reason="test",
+                                            result="OPERATIONAL",
+                                            agentid=provision_pb2.AGENTTYPE_GCP
+                                            )
+        self.gcp_core._handle_core_gcp_event(msg)
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_ONLINE)
+        self.gcp_core.fsm.TRIGGER_TCP_FAIL()
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_REINIT_IPSEC)
+        self.gcp_core.fsm.TRIGGER_IPSEC_OK()
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_REINIT_TCP)
+        msg = self.build_event_notification(ccap_id=self.gcp_core.ccap_core_id,
+                                            status=process_agent_pb2.msg_core_event_notification.OK,
+                                            reason="test",
+                                            result="TCP_OK",
+                                            agentid=provision_pb2.AGENTTYPE_GCP
+                                            )
+
+        self.gcp_core._handle_core_gcp_event(msg)
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_REINIT_GCP_IRA)
+
+        msg = self.build_event_notification(ccap_id=self.gcp_core.ccap_core_id,
+                                            status=process_agent_pb2.msg_core_event_notification.OK,
+                                            reason="test",
+                                            result="GCP_IRA",
+                                            agentid=provision_pb2.AGENTTYPE_GCP
+                                            )
+        self.gcp_core._handle_core_gcp_event(msg)
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_ONLINE)
+
+    def test_init_ipsec_backoff_reach_max(self):
+        self.gcp_core.fsm.TRIGGER_IPSEC_OK()
+        self.gcp_core.state_retried_times[CCAPFsm.STATE_INIT_IPSEC] = \
+            self.gcp_core.CoreStateFailureRetry[CCAPFsm.STATE_INIT_IPSEC] + 1
+        self.gcp_core.fsm.TRIGGER_TCP_FAIL()
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_FAIL)
+
+    def test_gcp_core_timeout(self):
+        self.gcp_core.fsm.TRIGGER_IPSEC_OK()
+        self.gcp_core.CoreStateTimeoutSeconds[CCAPFsm.STATE_INIT_GCP_IRA] = 1
+        self.assertIsNone(self.gcp_core.state_timer[CCAPFsm.STATE_INIT_GCP_IRA])
+        self.gcp_core.fsm.TRIGGER_TCP_OK()
+        time.sleep(1.1)
+        self.gcp_core.dispatcher.handle_one_event()
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_INIT_IPSEC)
+        self.gcp_core.fsm.TRIGGER_IPSEC_OK()
+        self.gcp_core.fsm.TRIGGER_TCP_OK()
+        self.gcp_core.CoreStateTimeoutSeconds[CCAPFsm.STATE_INIT_GCP_CFG] = 1
+        self.assertIsNotNone(self.gcp_core.state_timer[CCAPFsm.STATE_INIT_GCP_IRA])
+        self.assertIsNone(self.gcp_core.state_timer[CCAPFsm.STATE_INIT_GCP_CFG])
+        self.gcp_core.fsm.TRIGGER_GCP_IRA()
+        self.assertIsNone(self.gcp_core.state_timer[CCAPFsm.STATE_INIT_GCP_IRA])
+        self.assertIsNotNone(self.gcp_core.state_timer[CCAPFsm.STATE_INIT_GCP_CFG])
+        time.sleep(1.1)
+        self.gcp_core.dispatcher.handle_one_event()
+        self.assertEqual(self.gcp_core.fsm.current, CCAPFsm.STATE_INIT_IPSEC)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -66,7 +66,7 @@ class ControlMessageAVP(l2tpv3AVP):
     CDN = 14
     WEN = 15
     SLI = 16
-    #new control messages in RFC4951
+    # new control messages in RFC4951
     FSQ = 21
     FSR = 22
 
@@ -1028,6 +1028,7 @@ class RemoteEndID(l2tpv3AVP):
     def ValidateFlags(mustAvp, hiddenAvp):
         return mustAvp and not hiddenAvp
 
+
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.ItefVendor, RemoteEndID.AttrType)] = RemoteEndID
 
@@ -1088,6 +1089,7 @@ class PseudowireType(l2tpv3AVP):
     def ValidateFlags(mustAvp, hiddenAvp):
         return mustAvp and not hiddenAvp
 
+
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.ItefVendor, PseudowireType.AttrType)] = PseudowireType
 
@@ -1137,6 +1139,7 @@ class L2SpecificSublayer(l2tpv3AVP):
     @staticmethod
     def ValidateFlags(mustAvp, hiddenAvp):
         return mustAvp and not hiddenAvp
+
 
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.ItefVendor, L2SpecificSublayer.AttrType)] = L2SpecificSublayer
@@ -1268,7 +1271,6 @@ l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.ItefVendor, CircuitStatus.AttrType)] = CircuitStatus
 
 
-
 class SbfdDiscriminator(l2tpv3AVP):
     AttrType = l2tpv3AVP.SbfdDiscriminator
 
@@ -1288,7 +1290,7 @@ class SbfdDiscriminator(l2tpv3AVP):
 
         super(
             SbfdDiscriminator, self).__init__(AttrType=self.AttrType, VendorID=0, AttrValue=retStr,
-                                           MustAvp=mustAvp, HidenAVP=False)
+                                              MustAvp=mustAvp, HidenAVP=False)
 
     @addDebugLogToHandle
     def handleAvp(self, pkt, retPak):
@@ -1316,6 +1318,7 @@ class SbfdDiscriminator(l2tpv3AVP):
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.ItefVendor, SbfdDiscriminator.AttrType)] = SbfdDiscriminator
 
+
 class SbfdVccv(l2tpv3AVP):
     AttrType = l2tpv3AVP.SbfdVccv
     VccvValue = 384
@@ -1336,7 +1339,7 @@ class SbfdVccv(l2tpv3AVP):
 
         super(
             SbfdVccv, self).__init__(AttrType=self.AttrType, VendorID=0, AttrValue=retStr,
-                                           MustAvp=mustAvp, HidenAVP=False)
+                                     MustAvp=mustAvp, HidenAVP=False)
 
     @addDebugLogToHandle
     def handleAvp(self, pkt, retPak):
@@ -1364,6 +1367,7 @@ class SbfdVccv(l2tpv3AVP):
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.ItefVendor, SbfdVccv.AttrType)] = SbfdVccv
 
+
 class FailoverCapability(l2tpv3AVP):
     AttrType = l2tpv3AVP.FailoverCapability
 
@@ -1389,7 +1393,7 @@ class FailoverCapability(l2tpv3AVP):
             if failoverCapofDC:
                 mask |= 2
             retStr = struct.pack("!HI", mask, recoveryTime)
-        else :
+        else:
             retStr = attrValue
 
         super(
@@ -1410,7 +1414,7 @@ class FailoverCapability(l2tpv3AVP):
         if self.failoverCapofDC and L2tpv3GlobalSettings.L2tpv3GlobalSettings.failoverCapofDC:
             pkt.Connection.failoverCapofDC = True
 
-        pkt.Connection.recoveryTime =  self.recoveryTime
+        pkt.Connection.recoveryTime = self.recoveryTime
 
         avp = FailoverCapability(failoverCapofCC=L2tpv3GlobalSettings.L2tpv3GlobalSettings.failoverCapofCC,
                                  failoverCapofDC=L2tpv3GlobalSettings.L2tpv3GlobalSettings.failoverCapofDC,
@@ -1435,8 +1439,10 @@ class FailoverCapability(l2tpv3AVP):
     def ValidateFlags(mustAvp, hiddenAvp):
         return not mustAvp
 
+
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.ItefVendor, FailoverCapability.AttrType)] = FailoverCapability
+
 
 class TunnelRecovery(l2tpv3AVP):
     AttrType = l2tpv3AVP.TunnelRecovery
@@ -1447,12 +1453,12 @@ class TunnelRecovery(l2tpv3AVP):
 
         if attrValue == None:
             retStr = struct.pack("!HII", 0, recoverTunnelID, recoverRemoteTunnelID)
-        else :
+        else:
             retStr = attrValue
 
         super(
             TunnelRecovery, self).__init__(AttrType=self.AttrType, VendorID=0, AttrValue=retStr,
-                                               MustAvp=True, HidenAVP=False)
+                                           MustAvp=True, HidenAVP=False)
 
     @addDebugLogToHandle
     def handleAvp(self, pkt, retPak):
@@ -1472,8 +1478,10 @@ class TunnelRecovery(l2tpv3AVP):
     def ValidateFlags(mustAvp, hiddenAvp):
         return mustAvp and not hiddenAvp
 
+
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.ItefVendor, TunnelRecovery.AttrType)] = TunnelRecovery
+
 
 class SuggestedControlSequence(l2tpv3AVP):
     AttrType = l2tpv3AVP.SuggestedControlSequence
@@ -1489,7 +1497,7 @@ class SuggestedControlSequence(l2tpv3AVP):
 
         if attrValue == None:
             retStr = struct.pack("!HII", 0, suggestedNs, suggestedNr)
-        else :
+        else:
             retStr = attrValue
 
         super(
@@ -1498,7 +1506,7 @@ class SuggestedControlSequence(l2tpv3AVP):
 
     @addDebugLogToHandle
     def handleAvp(self, pkt, retPak):
-        #rpd doesn't support failover, will not receive this avp
+        # rpd doesn't support failover, will not receive this avp
         return True
 
     def SetFlags(self, mustAvp=False, hiddenAvp=False):
@@ -1515,8 +1523,10 @@ class SuggestedControlSequence(l2tpv3AVP):
     def ValidateFlags(mustAvp, hiddenAvp):
         return not mustAvp
 
+
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.ItefVendor, SuggestedControlSequence.AttrType)] = SuggestedControlSequence
+
 
 class FailoverSessionState(l2tpv3AVP):
     AttrType = l2tpv3AVP.FailoverSessionState
@@ -1532,16 +1542,17 @@ class FailoverSessionState(l2tpv3AVP):
 
         if attrValue == None:
             retStr = struct.pack("!HII", 0, sessionID, remoteSessionID)
-        else :
+        else:
             retStr = attrValue
 
         super(
             FailoverSessionState, self).__init__(AttrType=self.AttrType, VendorID=0, AttrValue=retStr,
                                                  MustAvp=False, HidenAVP=hiddenAvp)
+
     @addDebugLogToHandle
     def handleAvp(self, pkt, retPak):
         remoteSessionID = self.sessionID
-        sessionID =self.remoteSessionID
+        sessionID = self.remoteSessionID
         ses = pkt.Connection.findSessionByLocalSessionID(sessionID)
 
         if pkt.avps[0].messageType == ControlMessageAVP.FSR:
@@ -1580,6 +1591,7 @@ class FailoverSessionState(l2tpv3AVP):
     @staticmethod
     def ValidateFlags(mustAvp, hiddenAvp):
         return not mustAvp
+
 
 l2tpv3AVP.SubclassMapping[
     (l2tpv3AVP.ItefVendor, FailoverSessionState.AttrType)] = FailoverSessionState

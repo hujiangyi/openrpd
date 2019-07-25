@@ -21,17 +21,20 @@ import unittest
 import l2tpv3.src.L2tpv3Hal_pb2 as L2tpv3Hal_pb2
 from rpd.dispatcher.dispatcher import Dispatcher
 from l2tpv3.src.L2tpv3Transport import L2tpv3Transport, L2tpv3Network
-from l2tpv3.src.L2tpv3Dispatcher import L2tpv3Dispatcher, L2tpv3DispatcherError,L2tpv3DispatcherStats
+from l2tpv3.src.L2tpv3Dispatcher import L2tpv3Dispatcher, L2tpv3DispatcherError, L2tpv3DispatcherStats
 from l2tpv3.src.L2tpv3GlobalSettings import L2tpv3GlobalSettings
 from l2tpv3.src.L2tpv3API import L2tpv3API
 from l2tpv3.src.L2tpv3Connection import L2tpConnection
 from l2tpv3.src.L2tpv3Session import L2tpv3Session
+from rpd.confdb.testing.test_rpd_redis_db import setup_test_redis, \
+    stop_test_redis
 
 
 class testL2tpv3Dispatcher(unittest.TestCase):
 
     def setUp(self):
-        self.local_addr="127.0.0.1"
+        setup_test_redis()
+        self.local_addr = "127.0.0.1"
         self.global_dispatcher = Dispatcher()
         self.l2tp_dispatcher = L2tpv3Dispatcher(dispatcher=self.global_dispatcher, create_global_listen=False,
                                                 local_addr=self.local_addr)
@@ -49,12 +52,13 @@ class testL2tpv3Dispatcher(unittest.TestCase):
             trans_network = self.l2tp_dispatcher.socketMapping.pop(fd)
             # Close the socket
             trans_network.close()
+        stop_test_redis()
 
     def test_init(self):
         local_addr = "test"
         try:
             dispatcher = L2tpv3Dispatcher(dispatcher=self.global_dispatcher, create_global_listen=True,
-                                                local_addr=local_addr)
+                                          local_addr=local_addr)
         except L2tpv3DispatcherError as e:
             pass
 
@@ -92,7 +96,7 @@ class testL2tpv3Dispatcher(unittest.TestCase):
         self.assertEqual(len(self.l2tp_dispatcher.remoteAddrList), 0)
 
     def test_register_local_address(self):
-        local_addr="127.0.0.1"
+        local_addr = "127.0.0.1"
         ret, reason = self.l2tp_dispatcher.register_local_address(local_addr)
         self.assertTrue(ret)
         self.assertEqual(reason, "")
@@ -101,15 +105,14 @@ class testL2tpv3Dispatcher(unittest.TestCase):
         self.assertRegexpMatches(
             reason, "Addr:%s has been bind" % local_addr)
 
-
-        local_addr="test"
+        local_addr = "test"
         ret, reason = self.l2tp_dispatcher.register_local_address(local_addr)
         self.assertFalse(ret)
 
         ret, reason = self.l2tp_dispatcher._unregister_local_address(local_addr)
         self.assertFalse(ret)
         self.assertEqual(
-                reason, "Cannot find the local address in l2tp interface bindings.")
+            reason, "Cannot find the local address in l2tp interface bindings.")
 
         local_addr = "127.0.0.1"
         ret, reason = self.l2tp_dispatcher._unregister_local_address(local_addr)
@@ -131,12 +134,12 @@ class testL2tpv3Dispatcher(unittest.TestCase):
         self.assertEqual(reason, "")
 
     def test_register_transport(self):
-        conn = L2tpConnection(localConnectionID = 0, remoteConnectionID=1, remoteAddr="127.0.0.1",
-                 localAddr="127.0.0.1")
+        conn = L2tpConnection(localConnectionID=0, remoteConnectionID=1, remoteAddr="127.0.0.1",
+                              localAddr="127.0.0.1")
         self.l2tp_dispatcher.register_transport(conn.transport)
         self.assertEqual(self.l2tp_dispatcher.transportMapping[
             (conn.transport.localAddr, conn.transport.remoteAddr, conn.transport.connection.localConnID)],
-                         conn.transport )
+            conn.transport)
 
         self.l2tp_dispatcher._unregister_transport(conn.transport)
         self.assertNotIn((conn.transport.localAddr, conn.transport.remoteAddr, conn.transport.connection.localConnID),
@@ -152,13 +155,13 @@ class testL2tpv3Dispatcher(unittest.TestCase):
             self.l2tp_dispatcher.stats.clear()
             self.l2tp_dispatcher.register_transport(transport=trans)
         except L2tpv3DispatcherError as e:
-            self.assertEqual(self.l2tp_dispatcher.stats.error,1)
+            self.assertEqual(self.l2tp_dispatcher.stats.error, 1)
 
         try:
             self.l2tp_dispatcher.stats.clear()
             self.l2tp_dispatcher._unregister_transport(transport=trans)
         except L2tpv3DispatcherError as e:
-            self.assertEqual(self.l2tp_dispatcher.stats.error,1)
+            self.assertEqual(self.l2tp_dispatcher.stats.error, 1)
         conn.CloseConnection()
 
         self.l2tp_dispatcher.unregisterRequest = []
@@ -170,13 +173,12 @@ class testL2tpv3Dispatcher(unittest.TestCase):
         self.l2tp_dispatcher._process_unregister_request()
         self.assertEqual(len(self.l2tp_dispatcher.unregisterRequest), 0)
 
-
         conn = L2tpConnection(localConnectionID=0, remoteConnectionID=1, remoteAddr="::1",
                               localAddr="::1")
         self.l2tp_dispatcher.register_transport(conn.transport)
         self.assertEqual(self.l2tp_dispatcher.transportMapping[
             (conn.transport.localAddr, conn.transport.remoteAddr, conn.transport.connection.localConnID)],
-                         conn.transport )
+            conn.transport)
 
         self.l2tp_dispatcher._unregister_transport(conn.transport)
         self.assertNotIn((conn.transport.localAddr, conn.transport.remoteAddr, conn.transport.connection.localConnID),
@@ -192,7 +194,7 @@ class testL2tpv3Dispatcher(unittest.TestCase):
             self.l2tp_dispatcher.stats.clear()
             self.l2tp_dispatcher.register_transport(transport=trans)
         except L2tpv3DispatcherError as e:
-            self.assertEqual(self.l2tp_dispatcher.stats.error,1)
+            self.assertEqual(self.l2tp_dispatcher.stats.error, 1)
 
         try:
             self.l2tp_dispatcher.stats.clear()
@@ -239,9 +241,9 @@ class testL2tpv3Dispatcher(unittest.TestCase):
         })
 
         self.assertFalse(ret)
-        self.assertEqual("unknown unregister type: test" ,reason)
+        self.assertEqual("unknown unregister type: test", reason)
 
-        local_addr="127.0.0.1"
+        local_addr = "127.0.0.1"
         ret, reason = self.l2tp_dispatcher.register_local_address(local_addr)
 
         ret, reason = self.l2tp_dispatcher.request_unregister(
@@ -328,7 +330,7 @@ class testL2tpv3Dispatcher(unittest.TestCase):
         msg.session_selector.local_session_id = 2
         self.l2tp_dispatcher.receive_hal_message(msg)
 
-        #case 2
+        # case 2
         msg = L2tpv3Hal_pb2.t_l2tpSessionRsp()
 
         msg.session_selector.local_ip = addr
@@ -379,6 +381,7 @@ class testL2tpv3DispatcherStats(unittest.TestCase):
         self.assertEqual(stats.pkt_error, 0)
         self.assertEqual(stats.zmq_error, 0)
         self.assertEqual(stats.unexpected_else, 0)
+
 
 if __name__ == '__main__':
     unittest.main()

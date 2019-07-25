@@ -25,6 +25,7 @@ class IPSEC(FakeAgent):
     def __init__(self):
         super(IPSEC, self).__init__(agent.ProcessAgent.AGENTTYPE_IPSEC)
 
+
 if __name__ == "__main__":
     setup_logging("PROVISION", filename="provision_ike.log")
     pagent = IPSEC()

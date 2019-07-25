@@ -16,22 +16,53 @@
 #
 import unittest
 import threading
-from rpd.rcp.rcp_orchestrator import *
+import time
+import socket
+import json
+import os
+from rpd.dispatcher.dispatcher import Dispatcher
+from rpd.common.rpd_event_def import RpdEventOrderedBuffer, \
+    RPD_EVENT_CONNECTIVITY_CLOCK_SLAVE_REESTABLISHED
+from rpd.rcp.rcp_lib.rcp import RCPMessage, RCPPacket, Message, RCPSequence, \
+    RCP_PROTOCOL_ID
+from rpd.gpb.VendorSpecificExtension_pb2 import t_VendorSpecificExtension
+from rpd.rcp.rcp_lib.rcp import RCPPacketBuildError
+from rpd.hal.src.HalConfigMsg import MsgTypeRpdIpv6Info, MsgTypeRpdGroupInfo, \
+    MsgTypeFaultManagement, MsgTypeGeneralNtf, MsgTypeRoutePtpStatus
 from rpd.rcp.rcp_master_orchestrator import RCPMasterOrchestrator
 from rpd.rcp.gcp.gcp_sessions import GCPSessionDescriptor, GCPSlaveDescriptor
+from rpd.rcp.rcp_sessions import RCPSlaveSession, RCPMasterDescriptor
 from rpd.rcp.rcp_msg_handling import RCPMSGHandlingError
-from rpd.rcp.simulator.start_rpd_alone import *
+from rpd.rcp.rcp_orchestrator import RCPSlaveOrchestrator, GdmMsgHandler
 from rpd.common.rpd_logging import setup_logging, AddLoggerToClass
 from rpd.rcp.rcp_lib.testing import test_rcp
 from rpd.rcp.gcp.gcp_lib import gcp_msg_def
 from rpd.rcp.rcp_lib import rcp_tlv_def
+from rpd.rcp.rcp_msg_handling import RCPSlavePacketHandler
 from rpd.gpb.GeneralNotification_pb2 import t_GeneralNotification
+from rpd.confdb.rpd_redis_db import RCPDB
+from rpd.rcp.rcp_sessions import CcapCoreIdentification
+from rpd.confdb.testing.test_rpd_redis_db import create_db_conf,\
+    start_redis, stop_redis
+from rpd.rcp.rcp_sessions import RCPMasterDescriptor
 
 addr_family = socket.AF_INET
 local_interface = 'lo'
 local_port = GCPSessionDescriptor.DEFAULT_PORT_MASTER
 local_ip = "127.0.0.1"
 core_ip = "127.0.0.1"
+
+CONF_FILE = '/tmp/rcp_db.conf'
+SOCKET_PATH = '/tmp/testRedis.sock'
+
+
+def stop_dispatcher_loop(disp):
+    disp.end_loop()
+    start_time = time.time()
+    time_elapsed = 0
+    while (not disp.loop_stopped) and time_elapsed < disp.max_timeout_sec:
+        time.sleep(0.1)
+        time_elapsed = time.time() - start_time
 
 
 class TestRCPSlavePacketHandlerError(unittest.TestCase):
@@ -53,6 +84,10 @@ class TestRCPSlavePacketHandlerError(unittest.TestCase):
 class TestOrchestrator(unittest.TestCase):
     __metaclass__ = AddLoggerToClass
 
+    CORE_STATE_INIT = 0
+    CORE_STATE_CFG_COMPLETE = 1
+    CORE_STATE_MOVE_TO_OPTIONAL = 2
+
     class RcpProcessChannel(object):
 
         def notify_mgr_cb(self, seq, args=None):
@@ -63,10 +98,13 @@ class TestOrchestrator(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        create_db_conf()
+        start_redis()
+        RCPDB.DB_CFG_FILE = CONF_FILE
         cls.master_thread = None
         cls.slave_thread = None
-        cls.master_disp = dispatcher.Dispatcher()
-        cls.slave_disp = dispatcher.Dispatcher()
+        cls.master_disp = Dispatcher()
+        cls.slave_disp = Dispatcher()
         cls.master_orchestrator = None
         cls.slave_orchestrator = None
         cls.setup_master()
@@ -75,6 +113,8 @@ class TestOrchestrator(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        stop_redis()
+        os.remove(CONF_FILE)
         cls.master_disp.end_loop()
         cls.slave_disp.end_loop()
         cls.master_thread.join()
@@ -87,6 +127,7 @@ class TestOrchestrator(unittest.TestCase):
                                          reboot_cb=None)
 
     def tearDown(self):
+        stop_dispatcher_loop(self.slave_orchestrator.dispatcher)
         self.slave_orchestrator.remove_sessions_all()
         for s_id, ses in self.slave_orchestrator.sessions_active.items():
             desc = ses.get_descriptor()
@@ -102,18 +143,19 @@ class TestOrchestrator(unittest.TestCase):
     @classmethod
     def setup_master(cls):
         print "setup master"
-        caps = RCPMasterCapabilities(index=1,
-                                     core_id="SIM",
-                                     core_ip_addr=local_ip,
-                                     is_principal=True,
-                                     core_name="Master_SIM",
-                                     vendor_id=0,
-                                     is_active=True,
-                                     initial_configuration_complete=True,
-                                     move_to_operational=True,
-                                     core_function=1,
-                                     resource_set_index=2
-                                     )
+        caps = CcapCoreIdentification(index=1,
+                                      core_id="SIM",
+                                      core_ip_addr=local_ip,
+                                      is_principal=True,
+                                      core_name="Master_SIM",
+                                      vendor_id=0,
+                                      core_mode=True,
+                                      initial_configuration_complete=True,
+                                      move_to_operational=True,
+                                      core_function=1,
+                                      resource_set_index=2
+                                      )
+        caps.write()
         cls.master_desc = RCPMasterDescriptor(
             caps,
             addr=local_ip,
@@ -129,8 +171,8 @@ class TestOrchestrator(unittest.TestCase):
     def setup_slave(cls):
         print "setup slave"
         cls.slave_orchestrator = RCPSlaveOrchestrator(disp=cls.slave_disp,
-                                                 cfg_ipc_channel=cls.RcpProcessChannel(),
-                                                 reboot_cb=None)
+                                                      cfg_ipc_channel=cls.RcpProcessChannel(),
+                                                      reboot_cb=None)
         cls.slave_desc = GCPSlaveDescriptor(
             core_ip, port_master=local_port, addr_local=local_ip,
             interface_local=local_interface,
@@ -218,6 +260,7 @@ class TestOrchestrator(unittest.TestCase):
         self.slave_orchestrator.configuration_to_rcp_wrapper(slave,
                                                              seq, 'transaction_identifier', 'trans_id')
         # remvoe session
+        stop_dispatcher_loop(self.slave_orchestrator.dispatcher)
         self.slave_orchestrator.remove_sessions_by_core('lo', '127.0.0.1')
 
     def test_ex_cb(self):
@@ -245,7 +288,7 @@ class TestOrchestrator(unittest.TestCase):
         # rcp_sequence_list is empty
         try:
             self.slave_orchestrator.configuration_operation(slave,
-                                                        [], 'pkt_req', None)
+                                                            [], 'pkt_req', None)
         except Exception as e:
             self.assertEqual(AttributeError, type(e))
 
@@ -260,8 +303,8 @@ class TestOrchestrator(unittest.TestCase):
         seq = test_rcp.TestRCPSpecifics.create_testing_ds_cfg_sequence(
             gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_REX)
         self.slave_orchestrator.configuration_operation(slave,
-                                                            [seq, ], 'pkt_req', None)
-        self.assertEqual(len(self.slave_orchestrator.req_msg_db['pkt_req']["sent_msg"]),1)
+                                                        [seq, ], 'pkt_req', None)
+        self.assertEqual(len(self.slave_orchestrator.req_msg_db['pkt_req']["sent_msg"]), 1)
 
     def test_RCPSlaveOrchestrator_init_error(self):
         # dispatcher is None
@@ -286,16 +329,12 @@ class TestOrchestrator(unittest.TestCase):
             print 'session init fail'
             return
         slave = self.slave_orchestrator.sessions_active.values()[0]
-        slave.ccap_capabilities = self.master_desc.capabilities
+        slave.ccap_identification = self.master_desc.capabilities
         self.slave_orchestrator.set_active_principal_core('eth0', '127.0.0.1')
 
         # caps not None, interface is lo, mode is standby
-        slave.ccap_capabilities.is_active = False
+        slave.ccap_identification.is_active = False
         self.slave_orchestrator.set_active_principal_core('lo', '127.0.0.1')
-
-    def test_set_system_operational(self):
-        self.slave_orchestrator.set_system_operational(True)
-        self.assertTrue(self.slave_orchestrator.operational)
 
     def test_notification_process_cb(self):
         # not supported msg type
@@ -308,7 +347,7 @@ class TestOrchestrator(unittest.TestCase):
         gen_ntf_msg.NotificationType = \
             t_GeneralNotification.PTPRESULTNOTIFICATION
         gen_ntf_msg.PtpResult = t_GeneralNotification.PTPHOOUTOFSPEC
-        self.slave_orchestrator.notification_process_cb(\
+        self.slave_orchestrator.notification_process_cb(
             MsgTypeGeneralNtf, gen_ntf_msg.SerializeToString())
         # active session add, active fd
         self.slave_orchestrator.add_sessions([self.slave_desc])
@@ -320,38 +359,21 @@ class TestOrchestrator(unittest.TestCase):
 
         self.slave_orchestrator.session_initiate_cb(slave)
         self.slave_orchestrator.notification_process_cb(MsgTypeRoutePtpStatus, 'ALIGNED')
-        #support I07 general notification msg
+        # support I07 general notification msg
         gen_ntf_msg.PtpResult = t_GeneralNotification.PTPSYNCHRONIZED
-        self.slave_orchestrator.notification_process_cb(\
+        self.slave_orchestrator.notification_process_cb(
             MsgTypeGeneralNtf, gen_ntf_msg.SerializeToString())
-        # MsgTypeRpdIpv6Info, MsgTypeFaultManagement
-        ipv6_msg = t_VendorSpecificExtension()
-        sub_tlv_ipv6_addr = ipv6_msg.Ipv6Address.add()
-        sub_tlv_ipv6_addr.EnetPortIndex = 0
-        sub_tlv_ipv6_addr.IpAddress = "2001:93:3:1::0"
-        sub_tlv_ipv6_addr.AddrType = 1
-        sub_tlv_ipv6_addr.PrefixLen = 128
-        payload = ipv6_msg.SerializeToString()
-        self.slave_orchestrator.notification_process_cb(MsgTypeRpdIpv6Info, payload)
-
-        grp_msg = t_VendorSpecificExtension()
-        groupinfo = grp_msg.RpdGroupInfo
-        groupinfo.ShelfId = "12:34:56:78:90:ab"
-        groupinfo.Master = 1
-        groupinfo.ShelfSn = "CAT123456"
-        payload = grp_msg.SerializeToString()
-        self.slave_orchestrator.notification_process_cb(MsgTypeRpdGroupInfo, payload)
-
+        # MsgTypeFaultManagement
         try:
             self.slave_orchestrator.notification_process_cb(MsgTypeFaultManagement,
                                                             json.dumps((1, 'test', {})))
         except Exception as e:
             self.assertEqual(KeyError, type(e))
 
-        slave.ccap_capabilities = self.master_desc.capabilities
-        event_dict = rpd_event_def.RpdEventOrderedBuffer.new_dict(
-                        str(rpd_event_def.RPD_EVENT_CONNECTIVITY_208[0]), 'test', 0) 
-        self.assertIsInstance(event_dict[0],str)
+        slave.ccap_identification = self.master_desc.capabilities
+        event_dict = RpdEventOrderedBuffer.new_dict(
+            str(RPD_EVENT_CONNECTIVITY_CLOCK_SLAVE_REESTABLISHED[0]), 'test', 0)
+        self.assertIsInstance(event_dict[0], str)
         try:
             self.slave_orchestrator.notification_process_cb(
                 MsgTypeFaultManagement, json.dumps((1, 'test', event_dict[1])))
@@ -420,16 +442,16 @@ class TestOrchestrator(unittest.TestCase):
 
     @staticmethod
     def construct_eds_pkt_write_ssd():
-        seq = rcp.RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
-                              0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_READ)
+        seq = RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
+                          0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_READ)
 
         # Set RCP sequence
         seq.parent_gpb.Ssd.SsdServerAddress = '1.1.1.1'
 
-        rcp_msg = rcp.RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
+        rcp_msg = RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
         rcp_msg.sequences.append(seq)
 
-        gcp_msg = rcp.Message(gcp_msg_def.DataStructREQ)
+        gcp_msg = Message(gcp_msg_def.DataStructREQ)
         # TODO implement correct setting of message fields
         transaction_id = 0xffff
         gcp_msg.msg_fields.TransactionID.set_val(transaction_id)
@@ -441,9 +463,9 @@ class TestOrchestrator(unittest.TestCase):
 
         gcp_msg.tlv_data.rcp_msgs.append(rcp_msg)
 
-        pkt = rcp.RCPPacket()
+        pkt = RCPPacket()
         pkt.transaction_identifier = transaction_id
-        pkt.protocol_identifier = rcp.RCP_PROTOCOL_ID
+        pkt.protocol_identifier = RCP_PROTOCOL_ID
         pkt.unit_id = 0
         pkt.msgs.append(gcp_msg)
 
@@ -451,17 +473,17 @@ class TestOrchestrator(unittest.TestCase):
 
     @staticmethod
     def construct_eds_pkt_redirect():
-        seq = rcp.RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
-                              0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_READ)
+        seq = RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
+                          0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_READ)
 
         # Set RCP sequence
         red = seq.parent_gpb.RpdRedirect.add()
         red.RedirectIpAddress = '1.1.1.1'
 
-        rcp_msg = rcp.RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
+        rcp_msg = RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
         rcp_msg.sequences.append(seq)
 
-        gcp_msg = rcp.Message(gcp_msg_def.DataStructREQ)
+        gcp_msg = Message(gcp_msg_def.DataStructREQ)
         # TODO implement correct setting of message fields
         transaction_id = 0xffff
         gcp_msg.msg_fields.TransactionID.set_val(transaction_id)
@@ -473,9 +495,9 @@ class TestOrchestrator(unittest.TestCase):
 
         gcp_msg.tlv_data.rcp_msgs.append(rcp_msg)
 
-        pkt = rcp.RCPPacket()
+        pkt = RCPPacket()
         pkt.transaction_identifier = transaction_id
-        pkt.protocol_identifier = rcp.RCP_PROTOCOL_ID
+        pkt.protocol_identifier = RCP_PROTOCOL_ID
         pkt.unit_id = 0
         pkt.msgs.append(gcp_msg)
 
@@ -484,8 +506,8 @@ class TestOrchestrator(unittest.TestCase):
     @staticmethod
     def construct_eds_pkt_CcapCoreIdentification(need_info=False,
                                                  op=rcp_tlv_def.RCP_OPERATION_TYPE_READ):
-        seq = rcp.RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
-                              0xffff, op)
+        seq = RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
+                          0xffff, op)
 
         # Set RCP sequence
         ccap = seq.parent_gpb.CcapCoreIdentification.add()
@@ -498,10 +520,10 @@ class TestOrchestrator(unittest.TestCase):
             ccap.CoreName = 'CoreName'
             ccap.VendorId = 12
 
-        rcp_msg = rcp.RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
+        rcp_msg = RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
         rcp_msg.sequences.append(seq)
 
-        gcp_msg = rcp.Message(gcp_msg_def.DataStructREQ)
+        gcp_msg = Message(gcp_msg_def.DataStructREQ)
         # TODO implement correct setting of message fields
         transaction_id = 0xffff
         gcp_msg.msg_fields.TransactionID.set_val(transaction_id)
@@ -513,9 +535,62 @@ class TestOrchestrator(unittest.TestCase):
 
         gcp_msg.tlv_data.rcp_msgs.append(rcp_msg)
 
-        pkt = rcp.RCPPacket()
+        pkt = RCPPacket()
         pkt.transaction_identifier = transaction_id
-        pkt.protocol_identifier = rcp.RCP_PROTOCOL_ID
+        pkt.protocol_identifier = RCP_PROTOCOL_ID
+        pkt.unit_id = 0
+        pkt.msgs.append(gcp_msg)
+
+        return [pkt, gcp_msg]
+
+    @staticmethod
+    def construct_eds_pkt_CcapCoreIdentification_AW(inital=CORE_STATE_INIT):
+        seq = None
+        # Set RCP sequence
+        if inital == TestOrchestrator.CORE_STATE_INIT:
+            seq = RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
+                              0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_ALLOCATE_WRITE)
+            ccap = seq.parent_gpb.CcapCoreIdentification.add()
+            ccap.Index = 0
+            ccap.IsPrincipal = True
+            ccap.CoreMode = 1
+            ccap.CoreId = 'CoreId'
+            ccap.CoreIpAddress = '1.1.1.1'
+            ccap.CoreName = 'CoreName'
+            ccap.VendorId = 12
+        elif inital == TestOrchestrator.CORE_STATE_CFG_COMPLETE:
+            seq = RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
+                              0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_WRITE)
+            ccap = seq.parent_gpb.CcapCoreIdentification.add()
+            ccap.Index = 1
+            ccap.InitialConfigurationComplete = True
+        elif inital == TestOrchestrator.CORE_STATE_MOVE_TO_OPTIONAL:
+            seq = RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
+                              0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_WRITE)
+            ccap = seq.parent_gpb.CcapCoreIdentification.add()
+            ccap.Index = 1
+            ccap.MoveToOperational = True
+        else:
+            return
+
+        rcp_msg = RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
+        rcp_msg.sequences.append(seq)
+
+        gcp_msg = Message(gcp_msg_def.DataStructREQ)
+        # TODO implement correct setting of message fields
+        transaction_id = 0xffff
+        gcp_msg.msg_fields.TransactionID.set_val(transaction_id)
+        gcp_msg.msg_fields.Mode.set_val(0)
+        gcp_msg.msg_fields.Port.set_val(11)
+        gcp_msg.msg_fields.Channel.set_val(111)
+        gcp_msg.msg_fields.VendorID.set_val(1111)
+        gcp_msg.msg_fields.VendorIndex.set_val(254)
+
+        gcp_msg.tlv_data.rcp_msgs.append(rcp_msg)
+
+        pkt = RCPPacket()
+        pkt.transaction_identifier = transaction_id
+        pkt.protocol_identifier = RCP_PROTOCOL_ID
         pkt.unit_id = 0
         pkt.msgs.append(gcp_msg)
 
@@ -523,16 +598,15 @@ class TestOrchestrator(unittest.TestCase):
 
     @staticmethod
     def construct_eds_pkt_RpdConfigurationDone():
-        seq = rcp.RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
-                              0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_READ)
-
+        seq = RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
+                          0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_READ)
         # Set RCP sequence
         seq.parent_gpb.RpdConfigurationDone = 1
 
-        rcp_msg = rcp.RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
+        rcp_msg = RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
         rcp_msg.sequences.append(seq)
 
-        gcp_msg = rcp.Message(gcp_msg_def.DataStructREQ)
+        gcp_msg = Message(gcp_msg_def.DataStructREQ)
         # TODO implement correct setting of message fields
         transaction_id = 0xffff
         gcp_msg.msg_fields.TransactionID.set_val(transaction_id)
@@ -544,9 +618,9 @@ class TestOrchestrator(unittest.TestCase):
 
         gcp_msg.tlv_data.rcp_msgs.append(rcp_msg)
 
-        pkt = rcp.RCPPacket()
+        pkt = RCPPacket()
         pkt.transaction_identifier = transaction_id
-        pkt.protocol_identifier = rcp.RCP_PROTOCOL_ID
+        pkt.protocol_identifier = RCP_PROTOCOL_ID
         pkt.unit_id = 0
         pkt.msgs.append(gcp_msg)
 
@@ -554,18 +628,17 @@ class TestOrchestrator(unittest.TestCase):
 
     @staticmethod
     def construct_eds_pkt_RpdGlobal():
-        seq = rcp.RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
-                              0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_READ)
-
+        seq = RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
+                          0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_READ)
         # Set RCP sequence
         ctrl = seq.parent_gpb.RpdGlobal.EvCfg.EvControl.add()
         ctrl.EvPriority = 1
         ctrl.EvReporting = 1
 
-        rcp_msg = rcp.RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
+        rcp_msg = RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
         rcp_msg.sequences.append(seq)
 
-        gcp_msg = rcp.Message(gcp_msg_def.DataStructREQ)
+        gcp_msg = Message(gcp_msg_def.DataStructREQ)
         # TODO implement correct setting of message fields
         transaction_id = 0xffff
         gcp_msg.msg_fields.TransactionID.set_val(transaction_id)
@@ -577,9 +650,9 @@ class TestOrchestrator(unittest.TestCase):
 
         gcp_msg.tlv_data.rcp_msgs.append(rcp_msg)
 
-        pkt = rcp.RCPPacket()
+        pkt = RCPPacket()
         pkt.transaction_identifier = transaction_id
-        pkt.protocol_identifier = rcp.RCP_PROTOCOL_ID
+        pkt.protocol_identifier = RCP_PROTOCOL_ID
         pkt.unit_id = 0
         pkt.msgs.append(gcp_msg)
 
@@ -587,18 +660,17 @@ class TestOrchestrator(unittest.TestCase):
 
     @staticmethod
     def construct_eds_pkt_ConfiguredCoreTable():
-        seq = rcp.RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
-                              0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_READ)
-
+        seq = RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
+                          0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_READ)
         # Set RCP sequence
         tab = seq.parent_gpb.ConfiguredCoreTable.add()
         tab.ConfiguredCoreIp = '1.1.1.1'
         tab.Operation = 1
 
-        rcp_msg = rcp.RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
+        rcp_msg = RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
         rcp_msg.sequences.append(seq)
 
-        gcp_msg = rcp.Message(gcp_msg_def.DataStructREQ)
+        gcp_msg = Message(gcp_msg_def.DataStructREQ)
         # TODO implement correct setting of message fields
         transaction_id = 0xffff
         gcp_msg.msg_fields.TransactionID.set_val(transaction_id)
@@ -610,9 +682,9 @@ class TestOrchestrator(unittest.TestCase):
 
         gcp_msg.tlv_data.rcp_msgs.append(rcp_msg)
 
-        pkt = rcp.RCPPacket()
+        pkt = RCPPacket()
         pkt.transaction_identifier = transaction_id
-        pkt.protocol_identifier = rcp.RCP_PROTOCOL_ID
+        pkt.protocol_identifier = RCP_PROTOCOL_ID
         pkt.unit_id = 0
         pkt.msgs.append(gcp_msg)
 
@@ -620,16 +692,15 @@ class TestOrchestrator(unittest.TestCase):
 
     @staticmethod
     def construct_eds_pkt_ActivePrincipalCore():
-        seq = rcp.RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
-                              0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_READ)
+        seq = RCPSequence(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA,
+                          0xffff, rcp_tlv_def.RCP_OPERATION_TYPE_READ)
 
-        # Set RCP sequence
         seq.parent_gpb.ActivePrincipalCore = '1.1.1.1'
 
-        rcp_msg = rcp.RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
+        rcp_msg = RCPMessage(gcp_msg_def.DataStructREQ, rcp_tlv_def.RCP_MSG_TYPE_IRA)
         rcp_msg.sequences.append(seq)
 
-        gcp_msg = rcp.Message(gcp_msg_def.DataStructREQ)
+        gcp_msg = Message(gcp_msg_def.DataStructREQ)
         # TODO implement correct setting of message fields
         transaction_id = 0xffff
         gcp_msg.msg_fields.TransactionID.set_val(transaction_id)
@@ -641,15 +712,16 @@ class TestOrchestrator(unittest.TestCase):
 
         gcp_msg.tlv_data.rcp_msgs.append(rcp_msg)
 
-        pkt = rcp.RCPPacket()
+        pkt = RCPPacket()
         pkt.transaction_identifier = transaction_id
-        pkt.protocol_identifier = rcp.RCP_PROTOCOL_ID
+        pkt.protocol_identifier = RCP_PROTOCOL_ID
         pkt.unit_id = 0
         pkt.msgs.append(gcp_msg)
 
         return [pkt, gcp_msg]
 
     def test_handle_eds_pkt(self):
+        self.db = RCPDB()
         self.slave_orchestrator.add_sessions([self.slave_desc])
         if not len(self.slave_orchestrator.sessions_active):
             print 'session init fail'
@@ -662,8 +734,8 @@ class TestOrchestrator(unittest.TestCase):
         pkt_handler(msg, slave, pkt)
 
         # write ssd
-        slave.ccap_capabilities = self.master_desc.capabilities
-        slave.ccap_capabilities.is_active = False
+        slave.ccap_identification = self.master_desc.capabilities
+        slave.ccap_identification.is_active = False
         pkt, msg = self.construct_eds_pkt_write_ssd()
         pkt_handler(msg, slave, pkt)
 
@@ -671,7 +743,7 @@ class TestOrchestrator(unittest.TestCase):
         pkt, msg = self.construct_eds_pkt_RpdGlobal()
         pkt_handler(msg, slave, pkt)
 
-        #CcapCoreIdentification
+        # CcapCoreIdentification
         pkt, msg = self.construct_eds_pkt_CcapCoreIdentification()
         pkt_handler(msg, slave, pkt)
 
@@ -695,6 +767,15 @@ class TestOrchestrator(unittest.TestCase):
         pkt_handler(msg, slave, pkt)
 
     def test_handle_eds_pkt_AW(self):
+        coreIdentRecord = CcapCoreIdentification()
+        coreIdentRecord.Index = 0
+        coreIdentRecord.IsPrincipal = True
+        coreIdentRecord.CoreMode = 1
+        coreIdentRecord.CoreId = 'CoreId'
+        coreIdentRecord.CoreIpAddress = '127.0.0.1'
+        coreIdentRecord.CoreName = 'CoreName'
+        coreIdentRecord.VendorId = 9
+        coreIdentRecord.write()
         aw_type = rcp_tlv_def.RCP_OPERATION_TYPE_ALLOCATE_WRITE
         wr_type = rcp_tlv_def.RCP_OPERATION_TYPE_WRITE
         self.slave_orchestrator.add_sessions([self.slave_desc])
@@ -704,7 +785,7 @@ class TestOrchestrator(unittest.TestCase):
         slave = self.slave_orchestrator.sessions_active.values()[0]
         pkt_handler = self.slave_orchestrator.pkt_handler.handle_msg_eds_req
 
-        #CcapCoreIdentification
+        # CcapCoreIdentification
         pkt, msg = self.construct_eds_pkt_CcapCoreIdentification(False, aw_type)
         pkt_handler(msg, slave, pkt)
 
@@ -734,11 +815,11 @@ class TestOrchestrator(unittest.TestCase):
             print 'session init fail'
             return
 
-        Cold_Reset  = 1
-        Warm_Reset  = 2
-        Standby     = 3
-        Wakeup  = 4
-        Power_Down  = 5
+        Cold_Reset = 1
+        Warm_Reset = 2
+        Standby = 3
+        Wakeup = 4
+        Power_Down = 5
         Power_Up = 6
         try:
             slave = self.slave_orchestrator.sessions_active.values()[0]
@@ -755,8 +836,66 @@ class TestOrchestrator(unittest.TestCase):
             pkt_handler(pkt, slave)
             pkt = self.construct_gdm_packet(Wakeup)
             pkt_handler(pkt, slave)
-        except Exception as e:
+        except Exception:
             pass
+
+    def test_handle_eds_pkt_core_ident_AW(self):
+        self.db = RCPDB()
+        coreIdentRecord = CcapCoreIdentification()
+        coreIdentRecord.Index = 0
+        coreIdentRecord.IsPrincipal = True
+        coreIdentRecord.CoreMode = 1
+        coreIdentRecord.CoreId = 'CoreId'
+        coreIdentRecord.CoreIpAddress = '127.0.0.1'
+        coreIdentRecord.CoreName = 'CoreName'
+        coreIdentRecord.VendorId = 9
+        coreIdentRecord.write()
+        self.slave_orchestrator.add_sessions([self.slave_desc])
+        if not len(self.slave_orchestrator.sessions_active):
+            print 'session init fail'
+            return
+        slave = self.slave_orchestrator.sessions_active.values()[0]
+        pkt_handler = self.slave_orchestrator.pkt_handler.handle_msg_eds_req
+
+        # read rpd capability
+        pkt, msg = self.construct_eds_pkt_redirect()
+        pkt_handler(msg, slave, pkt)
+
+        # write ssd
+        slave.ccap_identification = self.master_desc.capabilities
+        slave.ccap_identification.is_active = False
+        pkt, msg = self.construct_eds_pkt_write_ssd()
+        pkt_handler(msg, slave, pkt)
+
+        # Global, not active
+        pkt, msg = self.construct_eds_pkt_RpdGlobal()
+        pkt_handler(msg, slave, pkt)
+
+        # CcapCoreIdentification
+        pkt, msg = self.construct_eds_pkt_CcapCoreIdentification_AW(
+            TestOrchestrator.CORE_STATE_INIT)
+        pkt_handler(msg, slave, pkt)
+
+        pkt, msg = self.construct_eds_pkt_CcapCoreIdentification_AW(
+            TestOrchestrator.CORE_STATE_CFG_COMPLETE)
+        pkt_handler(msg, slave, pkt)
+
+        # configuration done
+        pkt, msg = self.construct_eds_pkt_RpdConfigurationDone()
+        pkt_handler(msg, slave, pkt)
+
+        # Global, principal and active
+        pkt, msg = self.construct_eds_pkt_RpdGlobal()
+        pkt_handler(msg, slave, pkt)
+
+        pkt, msg = self.construct_eds_pkt_CcapCoreIdentification_AW(
+            TestOrchestrator.CORE_STATE_MOVE_TO_OPTIONAL)
+        pkt_handler(msg, slave, pkt)
+        coreIdentRecord.index = 1
+        coreIdentRecord.read()
+        self.assertTrue((coreIdentRecord.index == 1))
+        self.assertEqual(coreIdentRecord.move_to_operational, True)
+
 
 if __name__ == '__main__':
     setup_logging("GCP", filename="rcp.log")

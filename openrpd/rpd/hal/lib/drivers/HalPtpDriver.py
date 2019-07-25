@@ -314,6 +314,8 @@ class HalPtpDriver(HalDriverClient):
     def config_rdti(self, cfg):
         rdti_config_data = t_RcpMessage()
         rdti_config_data.ParseFromString(cfg.msg.CfgMsgPayload)
+        rdti_config_data.RcpDataResult = t_RcpMessage.RCP_RESULT_OK
+        cfg.msg.CfgMsgPayload = rdti_config_data.SerializeToString()
         self.logger.debug(
             "Recv ptp configuration message, %s" % rdti_config_data)
         self.sendCfgRspMsg(cfg)

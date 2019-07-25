@@ -110,7 +110,6 @@ class HalClientManager(HalManager):
         super(HalClientManager, self).__init__(
             HalTransport.HalTransportClientMgr, poller)
 
-
     def handleRegisterRequest(self, register, test=False):
         """
         handle the client reigster request HalMessage, the process will be as following:
@@ -185,7 +184,6 @@ class HalClientManager(HalManager):
             ret = self.transport.send(regRsp.Serialize())
             if ret is False:
                 self.logger.error("Send client register response failed")
-
 
     def disconnectCb(self, agent):
         """This is he disconnect callback function from the agent. When some
@@ -386,10 +384,10 @@ class HalClientManager(HalManager):
 
         if error:
             ret = self.transport.send(HalMessage("HalAgentStatsRsp",
-                                           Rsp={
-                                               "Status": HalCommon_pb2.FAILED,
-                                               "ErrorDescription": msg
-                                           }).Serialize())
+                                                 Rsp={
+                                                     "Status": HalCommon_pb2.FAILED,
+                                                     "ErrorDescription": msg
+                                                 }).Serialize())
             if ret is False:
                 self.logger.error("Send hal agent statistics failure response failed")
 
@@ -426,12 +424,12 @@ class HalClientManager(HalManager):
             self.logger.error(
                 "Cannot set the module to level[%d], client:%s", level, clientID)
             ret = self.transport.send(HalMessage("HalSetLoggingLevelRsp",
-                                           ClientID=clientID,
-                                           Rsp={
-                                               "Status": HalCommon_pb2.FAILED,
-                                               "ErrorDescription": "Cannot set debug level since the debug level is "
-                                                                   "invalid"
-                                           }).Serialize())
+                                                 ClientID=clientID,
+                                                 Rsp={
+                                                     "Status": HalCommon_pb2.FAILED,
+                                                     "ErrorDescription": "Cannot set debug level since the debug level is "
+                                                     "invalid"
+                                                 }).Serialize())
             if ret is False:
                 self.logger.error("Send logging level invalid response failed")
 
@@ -442,11 +440,11 @@ class HalClientManager(HalManager):
                 module, clientID)
             self.logger.error(msg)
             ret = self.transport.send(HalMessage("HalSetLoggingLevelRsp",
-                                           ClientID=clientID,
-                                           Rsp={
-                                               "Status": HalCommon_pb2.FAILED,
-                                               "ErrorDescription": msg
-                                           }).Serialize())
+                                                 ClientID=clientID,
+                                                 Rsp={
+                                                     "Status": HalCommon_pb2.FAILED,
+                                                     "ErrorDescription": msg
+                                                 }).Serialize())
             if ret is False:
                 self.logger.error("Send logging module invalid response failed")
 
@@ -457,11 +455,11 @@ class HalClientManager(HalManager):
         logger.setLevel(level)
 
         ret = self.transport.send(HalMessage("HalSetLoggingLevelRsp",
-                                       ClientID=clientID,
-                                       Rsp={
-                                           "Status": HalCommon_pb2.SUCCESS,
-                                           "ErrorDescription": ""
-                                       }).Serialize())
+                                             ClientID=clientID,
+                                             Rsp={
+                                                 "Status": HalCommon_pb2.SUCCESS,
+                                                 "ErrorDescription": ""
+                                             }).Serialize())
         if ret is False:
             self.logger.error("Send logging level success response failed")
 

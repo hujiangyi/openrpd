@@ -117,7 +117,7 @@ class CmdRpd(cmd.Cmd, object):
             '|': {
                 'begin':
                     {'LINE': {}, self.cmd_attribute_prefix +
-                                 'LINE': ('Regular Expression', self.beg_pipe, cli_def.ADMIN_MODE)},
+                     'LINE': ('Regular Expression', self.beg_pipe, cli_def.ADMIN_MODE)},
 
                 self.cmd_attribute_prefix + 'begin':
                     ('Begin with the line that matches',
@@ -474,7 +474,7 @@ class CmdRpd(cmd.Cmd, object):
         for item in cmd_list:
             if isinstance(cur_tree[item[0]], dict) and \
                (self.get_cmd_mode(cur_tree, item[0]) &
-               cli_def.HIDDEN_MODE == 0) and \
+                cli_def.HIDDEN_MODE == 0) and \
                (self.get_cmd_mode(cur_tree, item[0]) == self.mode):
                 print '%-20s' % item[0], self.get_cmd_help(cur_tree, item[0])
 
@@ -538,7 +538,7 @@ class CmdRpd(cmd.Cmd, object):
                 # No command match, but there is one arg, it's an parameter
                 if arg_num == 1:
                     if pipeline_supported and \
-                                    self.get_cmd_func(cur_tree, arg) != None:
+                            self.get_cmd_func(cur_tree, arg) != None:
                         pipeline_ready = True
                     else:
                         pipeline_ready = False
@@ -741,7 +741,7 @@ class CmdRpd(cmd.Cmd, object):
                         pipeline_supported = True
 
                     if pipeline_supported and \
-                                    self.get_cmd_func(cur_tree, command) != None:
+                            self.get_cmd_func(cur_tree, command) != None:
                         pipeline_ready = True
                     else:
                         pipeline_ready = False
@@ -782,7 +782,7 @@ class CmdRpd(cmd.Cmd, object):
                     if arg_num == 1:
                         cmd_tree = cur_tree
                         if pipeline_supported and \
-                            self.get_cmd_func(cur_tree, arg) != None:
+                                self.get_cmd_func(cur_tree, arg) != None:
                             pipeline_ready = True
                         else:
                             pipeline_ready = False

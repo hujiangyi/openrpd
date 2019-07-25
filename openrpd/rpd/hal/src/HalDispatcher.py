@@ -121,6 +121,12 @@ class HalDispatcher(object):
 
         return 0
 
+    def get_available_rsp(self, rsp_list):
+        for rsp in rsp_list:
+            if rsp.msg.Rsp.Status == HalCommon_pb2.SUCCESS:
+                return rsp
+        return None
+
     def dispatchCfgRspMessage(self, sendAgent, rsp):
         """Dispatch the message from the dstClient. Rsp function will not check
         it's self since it's passive function in most cases.
@@ -152,12 +158,12 @@ class HalDispatcher(object):
 
         # save the configuration message
         agent.save_cfg_rsp_msg(seq, rsp)
-
+        self.logger.debug("Recv rsp cfg msg type: %d seq %d" % (rsp.msg.CfgMsgType, seq))
         # update the timeout processing
         ref_count, rsp_list = agent.removeFromRuntimeObjList(seq)
         if ref_count == 0:
             for rsp in rsp_list:
-                if rsp.msg.Rsp.Status != HalCommon_pb2.SUCCESS:
+                if rsp.msg.Rsp.Status != HalCommon_pb2.SUCCESS and rsp.msg.Rsp.Status != HalCommon_pb2.SUCCESS_IGNORE_RESULT:
                     self.logger.warn(
                         "Agent %s: seq %d, msg rsp failure found, send it to original sender.",
                         agent.clientID, seq)
@@ -170,7 +176,11 @@ class HalDispatcher(object):
                 self.logger.debug(
                     "Agent %s:seq %d, all the rsp messages are(is) good, send rsp to original sender.",
                     agent.clientID, seq)
-                rsp = rsp_list[0]
+                rsp = self.get_available_rsp(rsp_list)
+                if rsp is None:
+                    self.logger.debug("Not get available rsp")
+                    return
+                self.logger.debug("Send rsp to src client")
                 # send the msg to srcClient
                 agent.transportPush.send(rsp.Serialize())
                 # do some stats

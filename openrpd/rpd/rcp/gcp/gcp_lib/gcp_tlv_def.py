@@ -24,8 +24,8 @@ class GCPTLVAlreadyDefined(GCPInternalException):
 
 class TLVDescriptionSet(DescriptionSet):
 
-    def __init__(self, hierarchy_name="TLVBase"):
-        super(TLVDescriptionSet, self).__init__(hierarchy_name)
+    def __init__(self, hierarchy_name="TLVBase", id=0):
+        super(TLVDescriptionSet, self).__init__(hierarchy_name, id)
 
 
 class TLVDesc(TLVDescriptionSet, DataDescription):
@@ -79,7 +79,7 @@ class TLVDesc(TLVDescriptionSet, DataDescription):
             if DataDescription.RW_FLAG_row_key == self.TLV_rw_flag:
                 self.TLV_child_key_list.append((self.id, self.name))
 
-        self.desc_type=self.get_desc_type_inline()
+        self.desc_type = self.get_desc_type_inline()
 
     def has_child(self):
         return not not self.child_dict_by_name
@@ -143,12 +143,13 @@ class TLVDesc(TLVDescriptionSet, DataDescription):
 
     def insert_description(self, desc_id, desc_name, desc):
         TLVDescriptionSet.insert_description(self, desc_id, desc_name, desc)
-        self.desc_type=self.get_desc_type_inline()
+        self.desc_type = self.get_desc_type_inline()
 
     def update_descriptions(self, description_set):
         TLVDescriptionSet.update_descriptions(
             self, description_set=description_set)
-        self.desc_type=self.get_desc_type_inline()
+        self.desc_type = self.get_desc_type_inline()
+
 
 # global GCP TLV database
 GCP_TLV_SET = TLVDescriptionSet(hierarchy_name="GCP_TLVs")
@@ -160,6 +161,7 @@ class GCP_TLV(TLVDesc):
     Used to enforce usage of 1B long TLV length field for GCP TLVs.
 
     """
+
     def __init__(self, tlv_id, name, parent=GCP_TLV_SET,
                  format_str=None, length=None, constraint=None,
                  rw=DataDescription.RW_FLAG_rw):

@@ -53,6 +53,8 @@ MsgTypeUsOob552Perf = 2058
 MsgTypeNdrPerf = 2059
 MsgTypeSidQos = 2060
 MsgTypeIucCounter = 2061
+MsgTypeUsOfdmaDataIuc = 2062
+MsgTypeUsRfPort = 2063
 MsgTypeFftCfg = 2070
 MsgTypeUsOob55D1ChannelConfig = 2080
 
@@ -132,11 +134,13 @@ MsgTypeUsPhySubSyncDone = 8197
 MsgTypeRpdIpv6Info = 8198
 MsgTypeStaticPwStatus = 8199
 MsgTypeRpdState = 8200
+MsgTypeUcdRefreshNtf = 8201
 
 # Fault management message type
 MsgTypeFaultManagement = 8600
 MsgTypeRpdGlobal = 8601
 MsgTypetEventNotification = 8602
+MsgTypeRpdCtrl = 8603
 
 MsgTypeCiscoOIB = 8700
 
@@ -161,6 +165,7 @@ RCP_TO_HAL_MSG_TYPE = {
     'DsOob552Perf': MsgTypeDsOob552Perf,
     'NdfPerf': MsgTypeNdfPerf,
 
+    'UsRfPort': MsgTypeUsRfPort,
     'UsRfPortPerf': MsgTypeUsRfPortPerf,
     'UsScQamChannelConfig': MsgTypeUsScQamChannelConfig,
     'UsOfdmaChannelConfig': MsgTypeUsOfdmaChannelConfig,
@@ -168,6 +173,7 @@ RCP_TO_HAL_MSG_TYPE = {
     'UsOfdmaFineRangingIuc': MsgTypeUsOfdmaFineRangingIuc,
     'UsOfdmaDataRangingIuc': MsgTypeUsOfdmaDataRangingIuc,
     'UsOfdmaSubcarrierCfgState': MsgTypeUsOfdmaSubcarrierCfgState,
+    'UsOfdmaDataIuc': MsgTypeUsOfdmaDataIuc,
     'UsScQamChannelPerf': MsgTypeUsScQamChannelPerf,
     'UsOfdmaChannelPerf': MsgTypeUsOfdmaChannelPerf,
     'UsOob551IPerf': MsgTypeUsOob551IPerf,
@@ -190,6 +196,8 @@ RCP_TO_HAL_MSG_TYPE = {
     "RpdGroupInfo": MsgTypeRpdGroupInfo,
     "RequestRpdOutput": MsgTypeRequestRpdOutput,
     "StaticPwConfig": MsgTypeGcppToL2tp,
+
+    "RpdCtrl": MsgTypeRpdCtrl,
 }
 
 ####ssd api####

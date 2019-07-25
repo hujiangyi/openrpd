@@ -50,8 +50,7 @@ class ProvisionStateMachineRecord(object):
         :return:
         """
 
-        if SysTools.is_vrpd():
-            self.RPD_MAC = SysTools.get_mac_address(core_instance.interface)
+        self.RPD_MAC = SysTools.get_mac_address(core_instance.interface)
 
         ccap_core_id = core_instance.ccap_core_id
         added_by = core_instance.added_by
@@ -82,8 +81,3 @@ class ProvisionStateMachineRecord(object):
                                            "core-ip": core_instance.ccap_core_network_address,
                                            "mac": self.RPD_MAC, "src": event.src, "dst": event.dst,
                                            "event": event.event, "Added-By": added_by}})
-
-
-
-
-

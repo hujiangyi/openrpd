@@ -19,10 +19,10 @@
 """basic command for CLI"""
 import fcntl
 import os
-from datetime import datetime
-from getpass import getpass
 from cli import cli_framework_def as cli_def
 from cli import db_defs
+from datetime import datetime
+from getpass import getpass
 
 
 class BasicCli(object):
@@ -208,14 +208,20 @@ class BasicCli(object):
     def show_version(self):
         """'show version' cabllback."""
 
-        print "\nSystem uptime:"
-        os.system("uptime")
-
-        print "\nSystem CPU information:"
-        os.system("cat /proc/cpuinfo")
-
-        print "\nSystem memory information:"
-        os.system("cat /proc/meminfo | head -n 5")
+        if os.path.exists('/etc/rpd_image_info'):
+            print "OpenRPD v{0}.{1}.{2}{3} Software, RPD-OS version v{4}.{5}.{6}{7}, build by {8} on {9}"\
+                .format(self.rpd_info['OPENRPD_MAJOR_REV'],
+                        self.rpd_info['OPENRPD_MINOR_REV'],
+                        self.rpd_info['OPENRPD_PATCH_REV'],
+                        self.rpd_info['OPENRPD_REV_SUFFIX'],
+                        self.rpd_info['RPDOS_MAJOR_REV'],
+                        self.rpd_info['RPDOS_MINOR_REV'],
+                        self.rpd_info['RPDOS_PATCH_REV'],
+                        self.rpd_info['RPDOS_REV_SUFFIX'],
+                        self.rpd_info['RPD_BUILDER'],
+                        time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(self.rpd_info['RPD_BUILD_TIME']))))
+        else:
+            print "Warning! OpenRPD version information is missing!"
 
     def enable_admin_mode(self, test=False, pwd=''):
         """'enable' cabllback."""

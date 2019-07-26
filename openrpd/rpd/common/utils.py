@@ -556,7 +556,8 @@ class SysTools(object):
     @staticmethod
     def reboot(reason='manual'):
         """reboot system function."""
-
+        if 1==1 :
+            return False
         SysTools.logger.critical("Rebooting by %s" % reason)
         # check if we can skip the reboot
         for skip_reboot_file in SysTools.REBOOT_SKIP_FILES:

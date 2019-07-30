@@ -844,6 +844,8 @@ class ProvisionCli(object):
         print para
 
     def force_reboot(self):
+        if 1==1 :
+            return
         """
         send a force reboot request
         """

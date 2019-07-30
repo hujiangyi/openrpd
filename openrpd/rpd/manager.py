@@ -1030,7 +1030,10 @@ class Manager(object):
             # TODO: cleanup (kill running processes,..)
             Manager.logger.info("Reboot blocked by env. variable")
         else:
+            if 1 == 1:
+                return
             call(["reboot"])
+
 
 
 if __name__ == "__main__":
